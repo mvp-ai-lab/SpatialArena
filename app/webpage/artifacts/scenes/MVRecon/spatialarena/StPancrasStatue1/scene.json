@@ -1,0 +1,26 @@
+{
+ "task": "MVRecon",
+ "dataset": "spatialarena",
+ "scene": "StPancrasStatue1",
+ "gt_points": 60000,
+ "bounds": [
+  [
+   -36.24213409423828,
+   -58.02156448364258,
+   -7.23433780670166
+  ],
+  [
+   65.15629577636719,
+   59.48780059814453,
+   30.85475730895996
+  ]
+ ],
+ "error": {
+  "colormap": "turbo",
+  "vmin": 0.0,
+  "vmax": 0.1,
+  "eval_threshold": 0.05,
+  "label": "distance to the nearest GT point"
+ },
+ "gt_colors": true
+}

@@ -1,0 +1,26 @@
+{
+ "task": "MVRecon",
+ "dataset": "eth3d",
+ "scene": "delivery_area",
+ "gt_points": 60000,
+ "bounds": [
+  [
+   -54.247954221286605,
+   -10.232540805211281,
+   -4.941131881379285
+  ],
+  [
+   15.66539276315771,
+   37.64353741871355,
+   0.991640974720887
+  ]
+ ],
+ "error": {
+  "colormap": "turbo",
+  "vmin": 0.0,
+  "vmax": 0.5,
+  "eval_threshold": 0.25,
+  "label": "distance to the nearest GT point"
+ },
+ "gt_colors": true
+}

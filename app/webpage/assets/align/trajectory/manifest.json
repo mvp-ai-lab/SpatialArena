@@ -1,0 +1,174 @@
+{
+ "stride": 10,
+ "ransacIterations": 25,
+ "seed": 42,
+ "cauchyC": 2.3849,
+ "credits": {
+  "TUM RGB-D": "Sturm et al., IROS 2012, CC BY 4.0",
+  "SpatialArena": "SpatialArena captures, CC BY-NC 4.0"
+ },
+ "scenarios": [
+  {
+   "key": "noise",
+   "label": "Noise",
+   "scenario": "noise",
+   "level": 0.05,
+   "note": "Gaussian noise on every camera center (σ = 5 % of the extent), 1° on every orientation. Nothing is wrong, so every estimator should agree.",
+   "cases": [
+    "noise_0.json",
+    "noise_1.json",
+    "noise_2.json"
+   ],
+   "paper": {
+    "source": "real TUM RGB-D & 7-Scenes GT, 540 trials",
+    "umeyama": [
+     0.97,
+     null
+    ],
+    "dagsfm": [
+     0.98,
+     null
+    ],
+    "ours": [
+     0.98,
+     null
+    ]
+   }
+  },
+  {
+   "key": "outliers",
+   "label": "Outliers",
+   "scenario": "outliers",
+   "level": 0.45,
+   "note": "45 % of the frames replaced by random poses within twice the extent. A least-squares fit is dragged towards them and hides the error.",
+   "cases": [
+    "outliers_0.json",
+    "outliers_1.json",
+    "outliers_2.json"
+   ],
+   "paper": {
+    "source": "real TUM RGB-D & 7-Scenes GT, 540 trials",
+    "umeyama": [
+     0.38,
+     null
+    ],
+    "dagsfm": [
+     1.0,
+     null
+    ],
+    "ours": [
+     1.0,
+     null
+    ]
+   }
+  },
+  {
+   "key": "jump",
+   "label": "Tracking jump",
+   "scenario": "jump",
+   "level": 0.45,
+   "note": "Tracking lost: the last 45 % of the frames are offset by a rigid 20° / 0.3-extent jump. Fitting all frames splits the difference.",
+   "cases": [
+    "jump_0.json",
+    "jump_1.json",
+    "jump_2.json"
+   ],
+   "paper": {
+    "source": "real TUM RGB-D & 7-Scenes GT, 540 trials",
+    "umeyama": [
+     0.51,
+     null
+    ],
+    "dagsfm": [
+     1.0,
+     null
+    ],
+    "ours": [
+     1.0,
+     null
+    ]
+   }
+  },
+  {
+   "key": "rot_noise",
+   "label": "Rotation noise",
+   "scenario": "rot_noise",
+   "level": 30.0,
+   "note": "Accurate centers, orientations off by up to 30°. Fits that trust single-frame rotations (the previous default) inflate the ATE.",
+   "cases": [
+    "rot_noise_0.json",
+    "rot_noise_1.json",
+    "rot_noise_2.json"
+   ],
+   "paper": {
+    "source": "real TUM RGB-D & 7-Scenes GT, 540 trials",
+    "umeyama": [
+     0.99,
+     null
+    ],
+    "dagsfm": [
+     2.89,
+     null
+    ],
+    "ours": [
+     0.99,
+     null
+    ]
+   }
+  },
+  {
+   "key": "drift",
+   "label": "Drift",
+   "scenario": "drift",
+   "level": 0.1,
+   "note": "Odometry drift: every relative motion is perturbed and integrated. No subset of frames is right, so the answer must not depend on the RANSAC seed.",
+   "cases": [
+    "drift_0.json",
+    "drift_1.json",
+    "drift_2.json"
+   ],
+   "paper": {
+    "source": "synthetic, 120 trials",
+    "umeyama": [
+     0.34,
+     null
+    ],
+    "dagsfm": [
+     0.45,
+     null
+    ],
+    "ours": [
+     0.35,
+     null
+    ]
+   }
+  },
+  {
+   "key": "collinear",
+   "label": "Near-collinear",
+   "scenario": "outliers",
+   "level": 0.3,
+   "note": "A 100 m straight path (lateral deviation 0.1 % of its length) with 30 % outliers: roll about the path is invisible to camera centers.",
+   "cases": [
+    "collinear_0.json",
+    "collinear_1.json",
+    "collinear_2.json"
+   ],
+   "paper": {
+    "source": "synthetic ε = 1e-3, 30 trials",
+    "umeyama": [
+     null,
+     86.3
+    ],
+    "dagsfm": [
+     null,
+     0.0
+    ],
+    "ours": [
+     null,
+     0.0
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,368 @@
+method	task	dataset	variant	scene	status	detail
+DEJAVIEW	SLAM	7scenes	long	chess_seq-03	error	exit 1
+DEJAVIEW	SLAM	7scenes	long	chess_seq-05	error	exit 1
+DEJAVIEW	SLAM	7scenes	long	fire_seq-03	error	exit 1
+DEJAVIEW	SLAM	7scenes	long	fire_seq-04	error	exit 1
+DEJAVIEW	SLAM	7scenes	long	heads_seq-01	error	exit 1
+DEJAVIEW	SLAM	7scenes	long	office_seq-02	error	exit 1
+DEJAVIEW	SLAM	7scenes	long	office_seq-06	error	exit 1
+DEJAVIEW	SLAM	7scenes	long	office_seq-07	error	exit 1
+DEJAVIEW	SLAM	7scenes	long	office_seq-09	error	exit 1
+DEJAVIEW	SLAM	7scenes	long	pumpkin_seq-01	error	exit 1
+DEJAVIEW	SLAM	7scenes	long	pumpkin_seq-07	error	exit 1
+DEJAVIEW	SLAM	7scenes	long	redkitchen_seq-03	error	exit 1
+DEJAVIEW	SLAM	7scenes	long	redkitchen_seq-04	error	exit 1
+DEJAVIEW	SLAM	7scenes	long	redkitchen_seq-06	error	exit 1
+DEJAVIEW	SLAM	7scenes	long	redkitchen_seq-12	error	exit 1
+DEJAVIEW	SLAM	7scenes	long	redkitchen_seq-14	error	exit 1
+DEJAVIEW	SLAM	kitti_odometry	large	00	error	exit 1
+DEJAVIEW	SLAM	kitti_odometry	large	01	error	exit 1
+DEJAVIEW	SLAM	kitti_odometry	large	02	error	exit 1
+DEJAVIEW	SLAM	kitti_odometry	large	03	error	exit 1
+DEJAVIEW	SLAM	kitti_odometry	large	05	error	exit 1
+DEJAVIEW	SLAM	kitti_odometry	large	06	error	exit 1
+DEJAVIEW	SLAM	kitti_odometry	large	07	error	exit 1
+DEJAVIEW	SLAM	kitti_odometry	large	08	error	exit 1
+DEJAVIEW	SLAM	kitti_odometry	large	09	error	exit 1
+DEJAVIEW	SLAM	kitti_odometry	large	10	error	exit 1
+DEJAVIEW	SLAM	oxford_spires	short	bodleian-library-02	error	exit 1
+DEJAVIEW	SLAM	oxford_spires	short	christ-church-02	error	exit 1
+DEJAVIEW	SLAM	oxford_spires	short	christ-church-03	error	exit 1
+DEJAVIEW	SLAM	oxford_spires	short	christ-church-05	error	exit 1
+DEJAVIEW	SLAM	oxford_spires	short	keble-college-02	error	exit 1
+DEJAVIEW	SLAM	oxford_spires	short	keble-college-03	error	exit 1
+DEJAVIEW	SLAM	oxford_spires	short	keble-college-04	error	exit 1
+DEJAVIEW	SLAM	oxford_spires	short	keble-college-05	error	exit 1
+DEJAVIEW	SLAM	oxford_spires	short	observatory-quarter-01	error	exit 1
+DEJAVIEW	SLAM	oxford_spires	short	observatory-quarter-02	error	exit 1
+DEJAVIEW	SLAM	spatialarena	large	CambridgeWesthub3	error	exit 1
+DEJAVIEW	SLAM	spatialarena	large	CoalDropsYard2	gpu_oom	exit 1
+DEJAVIEW	SLAM	spatialarena	large	NationalHistoryMuseumIndoor1	error	exit 1
+DEJAVIEW	SLAM	spatialarena	long	ArtHouse	error	exit 1
+DEJAVIEW	SLAM	spatialarena	long	StPancrasOutside	error	exit 1
+DEJAVIEW	SLAM	spatialarena	short	CambridgeSmallGarden2	error	exit 1
+DEJAVIEW	SLAM	spatialarena	short	EdinburghCastle1	error	exit 1
+DEJAVIEW	SLAM	spatialarena	short	GridironBuildingFloor5	error	exit 1
+DEJAVIEW	SLAM	tum_dynamics	long	rgbd_dataset_freiburg2_desk_with_person	error	exit 1
+DEJAVIEW	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_sitting_halfsphere	error	exit 1
+DEJAVIEW	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_sitting_rpy	error	exit 1
+DEJAVIEW	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_sitting_static	error	exit 1
+DEJAVIEW	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_sitting_xyz	error	exit 1
+DEJAVIEW	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_walking_halfsphere	error	exit 1
+DEJAVIEW	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_walking_rpy	error	exit 1
+DEJAVIEW	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_walking_static	error	exit 1
+DEJAVIEW	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_walking_xyz	error	exit 1
+DEJAVIEW	SLAM	tum_dynamics	short	rgbd_dataset_freiburg2_desk_with_person	error	exit 1
+DEJAVIEW	SLAM	vbr	large	campus_train0	gpu_oom	exit 1
+DEJAVIEW	SLAM	vbr	large	campus_train1	gpu_oom	exit 1
+DEJAVIEW	SLAM	vbr	large	ciampino_train1	gpu_oom	exit 1
+DEJAVIEW	SLAM	vbr	large	colosseo_train0	gpu_oom	exit 1
+DEJAVIEW	SLAM	vbr	large	diag_train0	gpu_oom	exit 1
+DEJAVIEW	SLAM	vbr	large	pincio_train0	gpu_oom	exit 1
+DEJAVIEW	SLAM	vbr	large	spagna_train0	gpu_oom	exit 1
+DUST3R	SLAM	7scenes	long	chess_seq-03	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	chess_seq-05	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	fire_seq-03	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	fire_seq-04	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	heads_seq-01	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	office_seq-02	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	office_seq-06	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	office_seq-07	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	office_seq-09	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	pumpkin_seq-01	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	pumpkin_seq-07	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	redkitchen_seq-03	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	redkitchen_seq-04	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	redkitchen_seq-06	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	redkitchen_seq-12	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	redkitchen_seq-14	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	stairs_seq-01	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	long	stairs_seq-04	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	short	chess_seq-03	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	short	chess_seq-05	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	short	fire_seq-03	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	short	fire_seq-04	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	short	heads_seq-01	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	short	office_seq-02	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	short	office_seq-06	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	short	office_seq-07	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	short	office_seq-09	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	short	pumpkin_seq-01	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	short	pumpkin_seq-07	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	short	redkitchen_seq-03	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	short	redkitchen_seq-04	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	short	redkitchen_seq-06	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	short	redkitchen_seq-12	killed_unknown	exit 137
+DUST3R	SLAM	7scenes	short	redkitchen_seq-14	killed_unknown	exit 137
+DUST3R	SLAM	kitti_odometry	large	00	killed_unknown	exit 137
+DUST3R	SLAM	kitti_odometry	large	01	killed_unknown	exit 137
+DUST3R	SLAM	kitti_odometry	large	02	killed_unknown	exit 137
+DUST3R	SLAM	kitti_odometry	large	03	killed_unknown	exit 137
+DUST3R	SLAM	kitti_odometry	large	04	killed_unknown	exit 137
+DUST3R	SLAM	kitti_odometry	large	05	killed_unknown	exit 137
+DUST3R	SLAM	kitti_odometry	large	06	killed_unknown	exit 137
+DUST3R	SLAM	kitti_odometry	large	07	killed_unknown	exit 137
+DUST3R	SLAM	kitti_odometry	large	08	killed_unknown	exit 137
+DUST3R	SLAM	kitti_odometry	large	09	killed_unknown	exit 137
+DUST3R	SLAM	kitti_odometry	large	10	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	large	bodleian-library-02	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	large	christ-church-02	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	large	christ-church-03	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	large	christ-church-05	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	large	keble-college-02	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	large	keble-college-03	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	large	keble-college-04	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	large	keble-college-05	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	large	observatory-quarter-01	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	large	observatory-quarter-02	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	short	bodleian-library-02	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	short	christ-church-02	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	short	christ-church-03	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	short	christ-church-05	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	short	keble-college-02	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	short	keble-college-03	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	short	keble-college-04	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	short	keble-college-05	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	short	observatory-quarter-01	killed_unknown	exit 137
+DUST3R	SLAM	oxford_spires	short	observatory-quarter-02	killed_unknown	exit 137
+DUST3R	SLAM	spatialarena	large	CambridgeWesthub3	killed_unknown	exit 137
+DUST3R	SLAM	spatialarena	large	CoalDropsYard2	killed_unknown	exit 137
+DUST3R	SLAM	spatialarena	large	NationalHistoryMuseumIndoor1	killed_unknown	exit 137
+DUST3R	SLAM	spatialarena	long	ArtHouse	killed_unknown	exit 137
+DUST3R	SLAM	spatialarena	long	StPancrasOutside	killed_unknown	exit 137
+DUST3R	SLAM	spatialarena	short	CambridgeSmallGarden2	killed_unknown	exit 137
+DUST3R	SLAM	spatialarena	short	EdinburghCastle1	killed_unknown	exit 137
+DUST3R	SLAM	spatialarena	short	GridironBuildingFloor5	killed_unknown	exit 137
+DUST3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg2_desk_with_person	killed_unknown	exit 137
+DUST3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_sitting_halfsphere	killed_unknown	exit 137
+DUST3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_sitting_rpy	killed_unknown	exit 137
+DUST3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_sitting_static	killed_unknown	exit 137
+DUST3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_sitting_xyz	killed_unknown	exit 137
+DUST3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_walking_halfsphere	killed_unknown	exit 137
+DUST3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_walking_rpy	killed_unknown	exit 137
+DUST3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_walking_static	killed_unknown	exit 137
+DUST3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_walking_xyz	killed_unknown	exit 137
+DUST3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg2_desk_with_person	killed_unknown	exit 137
+DUST3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_sitting_halfsphere	killed_unknown	exit 137
+DUST3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_sitting_rpy	gpu_oom	exit 1
+DUST3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_sitting_static	gpu_oom	exit 1
+DUST3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_sitting_xyz	killed_unknown	exit 137
+DUST3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_walking_halfsphere	killed_unknown	exit 137
+DUST3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_walking_rpy	killed_unknown	exit 137
+DUST3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_walking_static	gpu_oom	exit 1
+DUST3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_walking_xyz	killed_unknown	exit 137
+DUST3R	SLAM	vbr	large	campus_train0	killed_unknown	exit 137
+DUST3R	SLAM	vbr	large	campus_train1	killed_unknown	exit 137
+DUST3R	SLAM	vbr	large	ciampino_train1	killed_unknown	exit 137
+DUST3R	SLAM	vbr	large	colosseo_train0	killed_unknown	exit 137
+DUST3R	SLAM	vbr	large	diag_train0	killed_unknown	exit 137
+DUST3R	SLAM	vbr	large	pincio_train0	killed_unknown	exit 137
+DUST3R	SLAM	vbr	large	spagna_train0	killed_unknown	exit 137
+GENCEPTION_POSE	SLAM	7scenes	short	chess_seq-03	unsupported_sequence_length	100 frames > 81
+GENCEPTION_POSE	SLAM	7scenes	short	chess_seq-05	unsupported_sequence_length	100 frames > 81
+GENCEPTION_POSE	SLAM	7scenes	short	fire_seq-03	unsupported_sequence_length	100 frames > 81
+GENCEPTION_POSE	SLAM	7scenes	short	fire_seq-04	unsupported_sequence_length	100 frames > 81
+GENCEPTION_POSE	SLAM	7scenes	short	heads_seq-01	unsupported_sequence_length	100 frames > 81
+GENCEPTION_POSE	SLAM	7scenes	short	office_seq-02	unsupported_sequence_length	100 frames > 81
+GENCEPTION_POSE	SLAM	7scenes	short	office_seq-06	unsupported_sequence_length	100 frames > 81
+GENCEPTION_POSE	SLAM	7scenes	short	office_seq-07	unsupported_sequence_length	100 frames > 81
+GENCEPTION_POSE	SLAM	7scenes	short	office_seq-09	unsupported_sequence_length	100 frames > 81
+GENCEPTION_POSE	SLAM	7scenes	short	pumpkin_seq-01	unsupported_sequence_length	100 frames > 81
+GENCEPTION_POSE	SLAM	7scenes	short	pumpkin_seq-07	unsupported_sequence_length	100 frames > 81
+GENCEPTION_POSE	SLAM	7scenes	short	redkitchen_seq-03	unsupported_sequence_length	100 frames > 81
+GENCEPTION_POSE	SLAM	7scenes	short	redkitchen_seq-04	unsupported_sequence_length	100 frames > 81
+GENCEPTION_POSE	SLAM	7scenes	short	redkitchen_seq-06	unsupported_sequence_length	100 frames > 81
+GENCEPTION_POSE	SLAM	7scenes	short	redkitchen_seq-12	unsupported_sequence_length	100 frames > 81
+GENCEPTION_POSE	SLAM	7scenes	short	redkitchen_seq-14	unsupported_sequence_length	100 frames > 81
+GENCEPTION_POSE	SLAM	oxford_spires	short	bodleian-library-02	unsupported_sequence_length	320 frames > 81
+GENCEPTION_POSE	SLAM	oxford_spires	short	christ-church-02	unsupported_sequence_length	319 frames > 81
+GENCEPTION_POSE	SLAM	oxford_spires	short	christ-church-03	unsupported_sequence_length	320 frames > 81
+GENCEPTION_POSE	SLAM	oxford_spires	short	christ-church-05	unsupported_sequence_length	320 frames > 81
+GENCEPTION_POSE	SLAM	oxford_spires	short	keble-college-02	unsupported_sequence_length	320 frames > 81
+GENCEPTION_POSE	SLAM	oxford_spires	short	keble-college-03	unsupported_sequence_length	320 frames > 81
+GENCEPTION_POSE	SLAM	oxford_spires	short	keble-college-04	unsupported_sequence_length	320 frames > 81
+GENCEPTION_POSE	SLAM	oxford_spires	short	keble-college-05	unsupported_sequence_length	320 frames > 81
+GENCEPTION_POSE	SLAM	oxford_spires	short	observatory-quarter-01	unsupported_sequence_length	320 frames > 81
+GENCEPTION_POSE	SLAM	oxford_spires	short	observatory-quarter-02	unsupported_sequence_length	320 frames > 81
+GENCEPTION_POSE	SLAM	spatialarena	short	CambridgeSmallGarden2	unsupported_sequence_length	325 frames > 81
+GENCEPTION_POSE	SLAM	spatialarena	short	EdinburghCastle1	unsupported_sequence_length	265 frames > 81
+GENCEPTION_POSE	SLAM	spatialarena	short	GridironBuildingFloor5	unsupported_sequence_length	328 frames > 81
+GENCEPTION_POSE	SLAM	tum_dynamics	short	rgbd_dataset_freiburg2_desk_with_person	unsupported_sequence_length	364 frames > 81
+GENCEPTION_POSE	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_sitting_halfsphere	unsupported_sequence_length	107 frames > 81
+GENCEPTION_POSE	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_sitting_xyz	unsupported_sequence_length	122 frames > 81
+GENCEPTION_POSE	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_walking_halfsphere	unsupported_sequence_length	102 frames > 81
+GENCEPTION_POSE	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_walking_rpy	unsupported_sequence_length	87 frames > 81
+GENCEPTION_POSE	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_walking_xyz	unsupported_sequence_length	83 frames > 81
+IGGT4D	SLAM	kitti_odometry	large	00	gpu_oom	exit 1
+IGGT4D	SLAM	kitti_odometry	large	01	gpu_oom	exit 1
+IGGT4D	SLAM	kitti_odometry	large	02	gpu_oom	exit 1
+IGGT4D	SLAM	kitti_odometry	large	05	gpu_oom	exit 1
+IGGT4D	SLAM	kitti_odometry	large	06	gpu_oom	exit 1
+IGGT4D	SLAM	kitti_odometry	large	07	gpu_oom	exit 1
+IGGT4D	SLAM	kitti_odometry	large	08	gpu_oom	exit 1
+IGGT4D	SLAM	kitti_odometry	large	09	gpu_oom	exit 1
+IGGT4D	SLAM	kitti_odometry	large	10	gpu_oom	exit 1
+IGGT4D	SLAM	oxford_spires	large	bodleian-library-02	gpu_oom	exit 1
+IGGT4D	SLAM	oxford_spires	large	christ-church-02	gpu_oom	exit 1
+IGGT4D	SLAM	oxford_spires	large	christ-church-03	gpu_oom	exit 1
+IGGT4D	SLAM	oxford_spires	large	christ-church-05	gpu_oom	exit 1
+IGGT4D	SLAM	oxford_spires	large	keble-college-02	gpu_oom	exit 1
+IGGT4D	SLAM	oxford_spires	large	keble-college-03	gpu_oom	exit 1
+IGGT4D	SLAM	oxford_spires	large	keble-college-04	gpu_oom	exit 1
+IGGT4D	SLAM	oxford_spires	large	keble-college-05	gpu_oom	exit 1
+IGGT4D	SLAM	oxford_spires	large	observatory-quarter-01	gpu_oom	exit 1
+IGGT4D	SLAM	oxford_spires	large	observatory-quarter-02	gpu_oom	exit 1
+IGGT4D	SLAM	spatialarena	large	CambridgeWesthub3	gpu_oom	exit 1
+IGGT4D	SLAM	spatialarena	large	CoalDropsYard2	gpu_oom	exit 1
+IGGT4D	SLAM	spatialarena	large	NationalHistoryMuseumIndoor1	gpu_oom	exit 1
+IGGT4D	SLAM	spatialarena	long	ArtHouse	gpu_oom	exit 1
+IGGT4D	SLAM	tum_dynamics	long	rgbd_dataset_freiburg2_desk_with_person	gpu_oom	exit 1
+IGGT4D	SLAM	vbr	large	campus_train0	gpu_oom	exit 1
+IGGT4D	SLAM	vbr	large	campus_train1	gpu_oom	exit 1
+IGGT4D	SLAM	vbr	large	ciampino_train1	gpu_oom	exit 1
+IGGT4D	SLAM	vbr	large	colosseo_train0	gpu_oom	exit 1
+IGGT4D	SLAM	vbr	large	diag_train0	gpu_oom	exit 1
+IGGT4D	SLAM	vbr	large	pincio_train0	gpu_oom	exit 1
+IGGT4D	SLAM	vbr	large	spagna_train0	gpu_oom	exit 1
+MAPANYTHING	SLAM	kitti_odometry	large	00	gpu_oom	exit 1
+MAPANYTHING	SLAM	kitti_odometry	large	02	gpu_oom	exit 1
+MAPANYTHING	SLAM	kitti_odometry	large	05	gpu_oom	exit 1
+MAPANYTHING	SLAM	kitti_odometry	large	08	gpu_oom	exit 1
+MAPANYTHING	SLAM	kitti_odometry	large	09	gpu_oom	exit 1
+MAPANYTHING	SLAM	oxford_spires	large	bodleian-library-02	gpu_oom	exit 1
+MAPANYTHING	SLAM	oxford_spires	large	christ-church-02	gpu_oom	exit 1
+MAPANYTHING	SLAM	oxford_spires	large	christ-church-03	gpu_oom	exit 1
+MAPANYTHING	SLAM	oxford_spires	large	christ-church-05	gpu_oom	exit 1
+MAPANYTHING	SLAM	oxford_spires	large	keble-college-02	gpu_oom	exit 1
+MAPANYTHING	SLAM	oxford_spires	large	keble-college-03	gpu_oom	exit 1
+MAPANYTHING	SLAM	oxford_spires	large	keble-college-04	gpu_oom	exit 1
+MAPANYTHING	SLAM	oxford_spires	large	keble-college-05	gpu_oom	exit 1
+MAPANYTHING	SLAM	oxford_spires	large	observatory-quarter-01	gpu_oom	exit 1
+MAPANYTHING	SLAM	oxford_spires	large	observatory-quarter-02	gpu_oom	exit 1
+MAPANYTHING	SLAM	spatialarena	large	CambridgeWesthub3	gpu_oom	exit 1
+MAPANYTHING	SLAM	spatialarena	large	CoalDropsYard2	gpu_oom	exit 1
+MAPANYTHING	SLAM	spatialarena	large	NationalHistoryMuseumIndoor1	gpu_oom	exit 1
+MAPANYTHING	SLAM	vbr	large	campus_train0	gpu_oom	exit 1
+MAPANYTHING	SLAM	vbr	large	campus_train1	gpu_oom	exit 1
+MAPANYTHING	SLAM	vbr	large	ciampino_train1	host_oom	exit 137
+MAPANYTHING	SLAM	vbr	large	colosseo_train0	gpu_oom	exit 1
+MAPANYTHING	SLAM	vbr	large	diag_train0	gpu_oom	exit 1
+MAPANYTHING	SLAM	vbr	large	pincio_train0	gpu_oom	exit 1
+MAPANYTHING	SLAM	vbr	large	spagna_train0	gpu_oom	exit 1
+MAST3R	SLAM	7scenes	short	fire_seq-04	gpu_oom	exit 1
+MAST3R	SLAM	oxford_spires	short	bodleian-library-02	killed_unknown	exit 137
+MAST3R	SLAM	oxford_spires	short	christ-church-02	gpu_oom	exit 1
+MAST3R	SLAM	oxford_spires	short	christ-church-03	host_oom	exit 137
+MAST3R	SLAM	oxford_spires	short	christ-church-05	host_oom	exit 137
+MAST3R	SLAM	oxford_spires	short	keble-college-02	host_oom	exit 137
+MAST3R	SLAM	oxford_spires	short	keble-college-03	host_oom	exit 137
+MAST3R	SLAM	oxford_spires	short	keble-college-04	host_oom	exit 137
+MAST3R	SLAM	oxford_spires	short	keble-college-05	error	exit 1
+MAST3R	SLAM	oxford_spires	short	observatory-quarter-01	error	exit 1
+MAST3R	SLAM	oxford_spires	short	observatory-quarter-02	error	exit 1
+MAST3R	SLAM	spatialarena	long	ArtHouse	cache_disk_capacity	exit 1
+MAST3R	SLAM	spatialarena	long	StPancrasOutside	cache_disk_capacity	exit 1
+MAST3R	SLAM	spatialarena	short	CambridgeSmallGarden2	host_oom	exit 137
+MAST3R	SLAM	spatialarena	short	EdinburghCastle1	host_oom	exit 137
+MAST3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg2_desk_with_person	host_oom	exit 137
+MAST3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_sitting_halfsphere	gpu_oom	exit 1
+MAST3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_sitting_xyz	gpu_oom	exit 1
+MAST3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_walking_halfsphere	gpu_oom	exit 1
+POW3R	SLAM	7scenes	long	chess_seq-03	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	chess_seq-05	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	fire_seq-03	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	fire_seq-04	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	heads_seq-01	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	office_seq-02	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	office_seq-06	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	office_seq-07	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	office_seq-09	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	pumpkin_seq-01	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	pumpkin_seq-07	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	redkitchen_seq-03	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	redkitchen_seq-04	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	redkitchen_seq-06	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	redkitchen_seq-12	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	redkitchen_seq-14	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	stairs_seq-01	killed_unknown	exit 137
+POW3R	SLAM	7scenes	long	stairs_seq-04	killed_unknown	exit 137
+POW3R	SLAM	7scenes	short	chess_seq-03	killed_unknown	exit 137
+POW3R	SLAM	7scenes	short	chess_seq-05	killed_unknown	exit 137
+POW3R	SLAM	7scenes	short	fire_seq-03	killed_unknown	exit 137
+POW3R	SLAM	7scenes	short	fire_seq-04	killed_unknown	exit 137
+POW3R	SLAM	7scenes	short	heads_seq-01	killed_unknown	exit 137
+POW3R	SLAM	7scenes	short	office_seq-02	killed_unknown	exit 137
+POW3R	SLAM	7scenes	short	office_seq-06	killed_unknown	exit 137
+POW3R	SLAM	7scenes	short	office_seq-07	killed_unknown	exit 137
+POW3R	SLAM	7scenes	short	office_seq-09	killed_unknown	exit 137
+POW3R	SLAM	7scenes	short	pumpkin_seq-01	killed_unknown	exit 137
+POW3R	SLAM	7scenes	short	pumpkin_seq-07	killed_unknown	exit 137
+POW3R	SLAM	7scenes	short	redkitchen_seq-03	killed_unknown	exit 137
+POW3R	SLAM	7scenes	short	redkitchen_seq-04	killed_unknown	exit 137
+POW3R	SLAM	7scenes	short	redkitchen_seq-06	killed_unknown	exit 137
+POW3R	SLAM	7scenes	short	redkitchen_seq-12	killed_unknown	exit 137
+POW3R	SLAM	7scenes	short	redkitchen_seq-14	killed_unknown	exit 137
+POW3R	SLAM	kitti_odometry	large	00	killed_unknown	exit 137
+POW3R	SLAM	kitti_odometry	large	01	killed_unknown	exit 137
+POW3R	SLAM	kitti_odometry	large	02	killed_unknown	exit 137
+POW3R	SLAM	kitti_odometry	large	03	killed_unknown	exit 137
+POW3R	SLAM	kitti_odometry	large	04	killed_unknown	exit 137
+POW3R	SLAM	kitti_odometry	large	05	killed_unknown	exit 137
+POW3R	SLAM	kitti_odometry	large	06	killed_unknown	exit 137
+POW3R	SLAM	kitti_odometry	large	07	killed_unknown	exit 137
+POW3R	SLAM	kitti_odometry	large	08	killed_unknown	exit 137
+POW3R	SLAM	kitti_odometry	large	09	killed_unknown	exit 137
+POW3R	SLAM	kitti_odometry	large	10	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	large	bodleian-library-02	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	large	christ-church-02	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	large	christ-church-03	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	large	christ-church-05	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	large	keble-college-02	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	large	keble-college-03	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	large	keble-college-04	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	large	keble-college-05	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	large	observatory-quarter-01	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	large	observatory-quarter-02	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	short	bodleian-library-02	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	short	christ-church-02	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	short	christ-church-03	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	short	christ-church-05	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	short	keble-college-02	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	short	keble-college-03	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	short	keble-college-04	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	short	keble-college-05	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	short	observatory-quarter-01	killed_unknown	exit 137
+POW3R	SLAM	oxford_spires	short	observatory-quarter-02	killed_unknown	exit 137
+POW3R	SLAM	spatialarena	large	CambridgeWesthub3	killed_unknown	exit 137
+POW3R	SLAM	spatialarena	large	CoalDropsYard2	killed_unknown	exit 137
+POW3R	SLAM	spatialarena	large	NationalHistoryMuseumIndoor1	killed_unknown	exit 137
+POW3R	SLAM	spatialarena	long	ArtHouse	killed_unknown	exit 137
+POW3R	SLAM	spatialarena	long	StPancrasOutside	killed_unknown	exit 137
+POW3R	SLAM	spatialarena	short	CambridgeSmallGarden2	killed_unknown	exit 137
+POW3R	SLAM	spatialarena	short	EdinburghCastle1	killed_unknown	exit 137
+POW3R	SLAM	spatialarena	short	GridironBuildingFloor5	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg2_desk_with_person	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_sitting_halfsphere	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_sitting_rpy	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_sitting_static	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_sitting_xyz	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_walking_halfsphere	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_walking_rpy	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_walking_static	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_walking_xyz	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg2_desk_with_person	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_sitting_halfsphere	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_sitting_rpy	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_sitting_static	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_sitting_xyz	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_walking_halfsphere	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_walking_rpy	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_walking_static	killed_unknown	exit 137
+POW3R	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_walking_xyz	killed_unknown	exit 137
+POW3R	SLAM	vbr	large	campus_train0	killed_unknown	exit 137
+POW3R	SLAM	vbr	large	campus_train1	killed_unknown	exit 137
+POW3R	SLAM	vbr	large	ciampino_train1	killed_unknown	exit 137
+POW3R	SLAM	vbr	large	colosseo_train0	killed_unknown	exit 137
+POW3R	SLAM	vbr	large	diag_train0	killed_unknown	exit 137
+POW3R	SLAM	vbr	large	pincio_train0	killed_unknown	exit 137
+POW3R	SLAM	vbr	large	spagna_train0	killed_unknown	exit 137

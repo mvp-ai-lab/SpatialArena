@@ -1,0 +1,20 @@
+{
+ "task": "VideoDepth",
+ "dataset": "dycheck",
+ "scene": "apple",
+ "size": {
+  "height": 480,
+  "width": 360
+ },
+ "depth_range": [
+  0.19625162601470947,
+  1.5452681446075407
+ ],
+ "depth_colormap": "Spectral",
+ "error": {
+  "colormap": "turbo",
+  "vmin": 0.0,
+  "vmax": 0.25,
+  "label": "|aligned - gt| / gt"
+ }
+}

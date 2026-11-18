@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<!-- Copyright (c) 2026 Yu Chen. All rights reserved. -->
+<!-- SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0 -->
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpatialArena</title>
+    <link rel="icon" type="image/svg+xml" href="assets/logo/spatialarena.svg">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/benchmark.css">
+    <link rel="stylesheet" href="css/site.css">
+    <link rel="stylesheet" href="css/compare.css">
+    <link rel="stylesheet" href="css/home.css">
+    <script>
+        (function () {
+            let theme = null;
+            try { theme = localStorage.getItem("benchmark-dashboard-theme"); } catch (_error) { theme = null; }
+            if (!theme) theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+            document.documentElement.setAttribute("data-theme", theme);
+        })();
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <nav class="navbar" aria-label="Benchmark views">
+        <div class="navbar-container">
+            <a class="navbar-logo" href="#home" data-benchmark-home aria-label="SpatialArena home">
+                <span class="navbar-logo-icon"><svg class="navbar-logo-mark" viewBox="0 0 32 32" width="34" height="34" aria-hidden="true"><defs><linearGradient id="sa-logo-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4361ee"/><stop offset="0.55" stop-color="#7b3fe4"/><stop offset="1" stop-color="#f72585"/></linearGradient></defs><g fill="url(#sa-logo-grad)"><path fill-rule="evenodd" d="M2.2 27.2V7.1C6.6 5.6 11.6 5.0 17.2 5.2V7.6L21.8 7.6V12.6L26.0 12.6V18.9L29.8 18.9V27.2C21 28.9 11 28.9 2.2 27.2ZM4.10 25.00V20.90A1.30 1.30 0 0 1 6.70 20.90V25.00ZM8.60 25.00V21.10A1.50 1.50 0 0 1 11.60 21.10V25.00ZM13.30 25.00V21.20A1.60 1.60 0 0 1 16.50 21.20V25.00ZM18.00 25.00V21.20A1.60 1.60 0 0 1 21.20 21.20V25.00ZM22.60 25.00V21.10A1.50 1.50 0 0 1 25.60 21.10V25.00ZM26.60 25.00V20.80A1.20 1.20 0 0 1 29.00 20.80V25.00ZM4.10 18.00V14.70A1.30 1.30 0 0 1 6.70 14.70V18.00ZM8.60 18.00V14.90A1.50 1.50 0 0 1 11.60 14.90V18.00ZM13.30 18.00V15.00A1.60 1.60 0 0 1 16.50 15.00V18.00ZM18.00 18.00V15.00A1.60 1.60 0 0 1 21.20 15.00V18.00ZM22.60 18.00V14.90A1.50 1.50 0 0 1 25.60 14.90V18.00ZM4.10 12.00V9.70A1.30 1.30 0 0 1 6.70 9.70V12.00ZM8.60 12.00V9.90A1.50 1.50 0 0 1 11.60 9.90V12.00ZM13.30 12.00V10.00A1.60 1.60 0 0 1 16.50 10.00V12.00ZM18.00 12.00V10.00A1.60 1.60 0 0 1 21.20 10.00V12.00ZM4.6 6.9h1.4v0.9h-1.4ZM7.6 6.9h1.4v0.9h-1.4ZM10.6 6.9h1.4v0.9h-1.4ZM13.6 6.9h1.4v0.9h-1.4Z"/><path d="M2.2 27.2C11 28.9 21 28.9 29.8 27.2V28.4C21 30.2 11 30.2 2.2 28.4Z" opacity="0.55"/></g></svg></span>
+                <span class="navbar-logo-text">SpatialArena</span>
+            </a>
+            <div class="navbar-menu" role="tablist">
+                <a href="#overview" class="navbar-link" data-benchmark-view="overview" role="tab" aria-selected="false" aria-controls="benchmark-view-overview">
+                    <i class="fas fa-chart-line"></i> Overview
+                </a>
+                <a href="#leaderboard" class="navbar-link" data-benchmark-view="leaderboard" role="tab" aria-selected="false" aria-controls="benchmark-view-leaderboard">
+                    <i class="fas fa-medal"></i> Leaderboard
+                </a>
+                <a href="#artifacts" class="navbar-link" data-benchmark-view="artifacts" role="tab" aria-selected="false" aria-controls="benchmark-view-artifacts">
+                    <i class="fas fa-images"></i> Artifact Viewer
+                </a>
+                <a href="#download" class="navbar-link" data-benchmark-view="download" role="tab" aria-selected="false" aria-controls="benchmark-view-download">
+                    <i class="fas fa-download"></i> Download
+                </a>
+            </div>
+            <div class="navbar-actions">
+                <div class="theme-switch-wrapper">
+                    <div class="theme-switch">
+                        <input type="checkbox" id="theme-toggle">
+                        <label for="theme-toggle" aria-label="Toggle dark mode">
+                            <i class="fas fa-sun"></i>
+                            <i class="fas fa-moon"></i>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div class="dashboard-shell">
+
+        <main id="benchmark" class="benchmark-app">
+            <section id="benchmark-view-home" class="benchmark-view-panel active home" role="tabpanel">
+                <nav class="home-dots" id="home-dots" aria-label="Home slides"></nav>
+
+                <section class="home-slide home-slide-hero" data-slide-title="SpatialArena">
+                    <div class="home-hero-scene" id="home-hero-scene">
+                        <canvas aria-label="3D LiDAR map of a SpatialArena scene. Drag to orbit, right-drag to pan, Ctrl or Cmd and scroll to zoom."></canvas>
+                        <div class="home-hero-shade" aria-hidden="true"></div>
+                        <div class="home-hero-loader" id="home-hero-loader" role="status" aria-live="polite">
+                            <span class="home-hero-loader-text">Loading the scene…</span>
+                            <span class="home-hero-loader-bar"><i></i></span>
+                        </div>
+                        <div class="home-hero-tools">
+                            <p class="home-hero-caption" id="home-hero-caption"></p>
+                            <p class="home-hero-hint">Drag to orbit · right-drag to pan · Ctrl/⌘ + scroll to zoom</p>
+                            <div class="home-hero-buttons">
+                                <button type="button" id="home-hero-zoom-in" aria-label="Zoom in"><i class="fas fa-plus" aria-hidden="true"></i></button>
+                                <button type="button" id="home-hero-zoom-out" aria-label="Zoom out"><i class="fas fa-minus" aria-hidden="true"></i></button>
+                                <button type="button" id="home-hero-reset" aria-label="Reset the view"><i class="fas fa-rotate-left" aria-hidden="true"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="home-slide-inner">
+                    <header class="home-hero">
+                        <p class="home-eyebrow">A benchmark for geometric foundation models</p>
+                        <h1 class="home-title">SpatialArena</h1>
+                        <p class="home-lead">
+                            Monocular depth networks, feed-forward 3D/4D models, long-sequence SLAM systems and
+                            vision&ndash;language models, scored on the same data, with the same metrics, under the same rules.
+                        </p>
+                        <div class="home-actions">
+                            <a class="home-button home-button-primary" href="#leaderboard"><i class="fas fa-medal" aria-hidden="true"></i> Leaderboard</a>
+                            <a class="home-button" href="#download"><i class="fas fa-download" aria-hidden="true"></i> Download data</a>
+                            <a class="home-button" href="#artifacts"><i class="fas fa-images" aria-hidden="true"></i> Artifact viewer</a>
+                            <button type="button" class="home-button" data-home-scroll="home-get-started"><i class="fas fa-terminal" aria-hidden="true"></i> Evaluate your model</button>
+                        </div>
+                        <!-- The author list is hidden for now: remove `hidden` to show it again. -->
+                        <div class="home-authors" aria-label="Authors" hidden>
+                            <p class="home-author-list">
+                            <span class="home-author"><a href="https://aibluefisher.github.io/" target="_blank" rel="noopener">Yu Chen</a><sup title="Project leader">&dagger;</sup></span>
+                            <span class="home-author"><a href="https://happy-hsy.github.io/" target="_blank" rel="noopener">Haosen Yang</a></span>
+                            <span class="home-author"><a href="https://openreview.net/profile?id=~Su_Ee_Tan1" target="_blank" rel="noopener">Su Ee Tan</a></span>
+                            <span class="home-author"><a href="https://zhangzhensong.github.io/" target="_blank" rel="noopener">Zhensong Zhang</a></span>
+                            <span class="home-author"><a href="https://scholar.google.com/citations?user=9a1PjCIAAAAJ&amp;hl=en" target="_blank" rel="noopener">Jifei Song</a></span>
+                            <span class="home-author"><a href="https://jiankangdeng.github.io/" target="_blank" rel="noopener">Jiankang Deng</a><sup title="Corresponding author">&#9993;</sup></span>
+                            </p>
+                            <p class="home-affiliation"><img class="home-affiliation-logo" src="assets/logos/mvp_lab.png" alt="" width="22" height="22"> MVP Lab</p>
+                            <p class="home-author-notes"><span><sup>&dagger;</sup> Project leader</span><span><sup>&#9993;</sup> Corresponding author</span></p>
+                        </div>
+                        <nav class="home-links" aria-label="Project links">
+                            <a class="home-link" href="https://github.com/mvp-ai-lab/SpatialArena" target="_blank" rel="noopener">
+                                <svg class="home-link-logo" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 1C5.923 1 1 5.923 1 12c0 4.867 3.149 8.979 7.521 10.436.55.096.756-.233.756-.522 0-.262-.013-1.128-.013-2.049-2.764.509-3.479-.674-3.699-1.292-.124-.317-.66-1.293-1.127-1.554-.385-.207-.936-.715-.014-.729.866-.014 1.485.797 1.691 1.128.99 1.663 2.571 1.196 3.204.907.096-.715.385-1.196.701-1.471-2.448-.275-5.005-1.224-5.005-5.432 0-1.196.426-2.186 1.128-2.956-.111-.275-.496-1.402.11-2.915 0 0 .921-.288 3.024 1.128a10.193 10.193 0 0 1 2.75-.371c.936 0 1.871.123 2.75.371 2.104-1.43 3.025-1.128 3.025-1.128.605 1.513.221 2.64.111 2.915.701.77 1.127 1.747 1.127 2.956 0 4.222-2.571 5.157-5.019 5.432.399.344.743 1.004.743 2.035 0 1.471-.014 2.654-.014 3.025 0 .289.206.632.756.522C19.851 20.979 23 16.854 23 12c0-6.077-4.922-11-11-11Z"/></svg>
+                                <span>GitHub</span>
+                            </a>
+                            <a class="home-link" href="https://huggingface.co/datasets/Bluefish2333/benchmark" target="_blank" rel="noopener">
+                                <img class="home-link-logo" src="assets/logos/huggingface.svg" alt="" width="22" height="20">
+                                <span>Hugging Face dataset</span>
+                            </a>
+                        </nav>
+                    </header>
+
+                    </div>
+                </section>
+
+                <section class="home-slide home-atlas" id="home-atlas" data-slide-title="At a glance">
+                    <div class="home-slide-inner">
+                        <div class="atlas-card home-glance">
+                            <div class="atlas-head"><h3>SpatialArena at a Glance</h3><p>What the benchmark is made of: its evaluation cases, the conditions its datasets test, and the models it scores</p></div>
+                            <div class="home-release-bar">
+                                <div class="align-tabs" id="glance-tabs" role="tablist" aria-label="SpatialArena at a glance">
+                                    <button type="button" role="tab" id="glance-tab-composition" data-glance-tab="composition" aria-controls="glance-panel-composition" aria-selected="true">Hierarchical composition</button>
+                                    <button type="button" role="tab" id="glance-tab-coverage" data-glance-tab="coverage" aria-controls="glance-panel-coverage" aria-selected="false">Scene coverage</button>
+                                    <button type="button" role="tab" id="glance-tab-models" data-glance-tab="models" aria-controls="glance-panel-models" aria-selected="false">52 model configurations</button>
+                                </div>
+                            </div>
+                            <div class="glance-panel" id="glance-panel-composition" role="tabpanel" aria-labelledby="glance-tab-composition" data-glance-panel="composition">
+                                <p class="glance-lead">456 evaluation cases by environment, motion, scene type, and dataset</p>
+                                <div class="atlas-comp-grid">
+                                    <div class="atlas-comp-figure" id="atlas-composition"></div>
+                                    <div><div id="atlas-composition-legend" class="atlas-comp-legend"></div>
+                                        <p class="atlas-note">Rings, from the inside: environment, static or dynamic scenes, and scene type. Outer bars: evaluation cases per dataset (square-root length), stacked by task. Each scene is placed once: ETH3D and Tanks &amp; Temples are split by scene, and the Marigold suite by subset (NYUv2 indoor, KITTI driving, ETH3D and DIODE mixed). SLAM counts each sequence once per range track it runs in. SpatialArena (highlighted) counts one case per MonoDepth scene, VideoDepth clip, MVRecon or SfM scene, and SLAM sequence. A case is dynamic when people or vehicles cover over 3% of the pixels its camera sees (or appear in over 60% of its frames).</p></div>
+                                </div>
+                            </div>
+                            <div class="glance-panel" id="glance-panel-coverage" role="tabpanel" aria-labelledby="glance-tab-coverage" data-glance-panel="coverage" hidden>
+                                <p class="glance-lead">Which conditions each dataset tests, and which tasks use it</p>
+                                <div class="atlas-coverage-grid">
+                                    <div class="atlas-table-wrap atlas-matrix-wrap"><table class="atlas-matrix" id="atlas-matrix"></table></div>
+                                    <div class="atlas-coverage-side" id="atlas-coverage-side"></div>
+                                </div>
+                            </div>
+                            <div class="glance-panel" id="glance-panel-models" role="tabpanel" aria-labelledby="glance-tab-models" data-glance-panel="models" hidden>
+                                <p class="glance-lead">Specialists, generalists, and long-sequence systems on one scale</p>
+                                <div class="atlas-models-grid">
+                                    <div class="atlas-chart"><canvas id="atlas-family-donut" aria-label="Model configurations by family"></canvas></div>
+                                    <div style="min-width:0"><div class="atlas-families" id="atlas-families"></div>
+                                        <p class="atlas-note">Outlined names also accept geometric priors (cameras and/or depth).</p></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="home-slide home-atlas" data-slide-title="Evolving Curves for Geometric Foundation Models">
+                    <div class="home-slide-inner">
+                        <div class="atlas-card home-release">
+                            <div class="atlas-head">
+                                <h3>Evolving Curves for Geometric Foundation Models</h3>
+                                <p>Is the field getting better? Every run's task score against its paper date; VLMs are marked by their maker's logo.</p>
+                                <span class="atlas-badge" id="benchmark-release-badge">- runs</span>
+                            </div>
+                            <div class="home-release-bar">
+                                <div class="align-tabs" id="benchmark-release-tabs" role="tablist" aria-label="Task"></div>
+                                <label class="home-release-width">
+                                    Chart width
+                                    <select id="benchmark-release-width">
+                                        <option value="full" selected>Full</option>
+                                        <option value="half">Half</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div id="benchmark-release-scatter-grid" class="benchmark-release-grid"></div>
+                            <p class="atlas-note">
+                                Each point is one run: its leaderboard task score (0&ndash;100, higher is better) against
+                                its paper date (yy-mm; arXiv v1 first, else the official release). Each model keeps one
+                                color across the tasks; hollow triangles are runs given extra ground-truth input ([+C]
+                                cameras, [+D] depth). The lines are least-squares trends per model family over its
+                                image-only runs, with the slope in score points per year (3 runs needed for a line). Drag
+                                a box over the plot to zoom; double-click or <em>Reset zoom</em> to see it whole.
+                            </p>
+                            <p class="atlas-note" id="benchmark-release-undated"></p>
+                            <p class="atlas-note benchmark-flag-note" data-flag-note hidden></p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="home-slide" data-slide-title="Our scenes">
+                    <div class="home-slide-inner">
+                    <h2 class="home-section-title">Our scenes</h2>
+                    <p class="home-section-lead">
+                        The 30 SpatialArena scenes, captured with a handheld 3-camera LiDAR rig: each frame with its RGB image,
+                        the LiDAR depth projected into it, and the dense depth rendered from the LiDAR map.
+                    </p>
+                    <div class="home-carousel" id="home-carousel">
+                        <div class="home-carousel-head">
+                            <div class="home-segmented" role="radiogroup" aria-label="Task filter" id="home-gallery-tasks"></div>
+                            <span class="home-gallery-count" id="home-gallery-count"></span>
+                        </div>
+                        <div class="home-carousel-stage">
+                            <button type="button" class="home-carousel-arrow" id="home-carousel-prev" aria-label="Previous scene"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
+                            <div class="home-carousel-view" id="home-carousel-view" aria-live="polite"></div>
+                            <button type="button" class="home-carousel-arrow" id="home-carousel-next" aria-label="Next scene"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
+                        </div>
+                        <div class="home-carousel-strip" id="home-carousel-strip" role="tablist" aria-label="Scenes"></div>
+                    </div>
+                    <p class="home-footnote">Depth colours: turbo, nearer is warmer; the LiDAR and dense maps of a frame share one range.
+                        People and vehicles are masked out of the images. Pose-only SLAM sequences have no depth on disk.</p>
+                    </div>
+                </section>
+
+                <section class="home-slide" data-slide-title="Depth alignment">
+                    <div class="home-slide-inner">
+                    <h2 class="home-section-title">Depth alignment</h2>
+                    <p class="home-section-lead">
+                        Most models predict depth only up to a scale and shift. SpatialArena fits one scale and shift per image
+                        (per sequence for video depth) on the pixels with ground truth: least squares to start, then Huber
+                        reweighting until the fit stops moving, so bad pixels lose weight instead of dragging the fit.
+                        Below is the benchmark's own fit of a real frame.
+                    </p>
+                    <div class="align-depth" id="home-depth-demo">
+                        <div class="align-maps">
+                            <figure><canvas id="home-depth-rgb" role="img" aria-label="Input image"></canvas><figcaption>Image <small>the model's only input</small></figcaption></figure>
+                            <figure><canvas id="home-depth-gt" role="img" aria-label="Ground-truth depth map"></canvas><figcaption>GT depth <small>laser scan; hatched: no GT (windows, glass)</small></figcaption></figure>
+                            <figure><canvas id="home-depth-raw" role="img" aria-label="Raw predicted depth"></canvas><figcaption>Prediction <small>model units, unknown scale and shift</small></figcaption></figure>
+                            <figure><canvas id="home-depth-error" role="img" aria-label="Error of the current fit"></canvas><figcaption>Error |fit − GT| / GT <small>current step, 0 to 25 %</small></figcaption></figure>
+                        </div>
+                        <div class="align-plots">
+                            <figure class="align-plot">
+                                <figcaption><span>Prediction vs. GT <small>2,400 sampled pixels</small></span><b id="home-depth-scatter-value">–</b></figcaption>
+                                <canvas id="home-depth-scatter" role="img" aria-label="Prediction against GT depth with the fitted line"></canvas>
+                            </figure>
+                            <figure class="align-plot">
+                                <figcaption><span>Huber loss <small>lower is better</small></span><b id="home-depth-loss-value">–</b></figcaption>
+                                <canvas id="home-depth-loss" role="img" aria-label="Huber loss over the IRLS iterations"></canvas>
+                            </figure>
+                            <figure class="align-plot">
+                                <figcaption><span>AbsRel <small>lower is better</small></span><b id="home-depth-absrel-value">–</b></figcaption>
+                                <canvas id="home-depth-absrel" role="img" aria-label="AbsRel over the IRLS iterations"></canvas>
+                            </figure>
+                        </div>
+                        <div class="align-footer">
+                            <ol class="home-steps" id="home-depth-steps">
+                                <li data-step="raw">Raw prediction</li>
+                                <li data-step="l2">Least-squares start</li>
+                                <li data-step="irls">Huber IRLS until converged</li>
+                            </ol>
+                            <div class="align-stats" id="home-depth-stats" aria-live="polite"></div>
+                            <p class="align-source" id="home-depth-source"></p>
+                            <div class="home-legend">
+                                <span><i class="home-swatch home-swatch-pred"></i>Current fit</span>
+                                <span><i class="home-swatch home-swatch-l2"></i>Least-squares start</span>
+                                <span><i class="home-swatch home-swatch-out"></i>Down-weighted pixel</span>
+                            </div>
+                            <div class="align-controls">
+                                <button type="button" class="home-button home-button-small" data-align-replay><i class="fas fa-rotate-right" aria-hidden="true"></i> Next image</button>
+                                <button type="button" class="home-button home-button-small" data-align-pause aria-pressed="false"><i class="fas fa-pause" aria-hidden="true"></i> Pause</button>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                </section>
+
+                <section class="home-slide" data-slide-title="Trajectory alignment">
+                    <div class="home-slide-inner">
+                    <h2 class="home-section-title">Trajectory alignment</h2>
+                    <p class="home-section-lead">
+                        Predicted cameras live in their own frame, up to a similarity transform. SpatialArena fits a robust
+                        Sim(3): pose-aware two-frame samples, a refit on the best sample's inliers, then Cauchy-weighted refits
+                        on every frame. Each case is one trial of our alignment study, run through the evaluator's own code.
+                    </p>
+                    <div class="align-traj" id="home-traj-demo">
+                        <div class="align-traj-stage">
+                            <canvas id="home-traj-canvas" role="img" aria-label="GT and predicted camera frustums in 3D, with the alignment error of every frame"></canvas>
+                            <canvas id="home-traj-3d" role="img" aria-label="GT and predicted camera frustums in 3D, with the alignment error of every frame"></canvas>
+                            <div class="align-traj-label" aria-live="polite">
+                                <span class="primary" id="home-traj-step">Loading…</span>
+                                <span id="home-traj-case"></span>
+                            </div>
+                            <div class="align-traj-tools">
+                                <span class="align-traj-hint">Drag to orbit · Ctrl/⌘ + scroll to zoom</span>
+                                <button type="button" id="home-traj-reset" aria-label="Reset the view"><i class="fas fa-rotate-left" aria-hidden="true"></i></button>
+                            </div>
+                            <div class="align-traj-modes">
+                                <div class="align-tabs" id="home-traj-scenarios" role="tablist" aria-label="Corruption scenario"></div>
+                                <p class="align-note" id="home-traj-note"></p>
+                            </div>
+                        </div>
+                        <aside class="align-traj-side">
+                            <figure class="align-plot">
+                                <figcaption><span>ATE ratio over the fit <small>1 = exact · &lt; 1 hides error · &gt; 1 inflates it</small></span><b id="home-traj-ratio-value">–</b></figcaption>
+                                <canvas id="home-traj-curve" role="img" aria-label="ATE ratio over the alignment steps"></canvas>
+                            </figure>
+                            <div id="home-traj-compare" aria-live="polite"></div>
+                            <div class="align-stats" id="home-traj-stats" aria-live="polite"></div>
+                            <ol class="home-steps" id="home-traj-steps">
+                                <li data-step="raw">Own frame</li>
+                                <li data-step="ransac">Two-frame samples</li>
+                                <li data-step="refit">Inlier refit</li>
+                                <li data-step="irls">Cauchy IRLS</li>
+                            </ol>
+                            <div class="home-legend">
+                                <span><i class="home-swatch home-swatch-gt"></i>GT cameras</span>
+                                <span><i class="home-swatch home-swatch-pred"></i>Ours, current step</span>
+                                <span><i class="home-swatch home-swatch-l2"></i>Umeyama (evo)</span>
+                                <span><i class="home-swatch home-swatch-out"></i>Outlier / weight &lt; ½</span>
+                                <span><i class="home-swatch home-swatch-start"></i>First GT camera</span>
+                            </div>
+                            <div class="align-controls">
+                                <button type="button" class="home-button home-button-small" data-align-replay><i class="fas fa-rotate-right" aria-hidden="true"></i> Next trajectory</button>
+                                <button type="button" class="home-button home-button-small" data-align-pause aria-pressed="false"><i class="fas fa-pause" aria-hidden="true"></i> Pause</button>
+                            </div>
+                        </aside>
+                    </div>
+                    <p class="align-source" id="home-traj-source"></p>
+                    </div>
+                </section>
+
+                <section class="home-slide" id="home-get-started" data-slide-title="Evaluate your model">
+                    <div class="home-slide-inner">
+                    <h2 class="home-section-title">Evaluate your model with SpatialArena</h2>
+                    <p class="home-section-lead">
+                        Wrap your model as one command that writes depth maps or COLMAP cameras, and the pipeline does the rest:
+                        it plans the runs, executes them, scores them with the protocol above, and writes the report this
+                        dashboard reads.
+                    </p>
+                    <div class="home-code">
+                        <ol class="home-code-steps" id="home-code-steps">
+                            <li data-code-step="0"><b>Install</b><span>the benchmark package</span></li>
+                            <li data-code-step="1"><b>Describe your model</b><span>one command template</span></li>
+                            <li data-code-step="2"><b>Plan and evaluate</b><span>locally or on SLURM</span></li>
+                            <li data-code-step="3"><b>Compare</b><span>in this dashboard</span></li>
+                        </ol>
+                        <div class="home-code-window">
+                            <div class="home-code-bar">
+                                <span class="home-code-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                                <span class="home-code-file" id="home-code-file">terminal</span>
+                                <button type="button" class="home-code-replay" id="home-code-replay" aria-label="Replay the coding animation"><i class="fas fa-rotate-right" aria-hidden="true"></i></button>
+                            </div>
+                            <pre class="home-code-body" id="home-code-body" aria-live="off"></pre>
+                        </div>
+                    </div>
+                    </div>
+                </section>
+
+            </section>
+
+            <section id="benchmark-view-overview" class="benchmark-view-panel" role="tabpanel" hidden>
+            <div class="card benchmark-filter-card" id="benchmark-overview-filters">
+                <div class="benchmark-filter-bar">
+                    <details class="benchmark-filter-menu" data-filter="tasks">
+                        <summary>Tracks <span class="benchmark-filter-count"></span></summary>
+                        <div class="benchmark-filter-panel"></div>
+                    </details>
+                    <details class="benchmark-filter-menu" data-filter="datasets">
+                        <summary>Datasets <span class="benchmark-filter-count"></span></summary>
+                        <div class="benchmark-filter-panel"></div>
+                    </details>
+                    <details class="benchmark-filter-menu" data-filter="types">
+                        <summary>Model types <span class="benchmark-filter-count"></span></summary>
+                        <div class="benchmark-filter-panel"></div>
+                    </details>
+                    <button type="button" class="benchmark-btn benchmark-btn-secondary" id="benchmark-filter-reset">
+                        <i class="fas fa-rotate-left"></i> Reset
+                    </button>
+                    <span class="benchmark-muted" id="benchmark-filter-summary"></span>
+                </div>
+                <p class="benchmark-muted benchmark-filter-help">
+                    Filters every figure on this page. Scores stay normalized against all models, so hiding models
+                    does not change anyone's score; a track score averages the selected datasets' cases, each scene weighing
+                    the same and a case a model has no result for counting 0 (SLAM: its ranges), and the overall score
+                    averages the selected tracks (a track a model did not run counts as 0).
+                </p>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Method Leaderboard Radar</h2>
+                    <span class="badge" id="benchmark-radar-badge">- methods</span>
+                </div>
+                <div class="benchmark-controls">
+                    <label>
+                        Methods
+                        <select id="benchmark-radar-limit">
+                            <option value="5">Top 5</option>
+                            <option value="8" selected>Top 8</option>
+                            <option value="all">All</option>
+                        </select>
+                    </label>
+                    <button class="benchmark-btn" id="benchmark-reload">
+                        <i class="fas fa-sync-alt"></i>
+                        Reload
+                    </button>
+                </div>
+                <div class="benchmark-radar-grid">
+                    <div class="benchmark-radar-panel">
+                        <div class="benchmark-radar-title">Evaluation Track Leaderboard</div>
+                        <div class="benchmark-radar-wrap">
+                            <canvas id="benchmarkTrackRadarChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="benchmark-radar-panel">
+                        <div class="benchmark-radar-title">Dataset Leaderboard</div>
+                        <div class="benchmark-radar-wrap">
+                            <canvas id="benchmarkDatasetRadarChart"></canvas>
+                        </div>
+                        <p class="benchmark-muted benchmark-radar-note">&dagger; Not counted in the leaderboard (SpatialArena, Spring,
+                            ScanNet++): scored the same way, for comparison only; toggled in the Datasets filter.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Top-10 Scoreboards</h2>
+                    <span class="badge">ranked scores</span>
+                </div>
+                <div class="benchmark-bar-grid">
+                    <div class="benchmark-bar-panel benchmark-bar-panel-wide">
+                        <div class="benchmark-radar-title">Leaderboard</div>
+                        <div class="benchmark-bar-wrap">
+                            <canvas id="benchmarkOverallBarChart"></canvas>
+                        </div>
+                    </div>
+                    <div id="benchmark-track-bar-grid" class="benchmark-track-bar-grid"></div>
+                </div>
+            </div>
+
+            </section>
+
+            <section id="benchmark-view-download" class="benchmark-view-panel download" role="tabpanel" hidden>
+            <div class="card download-intro">
+                <div class="download-intro-text">
+                    <h2>Download the benchmark</h2>
+                    <p>
+                        Every dataset of the five tasks is packaged, ready to evaluate, in the Hugging Face dataset
+                        <a href="https://huggingface.co/datasets/Bluefish2333/benchmark" target="_blank" rel="noopener">Bluefish2333/benchmark</a>.
+                        Each scene is one uncompressed <code>&lt;Task&gt;/&lt;dataset&gt;/&lt;scene&gt;.tar</code>, so the
+                        download is about 500 files instead of about 900k; one script unpacks them into the layout the
+                        evaluator reads.
+                    </p>
+                </div>
+                <dl class="download-facts">
+                    <div><dt>5</dt><dd>tasks</dd></div>
+                    <div><dt>34</dt><dd>task&ndash;dataset tracks</dd></div>
+                    <div><dt id="download-contents-total">&ndash;</dt><dd>in total</dd></div>
+                </dl>
+            </div>
+
+            <ol class="download-steps">
+                <li class="card download-step">
+                    <h3><span class="download-step-number">1</span>Install the Hugging Face client</h3>
+                    <div class="download-code">
+                        <pre id="download-code-install">pip install -U huggingface_hub</pre>
+                        <button type="button" class="download-copy" data-copy="download-code-install" aria-label="Copy the install command"><i class="fas fa-copy" aria-hidden="true"></i><span>Copy</span></button>
+                    </div>
+                </li>
+
+                <li class="card download-step">
+                    <h3><span class="download-step-number">2</span>Download</h3>
+                    <p class="download-note">
+                        Pick the tasks to fetch. The command adds the folders of shared datasets the chosen tasks need, and
+                        <code>hf download</code> resumes an interrupted download when run again.
+                    </p>
+                    <div class="download-picker">
+                        <div class="download-chips" id="download-task-picker" role="group" aria-label="Tasks to download"></div>
+                        <div class="download-chips download-scope" id="download-scope" role="group" aria-label="Datasets to download">
+                            <button type="button" class="download-chip" data-download-scope="all">All datasets</button>
+                            <button type="button" class="download-chip" data-download-scope="spatialarena">SpatialArena only</button>
+                        </div>
+                    </div>
+                    <div class="download-code">
+                        <pre id="download-command"></pre>
+                        <button type="button" class="download-copy" data-copy="download-command" aria-label="Copy the download command"><i class="fas fa-copy" aria-hidden="true"></i><span>Copy</span></button>
+                    </div>
+                    <p class="download-size" id="download-size" aria-live="polite"></p>
+                </li>
+
+                <li class="card download-step">
+                    <h3><span class="download-step-number">3</span>Unpack the scenes</h3>
+                    <p class="download-note">
+                        The bundled script (standard library only) extracts every archive in place, keeps the relative
+                        symlinks, and with <code>--delete</code> removes each archive once it is extracted. Rerunning it
+                        skips the archives already done.
+                    </p>
+                    <div class="download-code">
+                        <pre id="download-code-extract">python /data/spatialarena/extract_benchmark_archives.py /data/spatialarena --delete</pre>
+                        <button type="button" class="download-copy" data-copy="download-code-extract" aria-label="Copy the extract command"><i class="fas fa-copy" aria-hidden="true"></i><span>Copy</span></button>
+                    </div>
+                </li>
+
+                <li class="card download-step">
+                    <h3><span class="download-step-number">4</span>Link the shared datasets</h3>
+                    <p class="download-note">
+                        Five datasets serve two tasks and are packaged once: the other task's folder only holds a
+                        <code>SEE_INSTEAD.md</code>. Replace each such folder with a link to the data.
+                    </p>
+                    <div class="download-code">
+                        <pre id="download-code-link">cd /data/spatialarena
+for pair in MVRecon/eth3d:SfM/eth3d MVRecon/tanks_and_temples:SfM/tanks_and_temples \
+            SfM/dtu:MVRecon/dtu SfM/hiroom:MVRecon/hiroom SfM/scannetpp:MVRecon/scannetpp; do
+    link=${pair%%:*}; data=${pair#*:}
+    if [ -f "$link/SEE_INSTEAD.md" ] &amp;&amp; [ -d "$data" ]; then rm -r "$link" &amp;&amp; ln -s "../$data" "$link"; fi
+done</pre>
+                        <button type="button" class="download-copy" data-copy="download-code-link" aria-label="Copy the link commands"><i class="fas fa-copy" aria-hidden="true"></i><span>Copy</span></button>
+                    </div>
+                </li>
+
+                <li class="card download-step">
+                    <h3><span class="download-step-number">5</span>Check it and evaluate</h3>
+                    <p class="download-note">
+                        From a clone of the SpatialArena repository, check that every dataset's metadata and layout is
+                        complete, then pass the folder to the evaluator as <code>benchmark_root</code>.
+                    </p>
+                    <div class="download-code">
+                        <pre id="download-code-verify">python scripts/preprocess/verify_benchmark_datasets.py --benchmark_root /data/spatialarena</pre>
+                        <button type="button" class="download-copy" data-copy="download-code-verify" aria-label="Copy the verify command"><i class="fas fa-copy" aria-hidden="true"></i><span>Copy</span></button>
+                    </div>
+                    <div class="download-code">
+                        <pre id="download-code-evaluate">from spatialarena import BenchmarkEvaluator
+
+bench = BenchmarkEvaluator(benchmark_root="/data/spatialarena")</pre>
+                        <button type="button" class="download-copy" data-copy="download-code-evaluate" aria-label="Copy the evaluator snippet"><i class="fas fa-copy" aria-hidden="true"></i><span>Copy</span></button>
+                    </div>
+                </li>
+            </ol>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>What the release contains</h2>
+                    <span class="badge">sizes as downloaded</span>
+                </div>
+                <div class="table-container">
+                    <table class="benchmark-table download-contents">
+                        <thead><tr><th>Task</th><th>Datasets</th><th class="numeric">Size</th></tr></thead>
+                        <tbody id="download-contents-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card download-licenses">
+                <div class="card-header">
+                    <h2>Licenses</h2>
+                </div>
+                <ul>
+                    <li>Every dataset folder carries a <code>LICENSE_NOTICE.md</code> with its source's license and citation.
+                        Read it before using that data: most sources allow non-commercial research use only, and packaging
+                        them here does not change their terms.</li>
+                    <li>SpatialArena, our own capture, is released under
+                        <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener">CC BY-NC 4.0</a>.</li>
+                    <li>Marigold ships without its ScanNet subset, whose terms forbid redistribution; its
+                        <code>LICENSE_NOTICE.md</code> gives the two commands that rebuild it from Marigold's own download.</li>
+                </ul>
+            </div>
+            </section>
+
+            <section id="benchmark-view-leaderboard" class="benchmark-view-panel" role="tabpanel" hidden>
+            <div class="card">
+                <div id="benchmark-task-tabs" class="benchmark-task-tabs benchmark-leaderboard-tabs" role="tablist" aria-label="Overall leaderboard or one task's metric tables"></div>
+                <div id="benchmark-leaderboard-overall" role="tabpanel">
+                    <div class="benchmark-controls benchmark-ranking-controls">
+                        <label class="benchmark-search-label">
+                            Method
+                            <input type="search" id="benchmark-ranking-search" placeholder="Filter ranking">
+                        </label>
+                        <label>
+                            Sort
+                            <select id="benchmark-ranking-sort">
+                                <option value="score_desc">Overall Score</option>
+                                <option value="average_rank_asc">Average Rank</option>
+                                <option value="wins_desc">Wins</option>
+                                <option value="coverage_desc">Coverage</option>
+                                <option value="method_asc">Method</option>
+                            </select>
+                        </label>
+                        <button class="benchmark-btn benchmark-btn-secondary" id="benchmark-export-ranking">
+                            <i class="fas fa-download"></i>
+                            Export Leaderboard
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <table class="benchmark-table">
+                            <thead id="benchmark-ranking-head"></thead>
+                            <tbody id="benchmark-ranking-body"></tbody>
+                        </table>
+                    </div>
+                    <p class="benchmark-muted benchmark-flag-note" data-flag-note hidden></p>
+                </div>
+                <div id="benchmark-leaderboard-task" role="tabpanel" hidden>
+                    <div id="benchmark-dataset-tabs" class="benchmark-task-tabs benchmark-dataset-tabs" role="tablist" aria-label="Datasets of the selected task"></div>
+                    <div class="benchmark-controls benchmark-filter-controls">
+                        <label>
+                            Metric Family
+                            <select id="benchmark-family-filter">
+                                <option value="all">All Families</option>
+                                <option value="depth_error">Depth Error</option>
+                                <option value="depth_accuracy">Depth Accuracy</option>
+                                <option value="pose_trajectory">Pose Trajectory</option>
+                                <option value="pose_error">Pose Error</option>
+                                <option value="pose_accuracy">Pose Accuracy</option>
+                                <option value="pose_auc">Pose AUC</option>
+                                <option value="slam_trajectory">SLAM Trajectory</option>
+                                <option value="slam_rpe">SLAM RPE</option>
+                                <option value="slam_pose_auc">SLAM Pose AUC</option>
+                                <option value="slam_coverage">SLAM Coverage</option>
+                            </select>
+                        </label>
+                        <label class="benchmark-search-label">
+                            Method
+                            <input type="search" id="benchmark-method-search" placeholder="Filter methods">
+                        </label>
+                        <button class="benchmark-btn benchmark-btn-secondary" id="benchmark-export-task">
+                            <i class="fas fa-file-csv"></i>
+                            Export Metrics
+                        </button>
+                    </div>
+                    <div id="benchmark-task-tables"></div>
+                    <p class="benchmark-muted benchmark-flag-note" data-flag-note hidden></p>
+                </div>
+            </div>
+            </section>
+
+            <section id="benchmark-view-artifacts" class="benchmark-view-panel" role="tabpanel" hidden>
+            <div class="card"></div>
+            </section>
+
+
+        </main>
+    </div>
+
+    <script src="js/chart_export.js"></script>
+    <script src="js/benchmark.js"></script>
+    <script src="js/download.js"></script>
+    <script src="js/home_atlas.js"></script>
+    <script src="js/home_align.js"></script>
+    <script src="js/home.js"></script>
+    <script type="module" src="js/home_scene.js"></script>
+    <script type="module" src="js/compare/compare_modes.js"></script>
+</body>
+
+</html>

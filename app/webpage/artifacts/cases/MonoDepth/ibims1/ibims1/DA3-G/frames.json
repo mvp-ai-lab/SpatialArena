@@ -1,0 +1,67 @@
+{
+ "task": "MonoDepth",
+ "dataset": "ibims1",
+ "scene": "ibims1",
+ "frames": [
+  {
+   "frame": "corridor_01",
+   "gt": "corridor_01.npy",
+   "absrel": 0.013091047283561544,
+   "delta125": 0.9942794781163976
+  },
+  {
+   "frame": "kitchen_03",
+   "gt": "kitchen_03.npy",
+   "absrel": 0.00886612990665031,
+   "delta125": 0.9990341387349156
+  },
+  {
+   "frame": "lectureroom_04",
+   "gt": "lectureroom_04.npy",
+   "absrel": 0.02360657816514185,
+   "delta125": 0.9939014237628999
+  },
+  {
+   "frame": "livingroom_13",
+   "gt": "livingroom_13.npy",
+   "absrel": 0.014718925773637943,
+   "delta125": 0.9988614172707113
+  },
+  {
+   "frame": "restaurant_02",
+   "gt": "restaurant_02.npy",
+   "absrel": 0.02762426993149982,
+   "delta125": 0.9827016996209479
+  },
+  {
+   "frame": "storageroom_08",
+   "gt": "storageroom_08.npy",
+   "absrel": 0.013004176928679986,
+   "delta125": 1.0
+  }
+ ],
+ "size": {
+  "height": 480,
+  "width": 640
+ },
+ "depth_range": [
+  0.8788895487785339,
+  9.299389839172363
+ ],
+ "metrics": {
+  "abs_relative_difference": 0.029852615793934806,
+  "squared_relative_difference": 0.022830788242630004,
+  "rmse_linear": 0.24897758942188472,
+  "rmse_log": 0.05949453282519529,
+  "log10": 0.012722965841503698,
+  "delta103_acc": 0.7718087654991237,
+  "delta125_acc": 0.9809162958722848,
+  "delta125_2_acc": 0.9946356053540641,
+  "delta125_3_acc": 0.9984666898053228,
+  "i_rmse": 0.025325195964906344,
+  "silog_rmse": 5.916565427127593,
+  "absrel_percent": 2.9852615793934816,
+  "delta103_percent": 77.18087654991234,
+  "delta125_percent": 98.09162958722851
+ }
+}

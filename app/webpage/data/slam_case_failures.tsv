@@ -1,0 +1,66 @@
+method	task	dataset	variant	scene	status	detail
+OMNIVGGT_rgb_depth	SLAM	oxford_spires	short	bodleian-library-02	blocked_missing_depth_prior	None
+OMNIVGGT_rgb_depth	SLAM	oxford_spires	short	christ-church-02	blocked_missing_depth_prior	None
+OMNIVGGT_rgb_depth	SLAM	oxford_spires	short	christ-church-03	blocked_missing_depth_prior	None
+OMNIVGGT_rgb_depth	SLAM	oxford_spires	short	christ-church-05	blocked_missing_depth_prior	None
+OMNIVGGT_rgb_depth	SLAM	oxford_spires	short	keble-college-02	blocked_missing_depth_prior	None
+OMNIVGGT_rgb_depth	SLAM	oxford_spires	short	keble-college-03	blocked_missing_depth_prior	None
+OMNIVGGT_rgb_depth	SLAM	oxford_spires	short	keble-college-04	blocked_missing_depth_prior	None
+OMNIVGGT_rgb_depth	SLAM	oxford_spires	short	keble-college-05	blocked_missing_depth_prior	None
+OMNIVGGT_rgb_depth	SLAM	oxford_spires	short	observatory-quarter-01	blocked_missing_depth_prior	None
+OMNIVGGT_rgb_depth	SLAM	oxford_spires	short	observatory-quarter-02	blocked_missing_depth_prior	None
+PI3_X_rgb_depth	SLAM	oxford_spires	short	bodleian-library-02	blocked_missing_depth_prior	None
+PI3_X_rgb_depth	SLAM	oxford_spires	short	christ-church-02	blocked_missing_depth_prior	None
+PI3_X_rgb_depth	SLAM	oxford_spires	short	christ-church-03	blocked_missing_depth_prior	None
+PI3_X_rgb_depth	SLAM	oxford_spires	short	christ-church-05	blocked_missing_depth_prior	None
+PI3_X_rgb_depth	SLAM	oxford_spires	short	keble-college-02	blocked_missing_depth_prior	None
+PI3_X_rgb_depth	SLAM	oxford_spires	short	keble-college-03	blocked_missing_depth_prior	None
+PI3_X_rgb_depth	SLAM	oxford_spires	short	keble-college-04	blocked_missing_depth_prior	None
+PI3_X_rgb_depth	SLAM	oxford_spires	short	keble-college-05	blocked_missing_depth_prior	None
+PI3_X_rgb_depth	SLAM	oxford_spires	short	observatory-quarter-01	blocked_missing_depth_prior	None
+PI3_X_rgb_depth	SLAM	oxford_spires	short	observatory-quarter-02	blocked_missing_depth_prior	None
+PI3_X_rgb_depth	SLAM	tum_dynamics	long	rgbd_dataset_freiburg2_desk_with_person	gpu_oom_recorded	1 gpu_oom None
+PI3_X_rgb_depth	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_sitting_xyz	gpu_oom_recorded	1 gpu_oom None
+R3	SLAM	vbr	large	ciampino_train1	gpu_oom_recorded	1 gpu_oom None
+R3	SLAM	vbr	large	spagna_train0	gpu_oom_recorded	1 gpu_oom None
+SCAL3R	SLAM	oxford_spires	large	bodleian-library-02	oom_job_affected	1 error job 73755 ended in state 'OUT_OF_MEMORY'
+SCAL3R	SLAM	oxford_spires	large	christ-church-02	oom_job_affected	1 error job 73755 ended in state 'OUT_OF_MEMORY'
+SCAL3R	SLAM	oxford_spires	large	christ-church-03	oom_job_affected	1 error job 73755 ended in state 'OUT_OF_MEMORY'
+SCAL3R	SLAM	oxford_spires	large	christ-church-05	oom_job_affected	1 error job 73755 ended in state 'OUT_OF_MEMORY'
+SCAL3R	SLAM	oxford_spires	large	keble-college-02	oom_job_affected	1 error job 73755 ended in state 'OUT_OF_MEMORY'
+SCAL3R	SLAM	oxford_spires	large	keble-college-03	oom_job_affected	1 error job 73755 ended in state 'OUT_OF_MEMORY'
+SCAL3R	SLAM	oxford_spires	large	keble-college-04	oom_job_affected	1 error job 73755 ended in state 'OUT_OF_MEMORY'
+SCAL3R	SLAM	oxford_spires	large	keble-college-05	oom_job_affected	1 error job 73755 ended in state 'OUT_OF_MEMORY'
+SCAL3R	SLAM	oxford_spires	large	observatory-quarter-01	oom_job_affected	1 error job 73755 ended in state 'OUT_OF_MEMORY'
+SCAL3R	SLAM	oxford_spires	large	observatory-quarter-02	oom_job_affected	1 error job 73755 ended in state 'OUT_OF_MEMORY'
+SCAL3R	SLAM	vbr	large	campus_train0	cpu_memory_oom	Host-memory limit exceeded after CPU offload. Not a valid score; no change to evaluation protocol.
+SCAL3R	SLAM	vbr	large	campus_train1	cpu_memory_oom	Host-memory limit exceeded after CPU offload. Not a valid score; no change to evaluation protocol.
+SCAL3R	SLAM	vbr	large	ciampino_train1	cpu_memory_oom	Host-memory limit exceeded after CPU offload. Not a valid score; no change to evaluation protocol.
+SCAL3R	SLAM	vbr	large	colosseo_train0	oom_job_affected	1 error job 73792 ended in state 'OUT_OF_MEMORY'
+SCAL3R	SLAM	vbr	large	diag_train0	cpu_memory_oom	Host-memory limit exceeded after CPU offload. Not a valid score; no change to evaluation protocol.
+SCAL3R	SLAM	vbr	large	pincio_train0	cpu_memory_oom	Host-memory limit exceeded after CPU offload. Not a valid score; no change to evaluation protocol.
+SCAL3R	SLAM	vbr	large	spagna_train0	cpu_memory_oom	Host-memory limit exceeded after CPU offload. Not a valid score; no change to evaluation protocol.
+VGGT_SLAM	SLAM	kitti_odometry	large	04	insufficient_predicted_poses	None
+VGGT_SLAM	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_sitting_static	insufficient_predicted_poses	None
+VGGT_SLAM	SLAM	tum_dynamics	long	rgbd_dataset_freiburg3_walking_static	insufficient_predicted_poses	None
+VGGT_SLAM	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_sitting_static	insufficient_predicted_poses	None
+VGGT_SLAM	SLAM	tum_dynamics	short	rgbd_dataset_freiburg3_walking_static	insufficient_predicted_poses	None
+ZIPMAP	SLAM	kitti_odometry	large	00	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	kitti_odometry	large	02	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	oxford_spires	large	bodleian-library-02	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	oxford_spires	large	christ-church-02	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	oxford_spires	large	christ-church-03	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	oxford_spires	large	christ-church-05	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	oxford_spires	large	keble-college-02	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	oxford_spires	large	keble-college-03	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	oxford_spires	large	keble-college-04	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	oxford_spires	large	keble-college-05	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	oxford_spires	large	observatory-quarter-01	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	oxford_spires	large	observatory-quarter-02	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	vbr	large	campus_train0	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	vbr	large	campus_train1	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	vbr	large	ciampino_train1	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	vbr	large	colosseo_train0	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	vbr	large	diag_train0	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	vbr	large	pincio_train0	gpu_oom_recorded	1 gpu_oom None
+ZIPMAP	SLAM	vbr	large	spagna_train0	gpu_oom_recorded	1 gpu_oom None

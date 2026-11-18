@@ -1,0 +1,67 @@
+{
+ "task": "MonoDepth",
+ "dataset": "spatialarena",
+ "scene": "CambridgeRalishLibrary",
+ "frames": [
+  {
+   "frame": "cam0__img0_000024",
+   "gt": "cam0__img0_000024.npy",
+   "absrel": 0.13163498809861307,
+   "delta125": 0.7985841082099301
+  },
+  {
+   "frame": "cam0__img0_000741",
+   "gt": "cam0__img0_000741.npy",
+   "absrel": 0.11717115276994547,
+   "delta125": 0.8833701667157562
+  },
+  {
+   "frame": "cam1__img1_000249",
+   "gt": "cam1__img1_000249.npy",
+   "absrel": 0.2662359304694442,
+   "delta125": 0.7864541201572269
+  },
+  {
+   "frame": "cam1__img1_000739",
+   "gt": "cam1__img1_000739.npy",
+   "absrel": 0.1397463562363195,
+   "delta125": 0.8697890315302389
+  },
+  {
+   "frame": "cam2__img2_000438",
+   "gt": "cam2__img2_000438.npy",
+   "absrel": 0.09337487584158162,
+   "delta125": 0.9416038153854507
+  },
+  {
+   "frame": "cam2__img2_001018",
+   "gt": "cam2__img2_001018.npy",
+   "absrel": 0.26196088005739304,
+   "delta125": 0.7043322833577819
+  }
+ ],
+ "size": {
+  "height": 518,
+  "width": 640
+ },
+ "depth_range": [
+  0.4694559192657471,
+  10.731846008300781
+ ],
+ "metrics": {
+  "abs_relative_difference": 0.17472151785428322,
+  "squared_relative_difference": 0.29047651012460224,
+  "rmse_linear": 1.0749369195948537,
+  "rmse_log": 0.2560576888311256,
+  "log10": 0.07315223094759526,
+  "delta103_acc": 0.21542060375129757,
+  "delta125_acc": 0.7836461914852767,
+  "delta125_2_acc": 0.9101997385664969,
+  "delta125_3_acc": 0.9600299396881231,
+  "i_rmse": 0.28183123818513967,
+  "silog_rmse": 24.85095060684494,
+  "absrel_percent": 17.47215178542832,
+  "delta103_percent": 21.54206037512975,
+  "delta125_percent": 78.36461914852771
+ }
+}

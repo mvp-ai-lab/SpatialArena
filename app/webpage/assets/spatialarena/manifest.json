@@ -1,0 +1,423 @@
+[
+ {
+  "scene": "ArtHouse",
+  "tasks": [
+   "SLAM"
+  ],
+  "source": "SLAM/spatialarena/ArtHouse",
+  "rgb": "assets/spatialarena/ArtHouse_rgb.jpg",
+  "size": [
+   504,
+   406
+  ],
+  "lidar": "assets/spatialarena/ArtHouse_lidar.jpg"
+ },
+ {
+  "scene": "BankUndergroundStation",
+  "tasks": [
+   "SfM"
+  ],
+  "source": "SfM/spatialarena/BankUndergroundStation",
+  "rgb": "assets/spatialarena/BankUndergroundStation_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/BankUndergroundStation_lidar.jpg"
+ },
+ {
+  "scene": "CambridgeRalishLibrary",
+  "tasks": [
+   "MonoDepth",
+   "VideoDepth"
+  ],
+  "source": "MonoDepth/spatialarena/CambridgeRalishLibrary",
+  "rgb": "assets/spatialarena/CambridgeRalishLibrary_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/CambridgeRalishLibrary_lidar.jpg",
+  "dense": "assets/spatialarena/CambridgeRalishLibrary_dense.jpg"
+ },
+ {
+  "scene": "CambridgeSmallGarden1",
+  "tasks": [
+   "MonoDepth",
+   "MVRecon"
+  ],
+  "source": "MVRecon/spatialarena/CambridgeSmallGarden1",
+  "rgb": "assets/spatialarena/CambridgeSmallGarden1_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/CambridgeSmallGarden1_lidar.jpg",
+  "dense": "assets/spatialarena/CambridgeSmallGarden1_dense.jpg"
+ },
+ {
+  "scene": "CambridgeSmallGarden2",
+  "tasks": [
+   "MonoDepth",
+   "SLAM"
+  ],
+  "source": "MonoDepth/spatialarena/CambridgeSmallGarden2",
+  "rgb": "assets/spatialarena/CambridgeSmallGarden2_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/CambridgeSmallGarden2_lidar.jpg",
+  "dense": "assets/spatialarena/CambridgeSmallGarden2_dense.jpg"
+ },
+ {
+  "scene": "CambridgeUpstair",
+  "tasks": [
+   "MonoDepth",
+   "SfM"
+  ],
+  "source": "MonoDepth/spatialarena/CambridgeUpstair",
+  "rgb": "assets/spatialarena/CambridgeUpstair_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/CambridgeUpstair_lidar.jpg",
+  "dense": "assets/spatialarena/CambridgeUpstair_dense.jpg"
+ },
+ {
+  "scene": "CambridgeWesthub3",
+  "tasks": [
+   "SLAM"
+  ],
+  "source": "SLAM/spatialarena/CambridgeWesthub3",
+  "rgb": "assets/spatialarena/CambridgeWesthub3_rgb.jpg",
+  "size": [
+   504,
+   406
+  ]
+ },
+ {
+  "scene": "CanaryWharfBuilding1",
+  "tasks": [
+   "SfM"
+  ],
+  "source": "SfM/spatialarena/CanaryWharfBuilding1",
+  "rgb": "assets/spatialarena/CanaryWharfBuilding1_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/CanaryWharfBuilding1_lidar.jpg"
+ },
+ {
+  "scene": "CelestialHouseBackyard",
+  "tasks": [
+   "MonoDepth",
+   "VideoDepth"
+  ],
+  "source": "MonoDepth/spatialarena/CelestialHouseBackyard",
+  "rgb": "assets/spatialarena/CelestialHouseBackyard_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/CelestialHouseBackyard_lidar.jpg",
+  "dense": "assets/spatialarena/CelestialHouseBackyard_dense.jpg"
+ },
+ {
+  "scene": "ChrispAlley1",
+  "tasks": [
+   "MonoDepth",
+   "VideoDepth"
+  ],
+  "source": "MonoDepth/spatialarena/ChrispAlley1",
+  "rgb": "assets/spatialarena/ChrispAlley1_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/ChrispAlley1_lidar.jpg",
+  "dense": "assets/spatialarena/ChrispAlley1_dense.jpg"
+ },
+ {
+  "scene": "ChrispAlley2",
+  "tasks": [
+   "MonoDepth",
+   "MVRecon",
+   "SfM"
+  ],
+  "source": "MVRecon/spatialarena/ChrispAlley2",
+  "rgb": "assets/spatialarena/ChrispAlley2_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/ChrispAlley2_lidar.jpg",
+  "dense": "assets/spatialarena/ChrispAlley2_dense.jpg"
+ },
+ {
+  "scene": "ChrispMarket",
+  "tasks": [
+   "MonoDepth",
+   "VideoDepth"
+  ],
+  "source": "MonoDepth/spatialarena/ChrispMarket",
+  "rgb": "assets/spatialarena/ChrispMarket_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/ChrispMarket_lidar.jpg",
+  "dense": "assets/spatialarena/ChrispMarket_dense.jpg"
+ },
+ {
+  "scene": "CoalDropsYard2",
+  "tasks": [
+   "SLAM"
+  ],
+  "source": "SLAM/spatialarena/CoalDropsYard2",
+  "rgb": "assets/spatialarena/CoalDropsYard2_rgb.jpg",
+  "size": [
+   504,
+   406
+  ]
+ },
+ {
+  "scene": "DugaldStewartMonument",
+  "tasks": [
+   "SfM"
+  ],
+  "source": "SfM/spatialarena/DugaldStewartMonument",
+  "rgb": "assets/spatialarena/DugaldStewartMonument_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/DugaldStewartMonument_lidar.jpg"
+ },
+ {
+  "scene": "EdinburghCastle1",
+  "tasks": [
+   "SLAM"
+  ],
+  "source": "SLAM/spatialarena/EdinburghCastle1",
+  "rgb": "assets/spatialarena/EdinburghCastle1_rgb.jpg",
+  "size": [
+   504,
+   406
+  ]
+ },
+ {
+  "scene": "GridironBuildingFloor5",
+  "tasks": [
+   "SLAM"
+  ],
+  "source": "SLAM/spatialarena/GridironBuildingFloor5",
+  "rgb": "assets/spatialarena/GridironBuildingFloor5_rgb.jpg",
+  "size": [
+   504,
+   406
+  ],
+  "lidar": "assets/spatialarena/GridironBuildingFloor5_lidar.jpg"
+ },
+ {
+  "scene": "KingsCrossCanal2",
+  "tasks": [
+   "MonoDepth"
+  ],
+  "source": "MonoDepth/spatialarena/KingsCrossCanal2",
+  "rgb": "assets/spatialarena/KingsCrossCanal2_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/KingsCrossCanal2_lidar.jpg",
+  "dense": "assets/spatialarena/KingsCrossCanal2_dense.jpg"
+ },
+ {
+  "scene": "KingsCrossIsleOfFlowers",
+  "tasks": [
+   "MonoDepth"
+  ],
+  "source": "MonoDepth/spatialarena/KingsCrossIsleOfFlowers",
+  "rgb": "assets/spatialarena/KingsCrossIsleOfFlowers_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/KingsCrossIsleOfFlowers_lidar.jpg",
+  "dense": "assets/spatialarena/KingsCrossIsleOfFlowers_dense.jpg"
+ },
+ {
+  "scene": "KingsCrossWalk2",
+  "tasks": [
+   "MonoDepth"
+  ],
+  "source": "MonoDepth/spatialarena/KingsCrossWalk2",
+  "rgb": "assets/spatialarena/KingsCrossWalk2_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/KingsCrossWalk2_lidar.jpg",
+  "dense": "assets/spatialarena/KingsCrossWalk2_dense.jpg"
+ },
+ {
+  "scene": "NationalHistoryMuseum2",
+  "tasks": [
+   "MonoDepth",
+   "MVRecon"
+  ],
+  "source": "MVRecon/spatialarena/NationalHistoryMuseum2",
+  "rgb": "assets/spatialarena/NationalHistoryMuseum2_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/NationalHistoryMuseum2_lidar.jpg",
+  "dense": "assets/spatialarena/NationalHistoryMuseum2_dense.jpg"
+ },
+ {
+  "scene": "NationalHistoryMuseumIndoor1",
+  "tasks": [
+   "SLAM"
+  ],
+  "source": "SLAM/spatialarena/NationalHistoryMuseumIndoor1",
+  "rgb": "assets/spatialarena/NationalHistoryMuseumIndoor1_rgb.jpg",
+  "size": [
+   504,
+   406
+  ]
+ },
+ {
+  "scene": "NationalScotlandMuseum5",
+  "tasks": [
+   "MonoDepth"
+  ],
+  "source": "MonoDepth/spatialarena/NationalScotlandMuseum5",
+  "rgb": "assets/spatialarena/NationalScotlandMuseum5_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/NationalScotlandMuseum5_lidar.jpg",
+  "dense": "assets/spatialarena/NationalScotlandMuseum5_dense.jpg"
+ },
+ {
+  "scene": "NationalScotlandMuseum6",
+  "tasks": [
+   "MonoDepth",
+   "VideoDepth"
+  ],
+  "source": "MonoDepth/spatialarena/NationalScotlandMuseum6",
+  "rgb": "assets/spatialarena/NationalScotlandMuseum6_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/NationalScotlandMuseum6_lidar.jpg",
+  "dense": "assets/spatialarena/NationalScotlandMuseum6_dense.jpg"
+ },
+ {
+  "scene": "NationalScotlandMuseum7",
+  "tasks": [
+   "MonoDepth",
+   "MVRecon"
+  ],
+  "source": "MVRecon/spatialarena/NationalScotlandMuseum7",
+  "rgb": "assets/spatialarena/NationalScotlandMuseum7_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/NationalScotlandMuseum7_lidar.jpg",
+  "dense": "assets/spatialarena/NationalScotlandMuseum7_dense.jpg"
+ },
+ {
+  "scene": "NationalScotlandMuseum8",
+  "tasks": [
+   "MonoDepth",
+   "VideoDepth"
+  ],
+  "source": "MonoDepth/spatialarena/NationalScotlandMuseum8",
+  "rgb": "assets/spatialarena/NationalScotlandMuseum8_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/NationalScotlandMuseum8_lidar.jpg",
+  "dense": "assets/spatialarena/NationalScotlandMuseum8_dense.jpg"
+ },
+ {
+  "scene": "StGilesCathedralStatue",
+  "tasks": [
+   "SfM"
+  ],
+  "source": "SfM/spatialarena/StGilesCathedralStatue",
+  "rgb": "assets/spatialarena/StGilesCathedralStatue_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/StGilesCathedralStatue_lidar.jpg"
+ },
+ {
+  "scene": "StPancrasCorridor",
+  "tasks": [
+   "MonoDepth",
+   "VideoDepth"
+  ],
+  "source": "MonoDepth/spatialarena/StPancrasCorridor",
+  "rgb": "assets/spatialarena/StPancrasCorridor_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/StPancrasCorridor_lidar.jpg",
+  "dense": "assets/spatialarena/StPancrasCorridor_dense.jpg"
+ },
+ {
+  "scene": "StPancrasOutside",
+  "tasks": [
+   "SLAM"
+  ],
+  "source": "SLAM/spatialarena/StPancrasOutside",
+  "rgb": "assets/spatialarena/StPancrasOutside_rgb.jpg",
+  "size": [
+   504,
+   406
+  ]
+ },
+ {
+  "scene": "StPancrasStatue1",
+  "tasks": [
+   "MonoDepth",
+   "MVRecon"
+  ],
+  "source": "MVRecon/spatialarena/StPancrasStatue1",
+  "rgb": "assets/spatialarena/StPancrasStatue1_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/StPancrasStatue1_lidar.jpg",
+  "dense": "assets/spatialarena/StPancrasStatue1_dense.jpg"
+ },
+ {
+  "scene": "YorminsterTheChapteraofRoof",
+  "tasks": [
+   "MonoDepth",
+   "MVRecon",
+   "SfM"
+  ],
+  "source": "MVRecon/spatialarena/YorminsterTheChapteraofRoof",
+  "rgb": "assets/spatialarena/YorminsterTheChapteraofRoof_rgb.jpg",
+  "size": [
+   640,
+   518
+  ],
+  "lidar": "assets/spatialarena/YorminsterTheChapteraofRoof_lidar.jpg",
+  "dense": "assets/spatialarena/YorminsterTheChapteraofRoof_dense.jpg"
+ }
+]

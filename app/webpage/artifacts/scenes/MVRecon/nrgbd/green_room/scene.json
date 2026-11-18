@@ -1,0 +1,26 @@
+{
+ "task": "MVRecon",
+ "dataset": "nrgbd",
+ "scene": "green_room",
+ "gt_points": 60000,
+ "bounds": [
+  [
+   -3.933091115696471,
+   -0.003557681894356829,
+   -0.7467490579373324
+  ],
+  [
+   11.702852180824966,
+   4.330516447575355,
+   4.957544803619385
+  ]
+ ],
+ "error": {
+  "colormap": "turbo",
+  "vmin": 0.0,
+  "vmax": 0.1,
+  "eval_threshold": 0.05,
+  "label": "distance to the nearest GT point"
+ },
+ "gt_colors": false
+}

@@ -1,0 +1,67 @@
+{
+ "task": "MonoDepth",
+ "dataset": "marigold",
+ "scene": "diode",
+ "frames": [
+  {
+   "frame": "indoors__scene_00019__scan_00183__00019_00183_indoors_000_010",
+   "gt": "indoors__scene_00019__scan_00183__00019_00183_indoors_000_010.npy",
+   "absrel": 0.047624380387406816,
+   "delta125": 0.9516181163361003
+  },
+  {
+   "frame": "indoors__scene_00020__scan_00186__00020_00186_indoors_160_020",
+   "gt": "indoors__scene_00020__scan_00186__00020_00186_indoors_160_020.npy",
+   "absrel": 0.12023761468536211,
+   "delta125": 0.8503675389591296
+  },
+  {
+   "frame": "indoors__scene_00021__scan_00192__00021_00192_indoors_040_000",
+   "gt": "indoors__scene_00021__scan_00192__00021_00192_indoors_040_000.npy",
+   "absrel": 0.024969853908462243,
+   "delta125": 0.9805466831452739
+  },
+  {
+   "frame": "outdoor__scene_00022__scan_00195__00022_00195_outdoor_310_020",
+   "gt": "outdoor__scene_00022__scan_00195__00022_00195_outdoor_310_020.npy",
+   "absrel": 0.10657592240338264,
+   "delta125": 0.9158131048933107
+  },
+  {
+   "frame": "outdoor__scene_00023__scan_00199__00023_00199_outdoor_030_000",
+   "gt": "outdoor__scene_00023__scan_00199__00023_00199_outdoor_030_000.npy",
+   "absrel": 0.09441326431594817,
+   "delta125": 0.9383799108489841
+  },
+  {
+   "frame": "outdoor__scene_00024__scan_00202__00024_00202_outdoor_340_030",
+   "gt": "outdoor__scene_00024__scan_00202__00024_00202_outdoor_340_030.npy",
+   "absrel": 0.37488663412185863,
+   "delta125": 0.6446805877165387
+  }
+ ],
+ "size": {
+  "height": 480,
+  "width": 640
+ },
+ "depth_range": [
+  1.2104653358459472,
+  45.243677368163986
+ ],
+ "metrics": {
+  "abs_relative_difference": 0.22527424594345177,
+  "squared_relative_difference": 3.281601985813284,
+  "rmse_linear": 3.566200975628882,
+  "rmse_log": 0.25746259050486453,
+  "log10": 0.05632397724416099,
+  "delta103_acc": 0.5430258185943262,
+  "delta125_acc": 0.85846236542384,
+  "delta125_2_acc": 0.9239316553220757,
+  "delta125_3_acc": 0.9534721508648777,
+  "i_rmse": 1.0562742639900724,
+  "silog_rmse": 24.940427049915314,
+  "absrel_percent": 22.527424594345163,
+  "delta103_percent": 54.30258185943257,
+  "delta125_percent": 85.84623654238389
+ }
+}

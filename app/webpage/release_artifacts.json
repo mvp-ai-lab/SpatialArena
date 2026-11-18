@@ -1,0 +1,32 @@
+{
+  "_comment": "What python/export_release_artifacts.py copies into artifacts/ (committed, served by the Artifact Viewer). Per scene: the task's top_methods best-ranked methods that have viewer assets for it, plus extra_methods. license: the spatialarena.dataset_licenses.SOURCE_LICENSES key credited in artifacts/README.md.",
+  "top_methods": 10,
+  "extra_methods": {
+    "MonoDepth": ["GPT_6_ASTRA", "GEMINI_4_ARGON", "CLAUDE_OPUS_5_5"]
+  },
+  "caps": {
+    "MonoDepth": {"frames": 6, "frame_pick": "spread"},
+    "VideoDepth": {"frames": 24, "frame_pick": "first"},
+    "MVRecon": {"points": 60000, "gt_points": 60000},
+    "thumbnail_width": 240,
+    "thumbnail_quality": 70
+  },
+  "max_total_mb": 200,
+  "scenes": [
+    {"task": "MonoDepth", "dataset_key": "spatialarena", "scene": "CambridgeRalishLibrary", "license": "spatialarena"},
+    {"task": "MonoDepth", "dataset_key": "ibims1", "scene": "ibims1", "license": "ibims1"},
+    {"task": "MonoDepth", "dataset_key": "marigold", "scene": "diode", "license": "diode"},
+    {"task": "VideoDepth", "dataset_key": "spatialarena", "scene": "ChrispAlley1_clip00_cam1", "license": "spatialarena"},
+    {"task": "VideoDepth", "dataset_key": "bonn", "scene": "rgbd_bonn_balloon", "license": "bonn_rgbd_dynamic"},
+    {"task": "VideoDepth", "dataset_key": "dycheck", "scene": "apple", "license": "dycheck"},
+    {"task": "MVRecon", "dataset_key": "spatialarena", "scene": "StPancrasStatue1", "license": "spatialarena"},
+    {"task": "MVRecon", "dataset_key": "eth3d", "scene": "delivery_area", "license": "eth3d"},
+    {"task": "MVRecon", "dataset_key": "nrgbd", "scene": "green_room", "license": "nrgbd"},
+    {"task": "SfM", "dataset_key": "spatialarena", "scene": "BankUndergroundStation", "license": "spatialarena"},
+    {"task": "SfM", "dataset_key": "eth3d", "scene": "courtyard", "license": "eth3d"},
+    {"task": "SfM", "dataset_key": "tanks_and_temples", "scene": "Barn", "license": "tanks_and_temples"},
+    {"task": "SLAM", "dataset_key": "spatialarena@short", "scene": "CambridgeSmallGarden2", "license": "spatialarena"},
+    {"task": "SLAM", "dataset_key": "tum_dynamics@short", "scene": "rgbd_dataset_freiburg3_sitting_rpy", "license": "tum_dynamics"},
+    {"task": "SLAM", "dataset_key": "7scenes@short", "scene": "stairs_seq-01", "license": "7scenes"}
+  ]
+}

@@ -1,0 +1,777 @@
+/*
+ * Copyright (c) 2026 Yu Chen. All rights reserved.
+ * SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+ */
+
+/* Comparison modes of the artifact viewer (js/compare/). */
+
+/* A rule's display value must not un-hide elements the scripts hide with the hidden attribute. */
+.compare-root [hidden] {
+    display: none !important;
+}
+
+.compare-segmented {
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    display: inline-flex;
+    flex-wrap: wrap;
+    overflow: hidden;
+}
+
+.compare-segmented button {
+    background: transparent;
+    border: 0;
+    border-right: 1px solid var(--glass-border);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 12px;
+}
+
+.compare-segmented button:last-child {
+    border-right: 0;
+}
+
+.compare-segmented button.active {
+    background: var(--primary);
+    color: #fff;
+}
+
+.compare-segmented button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.compare-mode-switch {
+    margin: 0 0 14px;
+}
+
+.compare-toolbar {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    margin-bottom: 10px;
+}
+
+.compare-inline {
+    align-items: center;
+    color: var(--text-secondary);
+    display: inline-flex;
+    font-size: 13px;
+    gap: 6px;
+}
+
+.compare-inline input[type="range"] {
+    width: 90px;
+}
+
+.compare-frame-control {
+    align-items: center;
+    display: flex;
+    flex: 1 1 260px;
+    gap: 8px;
+    min-width: 220px;
+}
+
+.compare-frame-control input[type="range"] {
+    flex: 1;
+}
+
+.compare-button {
+    align-items: center;
+    background: transparent;
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    font-size: 13px;
+    gap: 6px;
+    padding: 6px 12px;
+}
+
+.compare-button-primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+.compare-icon-button {
+    background: transparent;
+    border: 0;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 4px 6px;
+}
+
+.compare-link-button {
+    background: transparent;
+    border: 0;
+    color: var(--primary);
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    padding: 0 4px;
+}
+
+.compare-muted {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.compare-stage {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr) 280px;
+}
+
+.compare-canvas-wrap {
+    background: #111318;
+    border-radius: 10px;
+    height: min(68vh, 680px);
+    min-height: 320px;
+    overflow: hidden;
+    position: relative;
+}
+
+.compare-canvas {
+    display: block;
+    height: 100%;
+    width: 100%;
+}
+
+.compare-canvas-hint {
+    color: #cbd5e1;
+    font-size: 14px;
+    left: 50%;
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.compare-layers {
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+}
+
+.compare-layers-header {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.compare-layer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    list-style: none;
+    margin: 0;
+    max-height: 420px;
+    overflow-y: auto;
+    padding: 0;
+}
+
+.compare-layer {
+    align-items: center;
+    display: grid;
+    font-size: 13px;
+    gap: 6px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.compare-layer.is-hidden .compare-layer-name,
+.compare-layer.is-hidden .compare-layer-detail {
+    opacity: 0.45;
+}
+
+.compare-layer-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.compare-layer-detail {
+    color: var(--text-secondary);
+    font-size: 12px;
+    grid-column: 2;
+}
+
+.compare-layer .compare-icon-button[data-action="remove"] {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+}
+
+.compare-layer-toggle {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    grid-row: 1 / span 2;
+    padding: 2px;
+}
+
+.compare-swatch {
+    border: 1px solid rgba(0, 0, 0, 0.25);
+    border-radius: 3px;
+    display: inline-block;
+    height: 12px;
+    width: 12px;
+}
+
+.compare-add-button {
+    justify-content: center;
+}
+
+.compare-readout {
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 13px;
+    gap: 6px 14px;
+    margin-top: 10px;
+}
+
+.compare-readout-item {
+    align-items: center;
+    display: inline-flex;
+    gap: 6px;
+}
+
+.trajectory-inset {
+    background: rgba(17, 19, 24, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 6px;
+    left: 10px;
+    margin: 0;
+    overflow: hidden;
+    pointer-events: none;
+    position: absolute;
+    top: 10px;
+    width: min(30%, 320px);
+}
+
+.trajectory-inset img {
+    display: block;
+    width: 100%;
+}
+
+.trajectory-inset figcaption {
+    color: #e2e8f0;
+    font-size: 11px;
+    overflow: hidden;
+    padding: 3px 6px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Depth comparison */
+
+.depth-compare-main {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.depth-compare-area {
+    background: var(--depth-compare-bg, #111318);
+    border-radius: 10px;
+    min-height: 320px;
+    outline: none;
+    padding: 10px;
+    position: relative;
+}
+
+.depth-compare-hint {
+    position: absolute;
+}
+
+/* The minimum height only holds the empty-state hint; loaded maps size the area themselves. */
+.depth-compare-area:has(.depth-compare-block, .depth-compare-grid) {
+    min-height: 0;
+}
+
+.depth-compare-block,
+.depth-compare-tile {
+    background: var(--depth-compare-bg, #000);
+    border-radius: 6px;
+    cursor: crosshair;
+    margin: 0 auto;
+    max-height: min(68vh, 680px);
+    max-width: 100%;
+    overflow: hidden;
+    position: relative;
+    touch-action: none;
+    user-select: none;
+}
+
+.depth-compare-zoom {
+    height: 100%;
+    inset: 0;
+    position: absolute;
+    transform-origin: 0 0;
+    width: 100%;
+}
+
+.depth-compare-zoom img {
+    height: 100%;
+    image-rendering: auto;
+    inset: 0;
+    object-fit: contain;
+    position: absolute;
+    width: 100%;
+}
+
+.depth-compare-zoom img.is-missing {
+    visibility: hidden;
+}
+
+.depth-compare-divider {
+    background: #fff;
+    bottom: 0;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    transform: translateX(-1px);
+    width: 2px;
+}
+
+.depth-compare-tag {
+    background: rgba(17, 19, 24, 0.72);
+    border-radius: 4px;
+    color: #f1f5f9;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.25;
+    padding: 3px 8px;
+    pointer-events: none;
+    position: absolute;
+    top: 8px;
+}
+
+.depth-compare-tag:empty {
+    display: none;
+}
+
+.depth-compare-tag-left {
+    left: 8px;
+}
+
+.depth-compare-tag-right {
+    right: 8px;
+}
+
+.depth-compare-grid .depth-compare-tile {
+    width: 100%;
+}
+
+.depth-compare-grid {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(var(--depth-grid-columns, 2), minmax(0, 1fr));
+}
+
+.depth-compare-crosshair {
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+    height: 14px;
+    pointer-events: none;
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 14px;
+}
+
+/* Depth comparison layout: viewer layers (with the RGB reference thumbnail) above the depth maps. */
+.depth-compare-stage {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.depth-compare-panel {
+    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.depth-compare-layer-list {
+    display: flex;
+    flex: 1 1 360px;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+
+.depth-compare-layer-list .compare-layer-list {
+    display: grid;
+    gap: 6px 16px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    max-height: 168px;
+}
+
+.depth-compare-layer-list .compare-add-button {
+    align-self: flex-start;
+}
+
+.depth-rgb-thumb {
+    flex: 0 0 auto;
+    margin: 0;
+    width: min(280px, 100%);
+}
+
+.depth-rgb-thumb figcaption {
+    font-size: 12px;
+    margin-top: 4px;
+    text-align: center;
+}
+
+.depth-rgb-frame {
+    background: #000;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+}
+
+.depth-rgb-frame img {
+    height: 100%;
+    inset: 0;
+    object-fit: contain;
+    position: absolute;
+    width: 100%;
+}
+
+.depth-rgb-frame img.is-missing {
+    visibility: hidden;
+}
+
+.depth-rgb-marker {
+    border: 2px solid #facc15;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    position: absolute;
+}
+
+.depth-rgb-marker.is-point {
+    border-radius: 50%;
+    height: 10px !important;
+    transform: translate(-50%, -50%);
+    width: 10px !important;
+}
+
+/* Grid magnifier: a zoomed-in patch of the tile's own image, centered at the cursor. */
+.depth-compare-lens {
+    background-color: #000;
+    background-repeat: no-repeat;
+    border: 2px solid #fff;
+    border-radius: 6px;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 6px 18px rgba(0, 0, 0, 0.45);
+    image-rendering: pixelated;
+    pointer-events: none;
+    position: absolute;
+    z-index: 2;
+}
+
+.compare-color-input {
+    background: transparent;
+    border: 1px solid var(--glass-border);
+    border-radius: 4px;
+    cursor: pointer;
+    height: 22px;
+    padding: 0 2px;
+    width: 32px;
+}
+
+/* Trajectory pose AUC chart. */
+.trajectory-auc {
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 12px;
+    padding: 12px;
+}
+
+.trajectory-auc-header {
+    align-items: baseline;
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 13px;
+    gap: 4px 10px;
+}
+
+.trajectory-auc-chart {
+    color: var(--text-secondary);
+    font-size: 11px;
+    height: auto;
+    max-height: 300px;
+    width: 100%;
+}
+
+.trajectory-auc-chart text {
+    fill: currentColor;
+}
+
+.trajectory-auc-chart .auc-grid {
+    stroke: currentColor;
+    stroke-opacity: 0.18;
+}
+
+.trajectory-auc-legend {
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 12px;
+    gap: 6px 16px;
+}
+
+.depth-compare-legend {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 12px;
+    gap: 6px 18px;
+}
+
+.depth-legend-item {
+    align-items: center;
+    display: inline-flex;
+    gap: 6px;
+}
+
+.depth-legend-bar {
+    border-radius: 3px;
+    display: inline-block;
+    height: 10px;
+    width: 120px;
+}
+
+/* Reconstruction comparison */
+
+.recon-compare-wrap {
+    outline: none;
+}
+
+.recon-compare-labels {
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+}
+
+.recon-compare-label {
+    background: rgba(17, 19, 24, 0.72);
+    border-radius: 4px;
+    color: #f1f5f9;
+    display: flex;
+    flex-direction: column;
+    font-size: 17px;
+    font-weight: 600;
+    gap: 2px;
+    line-height: 1.25;
+    max-width: 60%;
+    padding: 4px 9px;
+    position: absolute;
+}
+
+.recon-compare-label strong {
+    font-weight: 600;
+}
+
+.recon-compare-label span {
+    color: #cbd5e1;
+    font-size: 13px;
+    font-weight: 400;
+}
+
+/* Dialog */
+
+.compare-dialog-overlay {
+    align-items: center;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    padding: 16px;
+    position: fixed;
+    z-index: 1000;
+}
+
+.compare-dialog {
+    background: var(--bg-primary, #fff);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.25);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+    width: min(480px, 100%);
+}
+
+.compare-dialog-header,
+.compare-dialog-footer {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    padding: 12px 16px;
+}
+
+.compare-dialog-header h3 {
+    font-size: 16px;
+    margin: 0;
+}
+
+.compare-dialog-footer {
+    border-top: 1px solid var(--glass-border);
+    justify-content: flex-end;
+}
+
+.compare-dialog-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    padding: 4px 16px 12px;
+}
+
+.compare-dialog-body label {
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+    gap: 4px;
+}
+
+.compare-dialog-methods-header {
+    display: flex;
+    font-size: 13px;
+    justify-content: space-between;
+}
+
+.compare-dialog-methods {
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    max-height: 260px;
+    overflow-y: auto;
+    padding: 6px 10px;
+}
+
+.compare-dialog-body .compare-dialog-method {
+    align-items: center;
+    display: grid;
+    gap: 8px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 3px 0;
+}
+
+.compare-dialog-method.is-loaded {
+    opacity: 0.6;
+}
+
+.compare-dialog-note {
+    color: #b45309;
+    font-size: 12px;
+    margin: 0;
+    min-height: 1em;
+}
+
+/* Full screen (the whole mode: toolbars on top, the viewer and its layer list filling the rest) */
+
+.compare-mode:fullscreen {
+    background: var(--card-bg);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow: auto;
+    padding: 12px;
+}
+
+.compare-mode:fullscreen .compare-stage {
+    flex: 1 1 auto;
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+}
+
+.compare-mode:fullscreen .compare-canvas-wrap {
+    height: auto;
+    min-height: 0;
+}
+
+.compare-mode:fullscreen .compare-layer-list {
+    max-height: none;
+}
+
+@media (max-width: 900px) {
+    .compare-stage {
+        grid-template-columns: 1fr;
+    }
+
+}
+
+/* ---- Reordering viewer windows: left / right arrows and Ctrl + drag ---- */
+
+.compare-layer.has-move {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+.compare-layer.has-move > .compare-move-buttons,
+.compare-layer.has-move > span:empty {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+}
+
+.compare-layer.has-move .compare-icon-button[data-action="remove"] {
+    grid-column: 4;
+}
+
+.compare-move-buttons {
+    display: inline-flex;
+    gap: 2px;
+}
+
+.compare-move-button {
+    font-size: 11px;
+    height: 22px;
+    padding: 0;
+    width: 22px;
+}
+
+.compare-move-button:disabled {
+    cursor: default;
+    opacity: 0.3;
+}
+
+.compare-move-hint {
+    font-size: 11px;
+}
+
+.is-reordering,
+.is-reordering * {
+    cursor: grabbing !important;
+}
+
+.recon-compare-drop {
+    border: 3px dashed #60a5fa;
+    border-radius: 6px;
+    box-sizing: border-box;
+    pointer-events: none;
+    position: absolute;
+}
+
+.depth-compare-tile.is-drop-target {
+    outline: 3px dashed #60a5fa;
+    outline-offset: -3px;
+}

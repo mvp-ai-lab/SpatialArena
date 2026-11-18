@@ -1,0 +1,22 @@
+method	task	dataset	variant	scene	status	detail
+FASTVGGT	MonoDepth	marigold		diode	error	~/datasets/benchmark/_ffb_eval/monodepth-geometry-batch-20261023/reports/benchmark_full_reports/full-depth/FASTVGGT/case_failures_FASTVGGT_full-depth_MonoDepth_marigold.tsv
+FASTVGGT	MonoDepth	marigold		eth3d	error	~/datasets/benchmark/_ffb_eval/monodepth-geometry-batch-20261023/reports/benchmark_full_reports/full-depth/FASTVGGT/case_failures_FASTVGGT_full-depth_MonoDepth_marigold.tsv
+FASTVGGT	MonoDepth	marigold		kitti	error	~/datasets/benchmark/_ffb_eval/monodepth-geometry-batch-20261023/reports/benchmark_full_reports/full-depth/FASTVGGT/case_failures_FASTVGGT_full-depth_MonoDepth_marigold.tsv
+FASTVGGT	MonoDepth	marigold		nyuv2	error	~/datasets/benchmark/_ffb_eval/monodepth-geometry-batch-20261023/reports/benchmark_full_reports/full-depth/FASTVGGT/case_failures_FASTVGGT_full-depth_MonoDepth_marigold.tsv
+IGGT	MonoDepth	hammer		hammer	gpu_oom	~/datasets/benchmark/_ffb_eval/monodepth-missing-20261029/reports/benchmark_full_reports/full-depth/IGGT/case_failures_IGGT_full-depth_MonoDepth_hammer.tsv
+IGGT	MonoDepth	ibims1		ibims1	gpu_oom	~/datasets/benchmark/_ffb_eval/monodepth-missing-20261029/reports/benchmark_full_reports/full-depth/IGGT/case_failures_IGGT_full-depth_MonoDepth_ibims1.tsv
+IGGT	MonoDepth	marigold		diode	gpu_oom	~/datasets/benchmark/_ffb_eval/monodepth-missing-20261029/reports/benchmark_full_reports/full-depth/IGGT/case_failures_IGGT_full-depth_MonoDepth_marigold.tsv
+IGGT	MonoDepth	marigold		eth3d	gpu_oom	~/datasets/benchmark/_ffb_eval/monodepth-missing-20261029/reports/benchmark_full_reports/full-depth/IGGT/case_failures_IGGT_full-depth_MonoDepth_marigold.tsv
+IGGT	MonoDepth	marigold		kitti	gpu_oom	~/datasets/benchmark/_ffb_eval/monodepth-missing-20261029/reports/benchmark_full_reports/full-depth/IGGT/case_failures_IGGT_full-depth_MonoDepth_marigold.tsv
+IGGT	MonoDepth	marigold		nyuv2	gpu_oom	~/datasets/benchmark/_ffb_eval/monodepth-missing-20261029/reports/benchmark_full_reports/full-depth/IGGT/case_failures_IGGT_full-depth_MonoDepth_marigold.tsv
+IGGT	MonoDepth	spring		spring	gpu_oom	~/datasets/benchmark/_ffb_eval/monodepth-missing-20261029/reports/benchmark_full_reports/full-depth/IGGT/case_failures_IGGT_full-depth_MonoDepth_spring.tsv
+IGGT	MonoDepth	synth4k		cyberpunk	gpu_oom	~/datasets/benchmark/_ffb_eval/monodepth-missing-20261029/reports/benchmark_full_reports/full-depth/IGGT/case_failures_IGGT_full-depth_MonoDepth_synth4k.tsv
+IGGT	MonoDepth	synth4k		deadisland	gpu_oom	~/datasets/benchmark/_ffb_eval/monodepth-missing-20261029/reports/benchmark_full_reports/full-depth/IGGT/case_failures_IGGT_full-depth_MonoDepth_synth4k.tsv
+IGGT	MonoDepth	synth4k		spiderman2	gpu_oom	~/datasets/benchmark/_ffb_eval/monodepth-missing-20261029/reports/benchmark_full_reports/full-depth/IGGT/case_failures_IGGT_full-depth_MonoDepth_synth4k.tsv
+IGGT	MonoDepth	synth4k		spidermanmm	gpu_oom	~/datasets/benchmark/_ffb_eval/monodepth-missing-20261029/reports/benchmark_full_reports/full-depth/IGGT/case_failures_IGGT_full-depth_MonoDepth_synth4k.tsv
+IGGT	MonoDepth	synth4k		watchdoglegion	gpu_oom	~/datasets/benchmark/_ffb_eval/monodepth-missing-20261029/reports/benchmark_full_reports/full-depth/IGGT/case_failures_IGGT_full-depth_MonoDepth_synth4k.tsv
+MARIGOLD_V2	MonoDepth	aerialmetric		decoupled	error	~/datasets/benchmark/_ffb_eval/monodepth-marigold-v2-qwen-20261027/reports/benchmark_full_reports/full-depth/MARIGOLD_V2/case_failures_MARIGOLD_V2_full-depth_MonoDepth_aerialmetric.tsv
+MARIGOLD_V2	MonoDepth	aerialmetric		oblique	error	~/datasets/benchmark/_ffb_eval/monodepth-marigold-v2-qwen-20261027/reports/benchmark_full_reports/full-depth/MARIGOLD_V2/case_failures_MARIGOLD_V2_full-depth_MonoDepth_aerialmetric.tsv
+MARIGOLD_V2	MonoDepth	hammer		hammer	error	~/datasets/benchmark/_ffb_eval/monodepth-marigold-v2-qwen-20261027/reports/benchmark_full_reports/full-depth/MARIGOLD_V2/case_failures_MARIGOLD_V2_full-depth_MonoDepth_hammer.tsv
+MARIGOLD_V2	MonoDepth	marigold		kitti	error	~/datasets/benchmark/_ffb_eval/monodepth-marigold-v2-qwen-20261027/reports/benchmark_full_reports/full-depth/MARIGOLD_V2/case_failures_MARIGOLD_V2_full-depth_MonoDepth_marigold.tsv
+MARIGOLD_V2	MonoDepth	marigold		nyuv2	error	~/datasets/benchmark/_ffb_eval/monodepth-marigold-v2-qwen-20261027/reports/benchmark_full_reports/full-depth/MARIGOLD_V2/case_failures_MARIGOLD_V2_full-depth_MonoDepth_marigold.tsv
