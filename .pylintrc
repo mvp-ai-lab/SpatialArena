@@ -1,0 +1,23 @@
+[MAIN]
+jobs=1
+recursive=y
+ignore=__pycache__,.git,.pytest_cache,.mypy_cache,spatialarena.egg-info
+ignore-paths=
+    spatialarena/eval/tnt_tools/.*
+
+[MESSAGES CONTROL]
+# Release linting focuses on code-breaking issues. The repository contains
+# research scripts, CLIs, long data-conversion routines, and vendored evaluator
+# code where default pylint style/docstring/complexity checks are too noisy to
+# use as a release gate.
+disable=
+    C,
+    R,
+    W,
+    duplicate-code,
+    import-error,
+    no-member,
+    c-extension-no-member
+
+[FORMAT]
+max-line-length=120

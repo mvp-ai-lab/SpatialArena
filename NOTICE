@@ -1,0 +1,13 @@
+SpatialArena
+
+Required Notice: Copyright (c) 2026 Yu Chen.
+
+License: PolyForm Noncommercial License 1.0.0
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+
+Commercial use requires separate written authorization from Yu Chen.
+
+This repository may include scripts or adapters that interact with third-party
+datasets, benchmarks, or libraries. Those external assets remain governed by
+their own licenses and access terms. This project license does not grant rights
+to redistribute or commercially use third-party datasets or model artifacts.
