@@ -1,0 +1,50 @@
+# Publish the results webpage (app/webpage) on GitHub Pages.
+# Only the files the page loads are published: index.html, css/, js/, assets/, artifacts/ and data/results*.json
+# (not the Python tools, docs, local server or the data folder's TSVs). The page is static, so nothing is built.
+# One-time setup: Settings -> Pages -> Source: "GitHub Actions".
+name: Deploy webpage
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/webpage/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; a newer push replaces a queued one.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Stage the web files
+        run: |
+          set -euo pipefail
+          src=app/webpage
+          mkdir -p _site/data
+          cp -r "$src/index.html" "$src/css" "$src/js" "$src/assets" "$src/artifacts" _site/
+          cp "$src"/data/results.json "$src"/data/results_live.json _site/data/
+          echo "staged $(find _site -type f | wc -l) files, $(du -sh _site | cut -f1)"
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v5
