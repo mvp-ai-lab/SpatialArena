@@ -1345,28 +1345,22 @@ function benchmarkApplyReleaseZoom(chart) {
 // Chart.js plugin: writes each point's model name next to it, trying positions around the point until the
 // label overlaps neither an earlier label nor a point; a label moved away from its point gets a leader line.
 // VLMs are drawn on the evolving curves as their maker's logo (assets/logos/models/, a white badge so the marks stay
-// legible in both themes): DepthVLM by Tencent Hunyuan, DepthLM by Meta, Qwen3-VL by Qwen, and the three commercial
-// models by Google, Anthropic and OpenAI. Keyed by base method, so every track of a model gets the logo.
+// legible in both themes): DepthVLM by Tencent Hunyuan, DepthLM by Meta, Qwen3-VL by Qwen, SenseNova-Vision by
+// SenseTime (its GitHub organisation's avatar), and the three commercial models by Google, Anthropic and OpenAI. Keyed by base method, so every track of a model gets the logo.
 const BENCHMARK_MODEL_LOGOS = {
-    DEPTHVLM: "hunyuan", DEPTHLM: "meta", QWEN3_VL: "qwen",
+    DEPTHVLM: "hunyuan", DEPTHLM: "meta", QWEN3_VL: "qwen", SENSENOVA_VISION: "sensenova",
     GEMINI_4_ARGON: "google", CLAUDE_OPUS_5_5: "anthropic", GPT_6_ASTRA: "openai",
 };
 const BENCHMARK_LOGO_SIZE = 22;
+const BENCHMARK_TOOLTIP_MARKER_SIZE = 16;
 
 // Results shown with a caveat until they are rerun, keyed by base method (every track of the model). Tables tag the
 // name ("rerun pending", the note on hover), charts add "*", and the leaderboard, task tables and evolving curves
 // print the notes underneath. Remove an entry once the method's rerun is collected.
-// The point-query VLMs first ran with one query per image; their MonoDepth SpatialArena scenes (2026-11-11), iBims-1,
-// Synth4K and AerialMetric wild, and all of VideoDepth (2026-11-18) were rerun with a 16x16 grid
-// (MethodSpec.point_grid_size), the other MonoDepth cases not yet.
-const BENCHMARK_CENTRE_QUERY_NOTE = "MonoDepth AerialMetric decoupled and oblique, Hammer, Marigold (DIODE, ETH3D, "
-    + "KITTI, NYUv2) and Spring are still scored from a single point query per image (the image centre), so each "
-    + "predicted depth map is constant; their rerun with the 16\u00d716 query grid already used for the other "
-    + "MonoDepth datasets and VideoDepth is pending";
-const BENCHMARK_METHOD_FLAGS = {
-    DEPTHLM: BENCHMARK_CENTRE_QUERY_NOTE,
-    QWEN3_VL: BENCHMARK_CENTRE_QUERY_NOTE,
-};
+// Entries look like `DEPTHLM: "<the caveat>"`. None at present: DepthLM and Qwen3-VL, first scored from one point query
+// per image, were rerun with a 16x16 grid (MethodSpec.point_grid_size) on every MonoDepth and VideoDepth case
+// (2026-11-11 to 2026-11-19).
+const BENCHMARK_METHOD_FLAGS = {};
 
 function benchmarkMethodFlag(methodOrRow) {
     const method = typeof methodOrRow === "string" ? methodOrRow : methodOrRow?.method;
@@ -1403,15 +1397,18 @@ function renderBenchmarkFlagNotes() {
 }  // CSS pixels; the SVG badges stay sharp at any device pixel ratio
 const benchmarkLogoImages = {};
 
-function benchmarkModelLogo(method) {
-    const name = BENCHMARK_MODEL_LOGOS[benchmarkBaseMethodName(method)];
-    if (!name) return null;
+// `size` is the drawn size in CSS pixels (Chart.js draws an image point style at the image's own width and height):
+// the plotted badge by default, a smaller one for the tooltip's marker.
+function benchmarkModelLogo(method, size = BENCHMARK_LOGO_SIZE) {
+    const logo = BENCHMARK_MODEL_LOGOS[benchmarkBaseMethodName(method)];
+    if (!logo) return null;
+    const name = size === BENCHMARK_LOGO_SIZE ? logo : `${logo}@${size}`;
     if (!benchmarkLogoImages[name]) {
-        const image = new Image(BENCHMARK_LOGO_SIZE, BENCHMARK_LOGO_SIZE);
-        image.alt = name;
+        const image = new Image(size, size);
+        image.alt = logo;
         // Charts drawn before the badge arrived redraw once it has.
         image.addEventListener("load", () => Object.values(benchmarkScatterCharts).forEach(chart => chart?.draw()));
-        image.src = `assets/logos/models/${name}.svg`;
+        image.src = `assets/logos/models/${logo}.svg`;
         benchmarkLogoImages[name] = image;
     }
     return benchmarkLogoImages[name];
@@ -1612,11 +1609,9 @@ function renderBenchmarkReleaseScatterCharts() {
         });
     }
 
-    const plotted = new Set();
     const undated = new Set();
     for (const task of tasks) {
         const { points, undated: missing } = benchmarkReleasePoints(task, rows);
-        points.forEach(point => plotted.add(point.method));
         missing.forEach(label => undated.add(label));
         const canvas = document.getElementById(`benchmarkReleaseScatter-${task}`);
         if (!canvas || !points.length) continue;
@@ -1707,7 +1702,17 @@ function renderBenchmarkReleaseScatterCharts() {
                     },
                     tooltip: {
                         filter: item => !item.dataset.trend,
+                        // The marker beside each entry is the point's own: the model's logo, or its circle / triangle
+                        // (not Chart.js's default colour square).
+                        usePointStyle: true,
+                        boxWidth: BENCHMARK_TOOLTIP_MARKER_SIZE,
+                        boxHeight: BENCHMARK_TOOLTIP_MARKER_SIZE,
                         callbacks: {
+                            labelPointStyle: context => ({
+                                pointStyle: benchmarkModelLogo(context.raw?.method, BENCHMARK_TOOLTIP_MARKER_SIZE)
+                                    || (context.raw?.auxiliary ? "triangle" : "circle"),
+                                rotation: 0,
+                            }),
                             label: context => {
                                 const point = context.raw;
                                 const family = point.family ? ` \u00b7 ${point.family.label}` : "";
@@ -1755,8 +1760,6 @@ function renderBenchmarkReleaseScatterCharts() {
         });
     }
     for (const chart of Object.values(benchmarkScatterCharts)) benchmarkAttachReleaseZoom(chart);
-    const badge = document.getElementById("benchmark-release-badge");
-    if (badge) badge.textContent = `${plotted.size} runs`;
     const note = document.getElementById("benchmark-release-undated");
     if (note) {
         note.textContent = undated.size

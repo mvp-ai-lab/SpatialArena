@@ -157,8 +157,8 @@ released scene with its four best methods.
 
 Results that need a caveat are listed in `BENCHMARK_METHOD_FLAGS` (`js/benchmark.js`, by base method): tables tag the
 name "rerun pending" (the caveat on hover), charts add `*`, and the leaderboard, task tables and evolving curves print
-the caveat underneath. DepthLM and Qwen3-VL are flagged until their non-SpatialArena MonoDepth datasets and VideoDepth are
-rerun with the 16x16 query grid their SpatialArena scenes already use; remove their entries then.
+the caveat underneath. No method is flagged at present (DepthLM and Qwen3-VL were, until their 16x16 point-grid rerun
+covered every MonoDepth and VideoDepth case on 2026-11-19).
 
 The Leaderboard view (`#leaderboard`) has an **Overall** tab, the ranking over all tasks, and one tab per task with
 that task's metric tables (this was the separate Task Metrics view). Under a task tab there is one tab per dataset of
@@ -214,8 +214,8 @@ reduced motion everything is shown at once.
 
 - **Authors**, on the first slide under the lead: each name links to the author's homepage; † marks the project
   leader (Yu Chen) and ✉ the corresponding author (Jiankang Deng); the lab is MVP Lab, with its logo
-  (`assets/logos/mvp_lab.png`, the lab's GitHub avatar). Static markup in `index.html`. Hidden for now (the block's
-  `hidden` attribute); remove the attribute to show it again.
+  (`assets/logos/mvp_lab.png`, the lab's GitHub avatar). Static markup in `index.html`; adding `hidden` to the
+  `.home-authors` block hides it.
 - **Hero scene** (`js/home_scene.js`): `assets/scene/yorkminster_chapter_house.sap2`, the SpatialArena
   YorminsterTheChapteraofRoof LiDAR map at 2.4M points, streamed in five chunks (two on small screens, data-saver
   connections and low-memory devices). Packed by `scripts/visualization/pack_home_hero_cloud.py`.
@@ -226,7 +226,9 @@ reduced motion everything is shown at once.
 - **Evolving Curves for Geometric Foundation Models**, score vs. release date (`renderBenchmarkReleaseScatterCharts` in `js/benchmark.js`; moved here from the
   Overview): one tab per task, each run's leaderboard task score against its paper date with per-family trend lines.
   VLMs are drawn as their maker's logo (`BENCHMARK_MODEL_LOGOS`, badges in `assets/logos/models/`; the Gemini, Claude
-  and GPT marks are the icons openrouter.ai shows for Google Gemini, Anthropic and OpenAI). Runs from the same month
+  and GPT marks are the icons openrouter.ai shows for Google Gemini, Anthropic and OpenAI; SenseNova-Vision's is
+  SenseTime's GitHub avatar). The hover tooltip marks each run with its logo, or its circle / triangle, rather than a
+  colour square. Runs from the same month
   with nearly the same score are spread sideways within the month (`benchmarkDodgeReleasePoints`; the trends fit the
   paper dates). It plots the
   published leaderboard scores, so the Overview's filters do not apply. Drag a box to zoom; the chart
