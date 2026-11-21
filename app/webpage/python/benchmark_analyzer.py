@@ -516,7 +516,7 @@ CASE_FAILURE_LABELS = {
     "oom": "OOM",
     "degenerate_constant_prediction": "Constant prediction",
     "empty_point_cloud": "Empty point cloud",
-    # The 2026-11-20 per-case triage (docs/case_failure.csv): causes found in the jobs' logs and reports.
+    # The 2026-11-20 per-case triage: causes found in the jobs' logs and reports.
     "empty_eval_region": "Empty eval region",
     "int32_index_limit": "Int32 index limit",
     "missing_dependency": "Missing dependency",
@@ -782,7 +782,7 @@ METHOD_TYPE_LABELS = {
 METHOD_TYPES = {
     **dict.fromkeys(("DUST3R", "MAST3R", "POW3R", "CUT3R", "FAST3R", "VGGT", "VGGT_OMEGA", "PI3_X", "AMB3R",
                      "FASTVGGT", "COME", "MAPANYTHING", "OMNIVGGT", "DEJAVIEW", "IGGT", "IGGT4D", "ROBUSTVGGT",
-                     "DA3-G", "DA3-L", "DA3-NGL", "DA3", "TRIDENT"), "feedforward_3d"),
+                     "DA3-G", "DA3-L", "DA3-NGL", "DA3"), "feedforward_3d"),
     **dict.fromkeys(("VGGT_LONG", "PI_LONG", "VGGT_SLAM", "LOGER", "ZIPMAP", "LINGBOT_MAP", "R3", "SCAL3R",
                      "ABOT_RECON"), "streaming"),
     **dict.fromkeys(("MOGE", "MOGE2", "MOGE3", "DEPTH_PRO", "UNIDEPTH_V2", "INFINIDEPTH", "MARIGOLD", "MARIGOLD_V2",
@@ -1620,11 +1620,6 @@ def missing_method_row(method: str) -> dict[str, Any]:
     }
 
 
-# Registered methods (with every track variant) kept off the dashboard's coverage matrix and "missing" rows until
-# they are published: our own models. Their real results, once collected, are listed as usual.
-UNLISTED_METHODS = frozenset({"TRIDENT"})
-
-
 # Coverage statuses of a method track that was run: it has results, recorded failures, or reported itself unsupported.
 ATTEMPTED_STATUSES = ("complete", "partial", "failed", "reported_unsupported")
 
@@ -1635,7 +1630,7 @@ def add_missing_method_rows(task_tables: dict[str, Any], coverage: dict[str, Any
     "Required" is the coverage matrix's view (build_coverage): a registered method whose ``<task>|<track>`` cell is
     not ``unsupported``, on the datasets that cell expects. Each existing dataset table gets the required methods
     expected on that dataset, and the all-datasets table every required method; rows already there are kept.
-    SLAM gets add_missing_slam_rows, and ``UNLISTED_METHODS`` get none. A method track with no result and no recorded
+    SLAM gets add_missing_slam_rows. A method track with no result and no recorded
     failure on any task (a track not run yet, a method without released weights) gets no rows either: the page shows
     what was evaluated. Returns the number of rows added.
     """
@@ -1644,8 +1639,6 @@ def add_missing_method_rows(task_tables: dict[str, Any], coverage: dict[str, Any
     attempted = {cell.get("method_id") for entry in coverage.get("methods", [])
                  for cell in (entry.get("cells") or {}).values() if cell.get("status") in ATTEMPTED_STATUSES}
     for entry in coverage.get("methods", []):
-        if entry.get("method") in UNLISTED_METHODS:
-            continue
         for key, cell in (entry.get("cells") or {}).items():
             task, _, track = key.partition("|")
             method = cell.get("method_id")

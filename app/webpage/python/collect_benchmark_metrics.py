@@ -43,7 +43,6 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from app.webpage.python.benchmark_analyzer import (  # noqa: E402
-    UNLISTED_METHODS,
     add_missing_method_rows,
     build_benchmark_visualization,
     on_slam_protocol,
@@ -419,8 +418,7 @@ def collect(
         failures_by_cell=read_failures_by_cell(roots),
         unsupported_statuses=data.get("method_statuses", []),
         report_roots=roots,
-        # Our own unpublished models stay off the coverage matrix (and so out of the "missing" rows).
-        method_specs=[spec for spec in METHOD_SPECS if spec.name not in UNLISTED_METHODS],
+        method_specs=METHOD_SPECS,
     )
     # Every method a task/track requires gets a row in its tables, "-" where it has no result.
     add_missing_method_rows(data["task_tables"], data["coverage"])
