@@ -9,6 +9,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
@@ -166,8 +167,15 @@ export class TrajectoryCompare {
         this.perspective.up.set(0, 0, 1);
         this.orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, -1e6, 1e6);
         this.camera = this.perspective;
-        this.controls = new OrbitControls(this.camera, this.canvas);
-        this.controls.enableDamping = true;
+        // Free view: a trackball, which turns the view about any axis (over the poles, and rolling it), unlike an
+        // orbit control that keeps +Z up. Axis views: an orbit control with rotation off (pan and zoom only).
+        this.trackball = new TrackballControls(this.perspective, this.canvas);
+        Object.assign(this.trackball, { rotateSpeed: 2.5, zoomSpeed: 1.2, panSpeed: 0.8, dynamicDampingFactor: 0.15 });
+        // No A/S/D modifier keys: typing elsewhere on the page must not change what a drag does.
+        this.trackball.keys = ['', '', ''];
+        this.orbit = new OrbitControls(this.orthographic, this.canvas);
+        Object.assign(this.orbit, { enableDamping: true, enableRotate: false, enabled: false });
+        this.controls = this.trackball;
         this.group = new THREE.Group();
         this.three.add(this.group);
         // Translation error lines in each method's color: the current frame's (redrawn per frame) and every
@@ -191,7 +199,12 @@ export class TrajectoryCompare {
         this.axes = new THREE.AxesHelper(1);
         this.three.add(this.axes);
         // Render on demand (camera moves, state changes), not every animation frame.
-        this.controls.addEventListener('change', () => this.requestRender());
+        for (const controls of [this.trackball, this.orbit]) {
+            controls.addEventListener('change', () => this.requestRender());
+        }
+        // The trackball moves the camera only in update(): keep rendering (and updating) while a drag lasts.
+        this.trackball.addEventListener('start', () => { this.dragging = true; this.requestRender(); });
+        this.trackball.addEventListener('end', () => { this.dragging = false; this.requestRender(); });
         this.resizeObserver = new ResizeObserver(() => this.resize());
         this.resizeObserver.observe(this.wrap);
         this.resize();
@@ -202,8 +215,9 @@ export class TrajectoryCompare {
         this.renderQueued = true;
         this.animationId = requestAnimationFrame(() => {
             this.renderQueued = false;
-            // update() returns true while damping still moves the camera; keep rendering until it settles.
-            if (this.controls.update()) this.requestRender();
+            // The orbit's update() returns true while damping still moves the camera; the trackball's reports its
+            // damped motion through 'change' events. Keep rendering until it settles.
+            if (this.controls.update() || this.dragging) this.requestRender();
             this.renderer.render(this.three, this.camera);
         });
     }
@@ -213,6 +227,8 @@ export class TrajectoryCompare {
         cancelAnimationFrame(this.animationId);
         clearInterval(this.playTimer);
         this.resizeObserver.disconnect();
+        this.trackball.dispose();
+        this.orbit.dispose();
         this.renderer.dispose();
     }
 
@@ -223,6 +239,7 @@ export class TrajectoryCompare {
         this.perspective.aspect = width / height;
         this.perspective.updateProjectionMatrix();
         this.updateOrthographicFrustum();
+        this.trackball.handleResize();
         this.forEachLine(material => material.resolution.set(width, height));
         this.requestRender();
     }
@@ -761,9 +778,12 @@ export class TrajectoryCompare {
         this.root.querySelectorAll('[data-view]').forEach(button => {
             button.classList.toggle('active', button.dataset.view === mode);
         });
-        this.camera = mode === 'free' ? this.perspective : this.orthographic;
-        this.controls.object = this.camera;
-        this.controls.enableRotate = mode === 'free';
+        const free = mode === 'free';
+        this.camera = free ? this.perspective : this.orthographic;
+        this.controls = free ? this.trackball : this.orbit;
+        this.trackball.enabled = free;
+        this.orbit.enabled = !free;
+        this.dragging = false;
         this.fitView();
     }
 
@@ -785,6 +805,7 @@ export class TrajectoryCompare {
         this.axes.position.copy(box.min);
         this.controls.target.copy(center);
         if (this.viewMode === 'free') {
+            this.perspective.up.set(0, 0, 1);  // the trackball rolls the camera; a fit starts upright again
             const offset = new THREE.Vector3(1, -1.2, 0.9).normalize().multiplyScalar(radius * 2.4);
             this.perspective.position.copy(center).add(offset);
             this.perspective.near = radius / 1000;

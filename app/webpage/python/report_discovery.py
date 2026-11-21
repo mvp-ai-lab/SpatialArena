@@ -200,29 +200,101 @@ def discover_report_roots(
     return sorted(discovered.values(), key=lambda item: (item.method, item.batch, item.suite, str(item.path)))
 
 
+# A failed ``eval_*.json``'s ``error_type`` -> case-failure status (benchmark_analyzer.CASE_FAILURE_LABELS).
+EVAL_ERROR_STATUSES = {"CUDA_OOM": "gpu_oom", "HOST_MEMORY_OOM": "host_oom"}
+# Without an ``error_type``, a message fragment names the status; anything else is a plain ``error``.
+EVAL_ERROR_MESSAGES = (
+    ("constant prediction", "degenerate_constant_prediction"),
+    ("point cloud is empty", "empty_point_cloud"),
+    ("input frames have a predicted pose", "insufficient_predicted_poses"),
+)
+# A job watchdog's outcome (``watchdog_execution_outcomes/*.json``) -> status, for the scenes of the job it killed.
+WATCHDOG_STATUSES = {"OUT_OF_MEMORY": "oom"}
+TASK_DIRS = ("MonoDepth", "VideoDepth", "MVRecon", "SfM", "SLAM")
+
+
+def _case_from_scene_dir(path: Path) -> tuple[str, str, str, str] | None:
+    """``(method, task, dataset, scene)`` of a per-scene file ``<METHOD>/<Task>/<dataset>/<scene>/<file>``."""
+    parts = path.parts
+    if len(parts) < 5 or parts[-4] not in TASK_DIRS:
+        return None
+    return parts[-5], parts[-4], parts[-3], parts[-2]
+
+
+def eval_failure_status(payload: dict) -> str | None:
+    """The case-failure status of a failed ``eval_*.json`` (no scene result, an error recorded), else None."""
+    if payload.get("num_scene_results") or payload.get("scene_results") or not payload.get("errors"):
+        return None
+    error = payload["errors"][0] if isinstance(payload["errors"][0], dict) else {}
+    status = EVAL_ERROR_STATUSES.get(str(error.get("error_type") or ""))
+    if status:
+        return status
+    message = str(error.get("error") or "").lower()
+    return next((status for fragment, status in EVAL_ERROR_MESSAGES if fragment in message), "error")
+
+
+def _read_failure_tsv(path: Path) -> list[CaseFailure]:
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        return [
+            CaseFailure(method=row["method"].strip(), task=row["task"].strip(),
+                        dataset=(row.get("dataset") or "").strip(), scene=(row.get("scene") or "").strip(),
+                        # The runner's files put the exit code in ``status`` and the cause (gpu_oom, ...) in ``reason``.
+                        status=(row.get("reason") or row.get("status") or "").strip(), source_path=path)
+            for row in csv.DictReader(handle, delimiter="\t") if row.get("method") and row.get("task")
+        ]
+
+
+def _read_inference_failure(path: Path) -> list[CaseFailure]:
+    """``inference_failure.tsv`` in a scene folder: one ``<exit code>\t<reason>`` line (e.g. ``1\tgpu_oom``)."""
+    case = _case_from_scene_dir(path)
+    fields = path.read_text(encoding="utf-8").strip().split("\t")
+    if case is None or len(fields) < 2 or not fields[1].strip():
+        return []
+    return [CaseFailure(*case, status=fields[1].strip(), source_path=path)]
+
+
+def _read_eval_failure(path: Path) -> list[CaseFailure]:
+    case = _case_from_scene_dir(path)
+    text = path.read_text(encoding="utf-8")
+    if case is None or '"errors": []' in text:
+        return []
+    status = eval_failure_status(json.loads(text))
+    return [CaseFailure(*case, status=status, source_path=path)] if status else []
+
+
+def _read_watchdog_outcome(path: Path) -> list[CaseFailure]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    status = WATCHDOG_STATUSES.get(str(payload.get("status") or ""))
+    item = (payload.get("job") or {}).get("work_item") or {}
+    if not status or not item.get("model") or not item.get("task"):
+        return []
+    track = str(item.get("track") or "rgb")
+    method = item["model"] if track == "rgb" else f"{item['model']}_{track}"
+    return [CaseFailure(method=method, task=item["task"], dataset=str(item.get("dataset") or ""), scene=str(scene),
+                        status=status, source_path=path) for scene in item.get("scenes") or ()]
+
+
 def read_case_failures(report_roots: Iterable[Path]) -> list[CaseFailure]:
-    """Read every ``case_failures*.tsv`` written by the case-list runner under the given roots."""
-    failures: list[CaseFailure] = []
+    """Every case failure the runs recorded under the given roots: the case-list runner's ``case_failures*.tsv``, a
+    scene's ``inference_failure.tsv``, a failed ``eval_*.json`` (no scene result, an error such as ``CUDA_OOM``) and a
+    job watchdog's ``watchdog_execution_outcomes/*.json`` (e.g. ``OUT_OF_MEMORY``). The same case recorded twice keeps
+    its first record, in that order."""
+    readers = (("case_failures*.tsv", _read_failure_tsv), ("inference_failure.tsv", _read_inference_failure),
+               ("eval_*.json", _read_eval_failure), ("watchdog_execution_outcomes/*.json", _read_watchdog_outcome))
+    failures: dict[tuple[str, ...], CaseFailure] = {}
     for root in report_roots:
-        for path in sorted(Path(root).rglob("case_failures*.tsv")):
-            try:
-                with path.open("r", encoding="utf-8", newline="") as handle:
-                    for row in csv.DictReader(handle, delimiter="\t"):
-                        if not row.get("method") or not row.get("task"):
-                            continue
-                        failures.append(
-                            CaseFailure(
-                                method=row["method"].strip(),
-                                task=row["task"].strip(),
-                                dataset=(row.get("dataset") or "").strip(),
-                                scene=(row.get("scene") or "").strip(),
-                                status=(row.get("status") or "").strip(),
-                                source_path=path,
-                            )
-                        )
-            except (OSError, UnicodeDecodeError, csv.Error):
-                continue
-    return failures
+        for pattern, reader in readers:
+            for path in sorted(Path(root).rglob(pattern)):
+                try:
+                    found = reader(path)
+                except (OSError, UnicodeDecodeError, ValueError, KeyError, csv.Error):
+                    continue
+                # A SLAM sequence is a case per range (its report folder ``full-slam-<range>``).
+                slam_range = next((part for part in path.parts if part.startswith("full-slam-")), "")
+                for failure in found:
+                    key = (failure.method, failure.task, failure.dataset, failure.scene, slam_range)
+                    failures.setdefault(key, failure)
+    return list(failures.values())
 
 
 def read_case_lists(paths: Iterable[Path]) -> set[tuple[str, str, str]]:

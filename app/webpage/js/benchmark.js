@@ -1561,12 +1561,23 @@ function benchmarkDodgeReleasePoints(points) {
     }
 }
 
+// Image-only (rgb) runs take their task scores from ``ranking``, the pool of the overall leaderboard, so a point and
+// the trend fits match the leaderboard's task columns; ``task_ranking`` also normalizes against the auxiliary
+// [+C]/[+D] runs and shifts some rgb scores (MVRecon, SLAM). Auxiliary runs exist only in ``task_ranking``.
+function benchmarkReleaseRows() {
+    const rgbRows = benchmarkData.ranking?.rows || [];
+    const taskRows = benchmarkData.task_ranking?.rows || [];
+    if (!rgbRows.length) return taskRows;
+    const rgbMethods = new Set(rgbRows.map(row => row.method));
+    return [...rgbRows, ...taskRows.filter(row => !rgbMethods.has(row.method) && benchmarkMethodAuxiliaryKind(row) !== "rgb")];
+}
+
 function renderBenchmarkReleaseScatterCharts() {
     const container = document.getElementById("benchmark-release-scatter-grid");
     if (!container || !benchmarkData || typeof Chart === "undefined") return;
     const width = document.getElementById("benchmark-release-width")?.value || benchmarkReleaseWidth();
     container.classList.toggle("benchmark-release-grid-half", width === "half");
-    const rows = benchmarkData.task_ranking?.rows || benchmarkData.ranking?.rows || [];
+    const rows = benchmarkReleaseRows();
     const allTasks = benchmarkFilterTasks();
     if (!allTasks.includes(benchmarkReleaseTask)) benchmarkReleaseTask = allTasks[0] || null;
     const tabs = document.getElementById("benchmark-release-tabs");
@@ -1942,6 +1953,22 @@ function benchmarkFailureLabel(row, metricKey) {
     return row.failure_label || "";
 }
 
+// A row's method limitations (failures of the method's own code, operators or outputs, not of the run): a badge on
+// its method cell whose tooltip names each one and why.
+function benchmarkLimitationBadge(row) {
+    const limitations = row.limitations || [];
+    if (!limitations.length) return "";
+    const title = ["Method limitation (not a run failure):"].concat(limitations.map(entry =>
+        `${entry.count} ${entry.label}: ${(entry.notes || []).join(" ")}`)).join("\n").replace(/`/g, "");
+    return `<span class="benchmark-limitation" title="${escapeBenchmarkAttr(title)}">Method limitation</span>`;
+}
+
+// Whether every failure a cell names ("15 Adapter argument error, 3 No camera export") is a method limitation.
+function benchmarkFailureIsLimitation(row, failure) {
+    const labels = new Set((row.limitations || []).map(entry => entry.label));
+    return labels.size > 0 && failure.split(", ").every(part => labels.has(part.replace(/^\d+ /, "")));
+}
+
 function benchmarkSectionRankRows(section) {
     // Methods marked unranked (incomplete SLAM coverage) are shown but never ranked.
     const rows = benchmarkResultRows(section.methodRows);
@@ -1978,7 +2005,7 @@ function renderBenchmarkSlamColumnGroups(section) {
     }
     return `
         <tr class="benchmark-column-groups">
-            <th colspan="2"></th>
+            <th></th><th></th>
             ${groups.map(group => `
                 <th class="benchmark-column-group" colspan="${group.span}">${escapeBenchmarkHtml(benchmarkDatasetLabel(group.dataset))}</th>
             `).join("")}
@@ -2012,8 +2039,9 @@ function renderBenchmarkTaskSection(section) {
     const rows = methodRows.map(row => {
         const metricCells = metricKeys.map(metricKey => {
             const failure = row.metrics?.[metricKey] ? "" : benchmarkFailureLabel(row, metricKey);
+            const limitation = failure && benchmarkFailureIsLimitation(row, failure);
             return failure
-                ? `<td class="numeric benchmark-failed-cell" title="${escapeBenchmarkAttr(failure)}">${escapeBenchmarkHtml(failure)}</td>`
+                ? `<td class="numeric benchmark-failed-cell${limitation ? " benchmark-limitation-cell" : ""}" title="${escapeBenchmarkAttr(limitation ? `Method limitation: ${failure}` : failure)}">${escapeBenchmarkHtml(failure)}</td>`
                 : renderBenchmarkMetricCell(row.metrics?.[metricKey], metricRanks[metricKey]?.get(row.method) ?? null, metricKey);
         }).join("");
         const unranked = section.ownScore && !row.ranked;
@@ -2032,7 +2060,7 @@ function renderBenchmarkTaskSection(section) {
         const rowClass = row.missing ? "benchmark-row-missing" : unranked ? "benchmark-row-unranked" : "";
         return `
             <tr${rowClass ? ` class="${rowClass}"` : ""}${row.missing ? ' title="Required for this track; no result yet"' : ""}>
-                <td class="benchmark-method-name">${benchmarkMethodNameHtml(row)}${coverage}</td>
+                <td class="benchmark-method-name">${benchmarkMethodNameHtml(row)}${coverage}${benchmarkLimitationBadge(row)}</td>
                 ${scoreCell}
                 ${metricCells}
             </tr>

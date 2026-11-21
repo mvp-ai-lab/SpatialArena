@@ -733,3 +733,76 @@
     color: var(--warning);
     margin-right: 4px;
 }
+
+/* Wide tables (js/table_drag.js): drag sideways with the mouse; the columns through Method stay in place. */
+.table-container.is-draggable {
+    cursor: grab;
+}
+
+.table-container.is-dragging {
+    cursor: grabbing;
+    user-select: none;
+}
+
+.table-container.is-dragging .benchmark-sort-header {
+    cursor: grabbing;
+}
+
+.benchmark-table .sticky-col {
+    background: var(--card-bg);
+    position: sticky;
+    z-index: 2;
+}
+
+.benchmark-table th.sticky-col {
+    background: var(--gray-light);
+    z-index: 3;
+}
+
+/* The row hover tint, drawn over the held cells' opaque background. */
+.benchmark-table tbody tr:hover td.sticky-col {
+    background-image: linear-gradient(rgba(67, 97, 238, 0.04), rgba(67, 97, 238, 0.04));
+}
+
+/* A dimmed row fades the held cells' content, not their background (the scrolled columns would show through). */
+.benchmark-row-unranked td.sticky-col {
+    color: color-mix(in srgb, var(--text-primary) 70%, var(--card-bg));
+    opacity: 1;
+}
+
+.benchmark-row-unranked td.sticky-col > * {
+    opacity: 0.7;
+}
+
+.table-container.is-scrolled .sticky-col-last {
+    box-shadow: 6px 0 8px -6px rgba(0, 0, 0, 0.25);
+}
+
+/* A method limitation (its own code, operators or outputs failed, not the run): a badge under the method name, and
+   the failed cells it explains, marked with the amber accent; the text stays in the text tokens. */
+.benchmark-limitation,
+.benchmark-limitation-cell {
+    --limitation-accent: #c2410c;
+}
+
+[data-theme="dark"] .benchmark-limitation,
+[data-theme="dark"] .benchmark-limitation-cell {
+    --limitation-accent: #fbbf24;
+}
+
+.benchmark-limitation {
+    border: 1px solid var(--limitation-accent);
+    border-radius: 999px;
+    color: var(--text-secondary);
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.4;
+    margin-top: 2px;
+    padding: 0 7px;
+    cursor: help;
+}
+
+.benchmark-limitation-cell {
+    box-shadow: inset 2px 0 0 var(--limitation-accent);
+}

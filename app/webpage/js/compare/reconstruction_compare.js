@@ -10,7 +10,7 @@
 // percentile of every method's points can be hidden.
 
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
 import {
     ASSET_ROOT, INDEX_ROOT, backgroundControlHtml, bindBackgroundControl, bindColorControl, bindFullscreen,
     bindWheelShortcuts, colorControlHtml, confidenceArray, confidenceControlHtml, confidenceThreshold, datasetLabel,
@@ -211,21 +211,28 @@ export class ReconstructionCompare {
     }
 
     createControls() {
-        // One set of controls on the whole canvas drives the shared camera, so every viewport follows. OrbitControls
-        // reads camera.up only when it is constructed (its orbit frame), so it is rebuilt whenever camera.up changes;
-        // a stale frame orbits about the old up axis, which turns horizontal drags the wrong way.
+        // One set of controls on the whole canvas drives the shared camera, so every viewport follows. A trackball
+        // turns the view about any axis (over the poles, and rolling it), unlike an orbit control, which keeps the up
+        // axis up. Rebuilt on each fit, which also drops any rotation still coasting from the last drag.
         const target = this.controls ? this.controls.target.clone() : new THREE.Vector3();
         this.controls?.dispose();
-        this.controls = new OrbitControls(this.camera, this.canvas);
-        this.controls.enableDamping = true;
+        this.controls = new TrackballControls(this.camera, this.canvas);
+        Object.assign(this.controls, { rotateSpeed: 2.5, zoomSpeed: 1.2, panSpeed: 0.8, dynamicDampingFactor: 0.15 });
+        // No A/S/D modifier keys: typing elsewhere on the page must not change what a drag does.
+        this.controls.keys = ['', '', ''];
         this.controls.target.copy(target);
         this.controls.addEventListener('change', () => this.requestRender());
+        // The trackball moves the camera only in update(): keep rendering (and updating) while a drag lasts.
+        this.controls.addEventListener('start', () => { this.dragging = true; this.requestRender(); });
+        this.controls.addEventListener('end', () => { this.dragging = false; this.requestRender(); });
+        this.dragging = false;
     }
 
     resize() {
         const width = Math.max(1, this.wrap.clientWidth);
         const height = Math.max(1, this.wrap.clientHeight);
         this.renderer.setSize(width, height, false);
+        this.controls.handleResize();
         this.layoutViewports();
         this.requestRender();
     }
@@ -265,7 +272,9 @@ export class ReconstructionCompare {
         this.renderQueued = true;
         requestAnimationFrame(() => {
             this.renderQueued = false;
-            if (this.controls.update()) this.requestRender();
+            // The trackball reports its damped motion through 'change' events; during a drag, keep updating.
+            this.controls.update();
+            if (this.dragging) this.requestRender();
             this.renderFrame();
         });
     }
@@ -663,7 +672,7 @@ export class ReconstructionCompare {
         this.camera.far = radius * 1000;
         this.camera.updateProjectionMatrix();
         this.camera.lookAt(center);
-        this.createControls();  // camera.up may have changed
+        this.createControls();
         this.controls.target.copy(center);
         this.controls.update();
         this.requestRender();
@@ -672,8 +681,11 @@ export class ReconstructionCompare {
     handleKey(event) {
         const target = this.controls.target;
         const offset = this.camera.position.clone().sub(target);
+        // Turns the view (camera.up with it), so the arrow keys go over the poles too, like a drag.
         const rotate = (axisVector, angle) => {
-            offset.applyAxisAngle(axisVector, angle);
+            const axis = axisVector.clone();
+            offset.applyAxisAngle(axis, angle);
+            this.camera.up.applyAxisAngle(axis, angle);
             this.camera.position.copy(target).add(offset);
             this.camera.lookAt(target);
         };

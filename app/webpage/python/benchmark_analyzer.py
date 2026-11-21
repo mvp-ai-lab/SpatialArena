@@ -10,6 +10,7 @@ import argparse
 import csv
 import json
 import math
+import re
 import sys
 from collections import Counter, defaultdict
 from collections.abc import Mapping
@@ -25,7 +26,7 @@ if str(REPO_ROOT) not in sys.path:
 from spatialarena.eval.dataset_registry import DEFAULT_BENCHMARK_ROOT, find_dataset_spec
 from spatialarena.eval.depth_prediction_evaluator import DepthEvaluationConfig, evaluate_depth_scene
 from spatialarena.eval.mvrecon_evaluator import MVReconEvaluationConfig, evaluate_mvrecon_scene
-from spatialarena.task_track_matrix import on_matrix
+from spatialarena.task_track_matrix import on_matrix, track_runs_on, track_runs_on_case
 
 
 DEFAULT_OUTPUT = REPO_ROOT / "app" / "webpage" / "data" / "results.json"
@@ -511,7 +512,62 @@ CASE_FAILURE_LABELS = {
     "cache_disk_capacity": "Disk full",
     "error_or_empty": "Failed",
     "error": "Failed",
+    # A job watchdog's OUT_OF_MEMORY, which does not say whether GPU or host memory ran out.
+    "oom": "OOM",
+    "degenerate_constant_prediction": "Constant prediction",
+    "empty_point_cloud": "Empty point cloud",
+    # The 2026-11-20 per-case triage (docs/case_failure.csv): causes found in the jobs' logs and reports.
+    "empty_eval_region": "Empty eval region",
+    "int32_index_limit": "Int32 index limit",
+    "missing_dependency": "Missing dependency",
+    "adapter_argument_error": "Adapter argument error",
+    "cuda_illegal_memory_access": "CUDA illegal access",
+    "runtime_error": "Runtime error",
+    "missing_camera_export": "No camera export",
+    "time_limit": "Time limit",
+    # Not started: the serial batch hit its time limit before reaching the case.
+    "not_reached_time_limit": "Not reached (time limit)",
+    # Predictions exist, but the scoring job was never submitted (its batch failed first).
+    "not_scored": "Not scored",
+    # Scored only under the dropped MVRecon TSDF protocol, not yet by direct backprojection.
+    "not_rescored": "Not re-scored",
 }
+
+# Case failures that are the method's own limitation -- its code, an operator it uses or an output the scorer rejects
+# -- rather than the evaluation's (memory, time limit, environment, disk, our adapters such as a missing camera export
+# or argument mismatch, scoring): the page marks them "Method limitation" on the method's row, with these notes (or the
+# record's own cause) as the explanation.
+METHOD_LIMITATION_NOTES = {
+    "degenerate_constant_prediction": "Predicts a constant depth map on this input; the scorer rejects it.",
+    "empty_point_cloud": "Its fused point cloud is empty after alignment and cropping; no metric can be computed.",
+    "empty_eval_region": "None of its predicted points falls inside the dataset's evaluation region.",
+    "insufficient_predicted_poses": "Returns a pose for only one frame of the sequence; no trajectory to score.",
+    "unsupported_sequence_length": "Accepts at most 81 frames; the sequence is longer.",
+    "int32_index_limit": "An operator it uses exceeds 32-bit indexing on this input (not an out-of-memory failure).",
+    "cuda_illegal_memory_access": "Crashes with a CUDA illegal memory access on this input (not out of memory).",
+    "runtime_error": "Its code raises an error on this input.",
+}
+
+
+def method_limitations(failures: Any) -> list[dict[str, Any]]:
+    """The method-limitation failures (METHOD_LIMITATION_NOTES) among ``failures`` (failure dicts, or a mapping of
+    them), one entry per label: ``{"label", "count", "notes"}``, notes the records' own causes where they give one."""
+    by_label: dict[str, dict[str, Any]] = {}
+    for failure in (failures.values() if isinstance(failures, dict) else failures or ()):
+        status = failure.get("status", "")
+        if status not in METHOD_LIMITATION_NOTES:
+            continue
+        entry = by_label.setdefault(failure["label"], {"label": failure["label"], "count": 0, "notes": []})
+        entry["count"] += 1
+        detail = str(failure.get("detail") or "")
+        # A record's detail is its cause when it is prose (the 2026-11-20 triage), not a report path or exit code.
+        # (A frame-limit record's detail is only its frame count: the note says it better.)
+        is_cause = (status != "unsupported_sequence_length" and " " in detail
+                    and not re.search(r"(^|\s)[~.]?/\S*/|\.(json|tsv|log)\b", detail))
+        note = detail if is_cause else METHOD_LIMITATION_NOTES[status]
+        if note not in entry["notes"]:
+            entry["notes"].append(note)
+    return sorted(by_label.values(), key=lambda entry: (-entry["count"], entry["label"]))
 
 METRICS = DEPTH_METRICS + MVRECON_METRICS + POSE_METRICS + SLAM_METRICS
 METRIC_BY_KEY = {metric["key"]: metric for metric in METRICS}
@@ -658,7 +714,6 @@ COMPACT_AXES = [
 
 METHOD_DISPLAY_BASE_NAMES = {
     "AMB3R": "AMB3R",
-    "COME": "COME",
     "CUT3R": "CUT3R",
     "DA3": "DA3",
     "DA3-G": "DA3-G",
@@ -934,6 +989,12 @@ def on_slam_protocol(method: str, task: str, slam_range: str) -> bool:
     return in_range_track(base, slam_range, track)
 
 
+def slam_method_cases(method: str, dataset: str, cases: list[str]) -> list[str]:
+    """The sequences of a SLAM cell that `method`'s track runs on (task_track_matrix.track_runs_on_case): e.g. not
+    the sequences without depth maps for a [+D] method. Only these count toward its score and coverage."""
+    return [scene for scene in cases if track_runs_on_case("SLAM", method_track(method), dataset, scene)]
+
+
 def filter_off_matrix_rows(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Drop rows whose (task, track, dataset) the task/track matrix rules out, e.g. MonoDepth given GT depth.
 
@@ -1068,7 +1129,7 @@ def recover_geometry_metrics_from_reports(
         try:
             dataset_obj = spec.create_dataset(DEFAULT_BENCHMARK_ROOT)
             scene_info = next((item for item in dataset_obj.list_scenes() if item.scene == scene), None)
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught  # best-effort lookup: no scene info
             scene_info = None
         scene_info_cache[cache_key] = scene_info
         return scene_info
@@ -1125,7 +1186,7 @@ def recover_geometry_metrics_from_reports(
                             prediction_scene_path,
                             config=DepthEvaluationConfig(),
                         )
-                    except Exception:
+                    except Exception:  # pylint: disable=broad-exception-caught  # best-effort metric recovery
                         depth_result = {}
                     for metric_key in (
                         "mae_normal_deg",
@@ -1146,7 +1207,7 @@ def recover_geometry_metrics_from_reports(
                             Path(scene.get("prediction_scene_path") or ""),
                             config=MVReconEvaluationConfig(),
                         )
-                    except Exception:
+                    except Exception:  # pylint: disable=broad-exception-caught  # best-effort metric recovery
                         mvrecon_result = {}
                     for metric_key in ("accuracy", "completion", "overall", "precision", "recall", "fscore"):
                         value = mvrecon_result.get("metrics", {}).get(metric_key)
@@ -1290,6 +1351,7 @@ def failed_slam_method_row(method: str, failures: dict[str, dict[str, Any]]) -> 
         "scenes": 0,
         "metrics": {},
         "failure_label": slam_failure_label(failures),
+        "limitations": method_limitations(failures),
     }
 
 
@@ -1300,8 +1362,9 @@ def attach_slam_scene_cell_scores(table: dict[str, Any], cell: dict[str, Any]) -
     present = {row["method"] for row in table["methods"]}
     for method in sorted(set(cell["scores"]) - present):
         table["methods"].append(failed_slam_method_row(method, cell["failures"].get(method, {})))
-    total = len(cell["cases"])
-    scores = {method: average([by_scene.get(scene, 0.0) for scene in cell["cases"]]) or 0.0
+    cases = {method: slam_method_cases(method, cell["dataset_base"], cell["cases"])
+             for method in set(cell["scores"]) | {row["method"] for row in table["methods"]}}
+    scores = {method: average([by_scene.get(scene, 0.0) for scene in cases[method]]) or 0.0
               for method, by_scene in cell["scores"].items()}
     ranks = rank_scores(scores)
     for method_row in table["methods"]:
@@ -1310,9 +1373,11 @@ def attach_slam_scene_cell_scores(table: dict[str, Any], cell: dict[str, Any]) -
         method_row["ranked"] = method in scores
         method_row["score"] = scores.get(method)
         method_row["score_rank"] = ranks.get(method)
-        method_row["coverage_label"] = slam_coverage_label(len(cell["evaluated"].get(method, ())), total, failures)
+        method_row["coverage_label"] = slam_coverage_label(len(cell["evaluated"].get(method, ())),
+                                                           len(cases[method]), failures)
         method_row["incomplete"] = bool(method_row["coverage_label"])  # metric means over a subset: not ranked
         method_row["failed_scenes"] = {scene: failure["label"] for scene, failure in sorted(failures.items())}
+        method_row["limitations"] = method_limitations(failures)
 
 
 def attach_slam_cell_scores(table: dict[str, Any], rows: list[dict[str, Any]]) -> None:
@@ -1351,10 +1416,14 @@ def build_slam_range_tables(task_rows: list[dict[str, Any]],
         failures_by_method: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
         if cells is not None:
             ranked = {method for cell in range_cells.values() for method in cell["scores"]}
-            cases = [(dataset, scene) for dataset in datasets for scene in range_cells[dataset]["cases"]]
+            method_cases = {
+                method: [(dataset, scene) for dataset in datasets
+                         for scene in slam_method_cases(method, dataset, range_cells[dataset]["cases"])]
+                for method in ranked | {row["method"] for row in range_rows} | set(failures_by_method)
+            }
             range_scores = {
                 method: average([range_cells[dataset]["scores"].get(method, {}).get(scene, 0.0)
-                                 for dataset, scene in cases]) or 0.0
+                                 for dataset, scene in method_cases[method]]) or 0.0
                 for method in ranked
             }
             for dataset, cell in range_cells.items():
@@ -1396,7 +1465,7 @@ def build_slam_range_tables(task_rows: list[dict[str, Any]],
                 evaluated = sum(len(range_cells[dataset]["evaluated"].get(method, ())) for dataset in datasets)
                 failures = {f"{dataset}/{scene}": failure for dataset, by_scene in failures_by_method[method].items()
                             for scene, failure in by_scene.items()}
-                coverage_label = slam_coverage_label(evaluated, len(cases), failures)
+                coverage_label = slam_coverage_label(evaluated, len(method_cases[method]), failures)
             else:
                 coverage_label = f"{covered}/{len(datasets)} datasets complete"
             methods.append(
@@ -1411,6 +1480,7 @@ def build_slam_range_tables(task_rows: list[dict[str, Any]],
                     "score": range_scores.get(method),
                     "score_rank": score_ranks.get(method),
                     "coverage_label": coverage_label,
+                    "limitations": method_limitations(failures) if cells is not None else [],
                     # Datasets where every sequence the method ran failed: their columns show the failure.
                     "dataset_failures": {dataset: slam_failure_label(by_scene)
                                          for dataset, by_scene in sorted(failures_by_method[method].items())
@@ -1555,23 +1625,31 @@ def missing_method_row(method: str) -> dict[str, Any]:
 UNLISTED_METHODS = frozenset({"TRIDENT"})
 
 
+# Coverage statuses of a method track that was run: it has results, recorded failures, or reported itself unsupported.
+ATTEMPTED_STATUSES = ("complete", "partial", "failed", "reported_unsupported")
+
+
 def add_missing_method_rows(task_tables: dict[str, Any], coverage: dict[str, Any]) -> int:
     """Give every task table a row for each method its tracks require, ``missing`` where there is no result.
 
     "Required" is the coverage matrix's view (build_coverage): a registered method whose ``<task>|<track>`` cell is
     not ``unsupported``, on the datasets that cell expects. Each existing dataset table gets the required methods
     expected on that dataset, and the all-datasets table every required method; rows already there are kept.
-    SLAM gets add_missing_slam_rows, and ``UNLISTED_METHODS`` get none. Returns the number of rows added.
+    SLAM gets add_missing_slam_rows, and ``UNLISTED_METHODS`` get none. A method track with no result and no recorded
+    failure on any task (a track not run yet, a method without released weights) gets no rows either: the page shows
+    what was evaluated. Returns the number of rows added.
     """
     expected: dict[str, dict[str, set[str]]] = {}
     slam_methods: list[tuple[str, str, str]] = []  # (method id, registered method, track)
+    attempted = {cell.get("method_id") for entry in coverage.get("methods", [])
+                 for cell in (entry.get("cells") or {}).values() if cell.get("status") in ATTEMPTED_STATUSES}
     for entry in coverage.get("methods", []):
         if entry.get("method") in UNLISTED_METHODS:
             continue
         for key, cell in (entry.get("cells") or {}).items():
             task, _, track = key.partition("|")
             method = cell.get("method_id")
-            if not method or cell.get("status", "unsupported") == "unsupported":
+            if not method or cell.get("status", "unsupported") == "unsupported" or method not in attempted:
                 continue
             expected.setdefault(task, {}).setdefault(method, set()).update(cell.get("datasets") or {})
             if task in SLAM_TASKS:
@@ -1603,24 +1681,24 @@ def attach_case_coverage(task_tables: dict[str, Any], coverage: dict[str, Any],
     ``case_failures``) and ``incomplete`` -- its metric means cover a subset, so the page does not rank them -- and one
     with no scene at all but recorded failures a ``failure_label`` shown in its cells.
     """
-    labels = {(failure["method"], failure["task"], failure["dataset"], failure["scene"]): failure["label"]
-              for failure in case_failures or ()}
+    records = {(failure["method"], failure["task"], failure["dataset"], failure["scene"]): failure
+               for failure in case_failures or ()}
     cells: dict[tuple[str, str], dict[str, Any]] = {}
     for entry in coverage.get("methods", []):
         for key, cell in (entry.get("cells") or {}).items():
             if cell.get("method_id") and cell.get("datasets"):
                 cells[(key.split("|", 1)[0], cell["method_id"])] = cell["datasets"]
 
-    def label(method: str, task: str, by_dataset: dict[str, Any]) -> tuple[str, str, bool]:
+    def label(method: str, task: str, by_dataset: dict[str, Any]) -> tuple[str, str, bool, list[dict[str, Any]]]:
         evaluated = sum(entry["evaluated"] for entry in by_dataset.values())
         expected = sum(entry["expected"] for entry in by_dataset.values())
         if not expected or evaluated >= expected:
-            return "", "", False
-        failed = {f"{dataset}/{scene}": {"label": labels.get((method, task, dataset, scene), "Failed")}
+            return "", "", False, []
+        failed = {f"{dataset}/{scene}": records.get((method, task, dataset, scene), {"label": "Failed"})
                   for dataset, entry in by_dataset.items() for scene in entry.get("failed_scenes", ())}
         failure = slam_failure_label(failed)
         return (f"{evaluated}/{expected} scenes" + (f" · {failure}" if failure else ""),
-                failure if not evaluated else "", True)
+                failure if not evaluated else "", True, method_limitations(failed))
 
     for task, table in task_tables.items():
         if task in SLAM_TASKS:
@@ -1636,9 +1714,11 @@ def attach_case_coverage(task_tables: dict[str, Any], coverage: dict[str, Any],
                     by_dataset = {name: entry for name, entry in by_dataset.items()
                                   if name not in LEADERBOARD_EXCLUDED_DATASETS
                                   and (entry["evaluated"] or entry.get("failed_scenes"))}
-                coverage_label, failure_label, incomplete = label(row["method"], task, by_dataset)
+                coverage_label, failure_label, incomplete, limitations = label(row["method"], task, by_dataset)
                 if row.get("missing") and not failure_label:
                     continue  # a plain "-" row: nothing to add
+                if limitations:
+                    row["limitations"] = limitations
                 if incomplete:
                     row["coverage_label"] = coverage_label
                     row["incomplete"] = True
@@ -1667,7 +1747,10 @@ def add_missing_slam_rows(table: dict[str, Any], slam_methods: list[tuple[str, s
             if dataset_table is None:
                 continue
             in_table = {row["method"] for row in dataset_table.get("methods", [])}
-            for method in sorted(required - in_table):
+            # Not where the method's track does not run (e.g. SLAM [+D] on a dataset without depth maps).
+            runs_here = {method for method in required
+                         if track_runs_on("SLAM", method_track(method), dataset)}
+            for method in sorted(runs_here - in_table):
                 dataset_table.setdefault("methods", []).append(missing_method_row(method))
                 added += 1
     return added
@@ -1814,6 +1897,9 @@ def read_case_failures(path: Path) -> list[dict[str, Any]]:
             status = raw_row.get("status", "")
             if not on_slam_protocol(raw_row.get("method", ""), task, raw_row.get("variant", "")):
                 continue
+            if not track_runs_on_case(task, method_track(raw_row.get("method", "")), raw_row.get("dataset", ""),
+                                      raw_row.get("scene", "")):
+                continue  # a case the track does not run on (e.g. SLAM [+D] on a sequence without depth maps)
             failures.append({
                 "method": raw_row.get("method", ""),
                 "task": task,
@@ -1951,9 +2037,6 @@ def add_scene_scores(method_stats: dict[str, Any], rows: list[dict[str, Any]],
     ``rows`` count, so the leaderboard's filters (off-matrix tracks, excluded datasets, auxiliary inputs) apply, and
     a method is scored on a task only if it has per-scene results there.
     """
-    # pylint: disable=import-outside-toplevel
-    from spatialarena.task_track_matrix import on_matrix
-
     eligible = {(row["method"], row["task"], row["dataset"]) for row in rows if row["task"] not in SLAM_TASKS}
     by_scene: dict[tuple[str, str, str], dict[str, dict[str, float]]] = defaultdict(dict)
     for row in scene_rows:
@@ -2367,7 +2450,7 @@ def build_benchmark_visualization(
         ]
         best_row = max(
             score_rows,
-            key=lambda row: (
+            key=lambda row, task=task: (
                 row["task_scores"][task]["score"],
                 # None: a method scored only from failed cases (all 0) has no average rank
                 -(row["task_scores"][task].get("average_rank") or float("inf")),

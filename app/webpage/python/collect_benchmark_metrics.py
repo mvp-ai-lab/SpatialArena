@@ -62,7 +62,9 @@ from app.webpage.python.viewer_index import build_viewer_index  # noqa: E402
 from spatialarena.paths import SPATIALARENA_ROOT  # noqa: E402
 from spatialarena.eval.dataset_registry import DEFAULT_BENCHMARK_ROOT  # noqa: E402
 from spatialarena.methods import METHOD_SPECS, MethodSpec  # noqa: E402
-from spatialarena.task_track_matrix import TASK_TRACK_MATRIX, runnable_tracks, track_runs_on  # noqa: E402
+from spatialarena.task_track_matrix import (  # noqa: E402
+    TASK_TRACK_MATRIX, runnable_tracks, track_runs_on, track_runs_on_case,
+)
 from scripts.test.summarize_benchmark_reports import (  # noqa: E402
     SceneMetrics,
     aggregate_by_dataset,
@@ -184,7 +186,7 @@ def build_coverage(
     unsupported_statuses: Sequence[dict[str, Any]],
     report_roots: Sequence[ReportRoot],
     method_specs: Sequence[MethodSpec] = METHOD_SPECS,
-    task_track_matrix: dict[str, tuple[str, ...]] = TASK_TRACK_MATRIX,
+    task_track_matrix: dict[str, tuple[str, ...]] | None = None,
 ) -> dict[str, Any]:
     """Join evaluated scenes with the method registry and the task/track matrix.
 
@@ -193,6 +195,7 @@ def build_coverage(
     failures recorded), ``reported_unsupported`` (an ``unsupported_status.json`` exists),
     ``not_run``, or ``unsupported`` (the method does not declare that track).
     """
+    task_track_matrix = TASK_TRACK_MATRIX if task_track_matrix is None else task_track_matrix
     expected = expected_scenes_by_task(cases)
     range_cases = slam_range_case_lists() if cases is not None and "SLAM" in expected else {}
     evaluated: dict[tuple[str, str], dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
@@ -219,13 +222,16 @@ def build_coverage(
                     cells[f"{task}|{track}"] = {"status": STATUS_UNSUPPORTED, "method_id": method_id}
                     method_totals[STATUS_UNSUPPORTED] += 1
                     continue
-                # Only the datasets the track runs on (TRACK_DATASETS): e.g. no MVRecon rgb_depth on dense-depth data.
+                # Only the datasets the track runs on (TRACK_DATASETS): e.g. no MVRecon rgb_depth on dense-depth data;
+                # and only their scenes it runs on (TRACK_EXCLUDED_SCENES: e.g. no SLAM rgb_depth on a sequence
+                # without depth maps).
                 evaluated_by_dataset = {
                     dataset: scenes for dataset, scenes in evaluated.get((method_id, task), {}).items()
                     if track_runs_on(task, track, dataset)
                 }
                 expected_by_dataset = {
-                    dataset: scenes for dataset, scenes in expected.get(task, {}).items()
+                    dataset: {scene for scene in scenes if track_runs_on_case(task, track, dataset, scene)}
+                    for dataset, scenes in expected.get(task, {}).items()
                     if track_runs_on(task, track, dataset)
                 }
                 if task == "SLAM" and range_cases:
@@ -237,7 +243,7 @@ def build_coverage(
                 failed_by_dataset: dict[str, set[str]] = defaultdict(set)
                 cell_failures = [
                     (dataset, scene) for dataset, scene in failures_by_cell.get((method_id, task), ())
-                    if track_runs_on(task, track, dataset)
+                    if track_runs_on_case(task, track, dataset, scene)
                 ]
                 for dataset, scene in cell_failures:
                     failed_by_dataset[dataset].add(scene)
@@ -338,7 +344,7 @@ def failure_slam_range(failure) -> str:
     return ""
 
 
-def failures_by_cell(report_roots: Sequence[ReportRoot]) -> dict[tuple[str, str], set[tuple[str, str]]]:
+def read_failures_by_cell(report_roots: Sequence[ReportRoot]) -> dict[tuple[str, str], set[tuple[str, str]]]:
     cells: dict[tuple[str, str], set[tuple[str, str]]] = defaultdict(set)
     for failure in read_case_failures(root.path for root in report_roots):
         if not on_slam_protocol(failure.method, failure.task, failure_slam_range(failure)):
@@ -410,7 +416,7 @@ def collect(
     data["coverage"] = build_coverage(
         scene_rows,
         cases=cases,
-        failures_by_cell=failures_by_cell(roots),
+        failures_by_cell=read_failures_by_cell(roots),
         unsupported_statuses=data.get("method_statuses", []),
         report_roots=roots,
         # Our own unpublished models stay off the coverage matrix (and so out of the "missing" rows).

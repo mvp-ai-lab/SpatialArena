@@ -95,6 +95,22 @@
         PathRecorder.prototype[method] = function (...args) { this.ops.push([method, args]); };
     }
 
+    // A loaded <img> (a model logo on a chart) rasterized at EXPORT_SCALE times its drawn size, so the embedded PNG
+    // stays sharp when the figure is enlarged; null while it has not loaded.
+    const embeddedImages = new Map();
+    function embeddedImage(image) {
+        if (!image.complete || !image.naturalWidth) return null;
+        const key = `${image.currentSrc || image.src}@${image.width}x${image.height}`;
+        if (!embeddedImages.has(key)) {
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.round(image.width * EXPORT_SCALE);
+            canvas.height = Math.round(image.height * EXPORT_SCALE);
+            canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+            embeddedImages.set(key, canvas);
+        }
+        return embeddedImages.get(key);
+    }
+
     function chartSvg(source) {
         const width = Math.round(source.width);
         const height = Math.round(source.height);
@@ -127,6 +143,18 @@
             if (dash.length && this.__currentElement) this.__currentElement.setAttribute("stroke-dasharray", dash.join(" "));
         };
         context.fill = function (path) { replay(this, path); fill.call(this); };
+        // canvas2svg links an <img> by its src ("assets/logos/models/qwen.svg"), which a saved file cannot resolve:
+        // draw it from a PNG copy instead, which canvas2svg embeds as a data URL.
+        const { drawImage } = context;
+        context.drawImage = function (image, ...args) {
+            if (image?.nodeName !== "IMG" || !image.width || !image.height) return drawImage.call(this, image, ...args);
+            const png = embeddedImage(image);
+            if (!png) return undefined;
+            const k = png.width / image.width;
+            if (args.length === 2) args = [...args, image.width, image.height];
+            else if (args.length === 8) args = [...args.slice(0, 4).map(value => value * k), ...args.slice(4)];
+            return drawImage.call(this, png, ...args);
+        };
         // canvas2svg's clip paths leak into later drawing; charts stay inside their axes without them.
         context.clip = function () { this.beginPath(); };
         const canvas = { width, height, style: {}, getContext: () => context };

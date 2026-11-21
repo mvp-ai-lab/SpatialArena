@@ -105,7 +105,8 @@ buttons, so screenshots stay clean. The order is kept in the URL.
 - **Trajectory comparison** (SfM, Weak-Texture SfM, SLAM): the GT and several methods' trajectories in one 3D view,
   each aligned exactly as its ATE is computed. The GT is drawn on the frames the visible methods have a pose for (a
   method that registered part of the images or returns keyframes only is compared on its own frames), and a
-  trajectory with missing poses is joined across them. Free orbit or views along X / Y / Z, a frame slider with
+  trajectory with missing poses is joined across them. A free view (a trackball: drags turn it about any axis, over
+  the top and rolling) or views along X / Y / Z (pan and zoom only), a frame slider with
   markers, and the per-frame position error of every method. *Error lines* link each predicted camera center to its GT center
   (the translation error), in the method's color: at the current frame, for every camera, or off.
 - **Depth comparison** (MonoDepth, VideoDepth): *Grid* (the default) shows every method side by side with shared
@@ -114,8 +115,9 @@ buttons, so screenshots stay clean. The order is kept in the URL.
   their aligned depth or their error map. All methods of a scene use one depth color scale fixed by the GT, so they
   compare directly; frames play back like a video.
 - **Reconstruction comparison** (MVRecon): each method's fused cloud, aligned to the GT as scored, in its own window.
-  All windows share one camera, so orbiting, zooming or a shortcut key (arrows, +/-, F, 1/2/3) in any of them moves
-  all. Points show their fused color or their error (distance to the nearest GT point). *GT window* hides or shows
+  All windows share one camera, so turning, zooming or a shortcut key (arrows, +/-, F, 1/2/3) in any of them moves
+  all. The camera turns freely (a trackball: over the top and rolling, with the arrow keys too); F and 1/2/3 set it
+  upright again. Points show their fused color or their error (distance to the nearest GT point). *GT window* hides or shows
   the ground-truth window (as does its row's swatch or x), *GT overlay* draws the GT points in every method window,
   and *Cameras* draws the fused views' frustums (in a *Frustum color* of your choice). *Hide low confidence* hides
   each method's least confident points, as a percentile of its own predicted confidence (methods use different
@@ -154,6 +156,10 @@ place, if it exceeds `max_total_mb` (200). Rerun it after the leaderboard change
 released scene with its four best methods.
 
 ## Leaderboard and task metrics tables
+
+A table wider than the page can be dragged sideways with the mouse (or scrolled as before); the columns through
+Method (Rank and Method in the leaderboard) stay in place, so every row's metrics stay next to its method name. A drag
+never sorts the column it started on; a plain click still does (`js/table_drag.js`).
 
 Results that need a caveat are listed in `BENCHMARK_METHOD_FLAGS` (`js/benchmark.js`, by base method): tables tag the
 name "rerun pending" (the caveat on hover), charts add `*`, and the leaderboard, task tables and evolving curves print
@@ -274,6 +280,7 @@ app/webpage/
   css/compare.css               comparison mode styles
   css/home.css                  home page
   js/benchmark.js               data loading, view switching, rankings, charts, task tables
+  js/table_drag.js              wide tables: drag to scroll, the method column held in place
   js/download.js                Download view: task picker, download command, release contents
   js/compare/                   artifact viewer comparison modes (trajectory, depth, reconstruction) and mode switch
   js/home*.js                   home page slides
