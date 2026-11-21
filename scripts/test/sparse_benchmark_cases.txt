@@ -1,0 +1,2 @@
+# task|dataset|scene|interval
+SfM|imc|british_museum|132

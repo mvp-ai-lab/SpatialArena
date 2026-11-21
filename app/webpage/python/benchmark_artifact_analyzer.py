@@ -224,7 +224,7 @@ def load_scene_infos(benchmark_root: Path) -> dict[tuple[str, str, str], object]
             dataset = spec.create_dataset(benchmark_root)
             for scene_info in dataset.list_scenes():
                 scene_infos[(scene_info.task, scene_info.dataset, scene_info.scene)] = scene_info
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             continue
     return scene_infos
 
@@ -302,7 +302,7 @@ def depth_frames_for_scene(scene_info, prediction_scene_path: Path, limit: int) 
 def load_json(path: Path) -> dict:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         return {}
 
 
@@ -505,7 +505,7 @@ def scan_depth_cases(
                         limit=1,
                     )
                     pair_error = ""
-                except Exception as error:
+                except Exception as error:  # pylint: disable=broad-exception-caught
                     depth_pairs = []
                     pair_error = str(error)
                 if not depth_pairs:
@@ -673,7 +673,7 @@ def pose_errors_by_name(pred_sparse_path: Path, gt_sparse_path: Path) -> dict[st
     try:
         pred_poses = read_colmap_poses_cached(str(pred_sparse_path))
         gt_poses = read_colmap_poses_cached(str(gt_sparse_path))
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         return {}
     matched_names = sorted(set(pred_poses) & set(gt_poses))
     if len(matched_names) < 1:
@@ -682,7 +682,7 @@ def pose_errors_by_name(pred_sparse_path: Path, gt_sparse_path: Path) -> dict[st
     gt_centers = np.stack([gt_poses[name].center for name in matched_names], axis=0)
     try:
         aligned_pred, _scale, _rotation, _translation = align_points_similarity(pred_centers, gt_centers)
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         aligned_pred = pred_centers
     errors = np.linalg.norm(aligned_pred - gt_centers, axis=1)
     return {name: float(error) for name, error in zip(matched_names, errors)}

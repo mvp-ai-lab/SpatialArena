@@ -1,0 +1,74 @@
+# Full benchmark: SLAM, every range track (full-slam-<range> suite).
+# Every registered method on each track the task/track matrix (spatialarena/task_track_matrix.py) allows for
+# SLAM and the method supports.
+# SLAM: plan() makes one run per SLAM range track (spatialarena/slam_protocol.py) the method and
+# dataset take part in.
+#
+#   python -m spatialarena.run_config configs/benchmark/full_slam.yaml plan     # the planned runs
+#   python -m spatialarena.run_config configs/benchmark/full_slam.yaml generate # write the job scripts for review
+#   python -m spatialarena.run_config configs/benchmark/full_slam.yaml coverage # compare with the canonical case lists
+#   python -m spatialarena.run_config configs/benchmark/full_slam.yaml submit   # submit (max_in_flight runs queued)
+#
+# Results go to the canonical report folders (spatialarena/report_layout.py); scripts and SLURM logs to
+# <experiment_root>/<experiment_name>/.
+
+job_system: slurm
+benchmark_root: ${SPATIALARENA_ROOT}/benchmarks
+experiment_root: ${SPATIALARENA_ROOT}/benchmarks/_eval_job_scripts
+experiment_name: full_slam
+max_in_flight: 16
+slurm_exclude: []
+# SLAM evaluation is light (trajectory metrics on camera poses), so the engine's 320G eval default would
+# leave one job at a time on the single cpu node. VGGT-Long and Pi-Long also run their CPU chunk alignment in the eval
+# job (measured peaks: 12-15 GB on the short range, 16 GB / 29 GB on the large range), hence their own 128G below.
+# Inference: 12 h instead of the engine's 48 h (past inference jobs ran under 3 h), so jobs can backfill onto idle
+# nodes ahead of an upcoming reservation.
+slurm_resources:
+  infer: {time: "12:00:00"}
+  eval: {mem: 64G, cpus-per-task: 8}
+
+datasets:
+  - {task: SLAM, dataset: 7scenes}
+  - {task: SLAM, dataset: tum_dynamics}
+  - {task: SLAM, dataset: oxford_spires}
+  - {task: SLAM, dataset: vbr}
+  - {task: SLAM, dataset: kitti_odometry}
+  - {task: SLAM, dataset: spatialarena}
+
+models:
+  - {name: DA3-L, track: rgb}
+  - {name: DA3-G, track: rgb}
+  - {name: DA3-NGL, track: rgb}
+  - {name: VGGT, track: rgb, env: {INFER_CASE_PARALLELISM: 1}}
+  - {name: AMB3R, track: rgb}
+  - {name: PI3_X, track: rgb}
+  - {name: PI3_X, track: rgb_depth}
+  - {name: FASTVGGT, track: rgb}
+  - {name: COME, track: rgb}
+  - {name: CUT3R, track: rgb}
+  - {name: FAST3R, track: rgb}
+  - {name: VGGT_OMEGA, track: rgb}
+  - {name: OMNIVGGT, track: rgb}
+  - {name: OMNIVGGT, track: rgb_depth}
+  - {name: IGGT, track: rgb, env: {INFER_CASE_PARALLELISM: 1}}
+  - {name: ROBUSTVGGT, track: rgb}
+  # Budget below the short range's longest input (364 frames) or not measured: attempted on the short and long
+  # ranges (slam_protocol.ATTEMPTED_SHORT_AND_LONG), each failed sequence recorded with its cause (gpu_oom /
+  # host_oom / error) in case_failures*.tsv; not on the large range, where they run out of memory. One case at a
+  # time, so a failure is the sequence's own, not a neighbour's.
+  - {name: MAPANYTHING, track: rgb, env: {INFER_CASE_PARALLELISM: 1}}
+  - {name: MAPANYTHING, track: rgb_depth, env: {INFER_CASE_PARALLELISM: 1}}
+  - {name: DEJAVIEW, track: rgb, env: {INFER_CASE_PARALLELISM: 1}}
+  - {name: IGGT4D, track: rgb, env: {INFER_CASE_PARALLELISM: 1}}
+  - {name: POW3R, track: rgb, env: {INFER_CASE_PARALLELISM: 1}}
+  - {name: DUST3R, track: rgb, env: {INFER_CASE_PARALLELISM: 1}}
+  - {name: MAST3R, track: rgb, env: {INFER_CASE_PARALLELISM: 1}}
+  - {name: VGGT_LONG, track: rgb, slurm_resources: {eval: {mem: 128G, cpus-per-task: 16}}}
+  - {name: PI_LONG, track: rgb, slurm_resources: {eval: {mem: 128G, cpus-per-task: 16}}}
+  - {name: VGGT_SLAM, track: rgb}
+  - {name: LOGER, track: rgb}
+  - {name: ZIPMAP, track: rgb}
+  - {name: LINGBOT_MAP, track: rgb}
+  - {name: R3, track: rgb}
+  - {name: SCAL3R, track: rgb}
+  - {name: ABOT_RECON, track: rgb}

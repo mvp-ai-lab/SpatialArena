@@ -1,0 +1,52 @@
+# Commercial VLMs on MonoDepth through OpenRouter (scripts/inference/openrouter_vlm_depth.py).
+#
+# Runs locally (job_system: native; no GPU needed). The API key is never put in this file or the generated scripts:
+# export it in the shell that runs the config, together with a Python that has the requirements installed:
+#
+#   export OPENROUTER_API_KEY=...            # or OPENROUTER_API_KEY_FILE=/path/to/keyfile
+#   export PYTHON=/path/to/python            # the engine otherwise defaults to the cluster's si_bench env
+#   python -m spatialarena.run_config configs/benchmark/api_vlm_monodepth.yaml plan
+#   python -m spatialarena.run_config configs/benchmark/api_vlm_monodepth.yaml coverage
+#   python -m spatialarena.run_config configs/benchmark/api_vlm_monodepth.yaml submit
+#
+# Protocol: 16x16 marker grid, grid-v2 prompt (clean + marked photo, "sky" allowed), bilinear fill.
+# Cost: one API call per image (~11,650 images per model; ~$1.7k for these three models).
+# Answers are cached under OPENROUTER_CACHE_DIR
+# (default ~/.cache/feedforward_benchmark/openrouter), so reruns only pay for images not yet answered.
+# OPENROUTER_MAX_COST_USD caps each adapter invocation (at most 100 images); cap the total with the key's own
+# credit limit on openrouter.ai.
+
+job_system: native
+benchmark_root: ~/datasets/benchmark
+benchmark_eval_root: ~/datasets/benchmark/_eval
+checkpoint_root: ~/datasets/benchmark/_checkpoints
+experiment_root: ~/datasets/benchmark/_eval_job_scripts
+experiment_name: api_vlm_monodepth
+
+datasets:
+  - {task: MonoDepth, dataset: aerialmetric}
+  - {task: MonoDepth, dataset: hammer}
+  - {task: MonoDepth, dataset: ibims1}
+  - {task: MonoDepth, dataset: spring}
+  - {task: MonoDepth, dataset: synth4k}
+  - {task: MonoDepth, dataset: spatialarena}
+  # Last: the native runner goes dataset by dataset (infer, then score), so the largest scoring job runs after
+  # the API inference of every other dataset instead of idling the API while it scores.
+  - {task: MonoDepth, dataset: marigold}
+
+models:
+  - name: CLAUDE_OPUS_5_5
+    track: rgb
+    env: &openrouter
+      OPENROUTER_CONCURRENCY: "8"
+      OPENROUTER_REASONING_EFFORT: low
+      OPENROUTER_DEPTH_GRID_SIZE: "16"
+      OPENROUTER_PROMPT_VERSION: grid-v2
+      OPENROUTER_MAX_COST_USD: "25"
+      # Scoring (torch/numpy) otherwise starts one thread per core in every case process; with several cases and
+      # models scoring at once that oversubscribes the CPU several times over.
+      OMP_NUM_THREADS: "4"
+      MKL_NUM_THREADS: "4"
+      OPENBLAS_NUM_THREADS: "4"
+  - {name: GPT_6_ASTRA, track: rgb, env: *openrouter}
+  - {name: GEMINI_4_ARGON, track: rgb, env: *openrouter}

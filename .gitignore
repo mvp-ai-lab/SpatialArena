@@ -22,6 +22,6 @@ test/realworld
 .codex_write_test
 scripts/preprocess/tmp-shell-test.log
 scripts/preprocess/pose_refine_cpp/build/
-scripts/preprocess/mindcloud/pose_refine_cpp/build/
+scripts/preprocess/spatialarena_benchmark/pose_refine_cpp/build/
 app/webpage/benchmark_eval
 app/webpage/artifacts.tmp/

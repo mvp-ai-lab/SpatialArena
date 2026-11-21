@@ -1,0 +1,64 @@
+# Example config for BenchmarkEvaluator.configure() -- see docs/benchmark/evaluator_quickstart.md, Section 5a.
+#
+#   from spatialarena import BenchmarkEvaluator
+#   bench = BenchmarkEvaluator()
+#   bench.configure("configs/benchmark/evaluation_example.yaml")
+#
+# Every key is optional. Precedence, highest first: configure(**overrides) > BenchmarkEvaluator(...) constructor
+# arguments > this file > environment variables (in parentheses below) > built-in defaults.
+
+# --- Job system and progress display ---------------------------------------------------------------------------
+job_system: slurm            # slurm | native (also accepted as a mapping: {type: slurm})
+progress_mode: bars          # bars | board | none ($BENCHMARK_PROGRESS_MODE)
+# case_parallelism: 4        # cases (scenes) run concurrently inside one run (default: 4 inference, 6 evaluation)
+# max_in_flight: 16          # evaluate(): at most this many runs queued at once (default: submit every run)
+slurm_exclude: []            # SLURM nodes the generated jobs avoid (#SBATCH --exclude), e.g. [node1]
+# evaluate_only: false       # true: submit only the evaluation jobs (the predictions already exist)
+# reevaluate: false          # true: score every case again although its evaluation file has results (after an
+#                            # evaluator fix; the engine's REEVALUATE=1)
+slurm_resources:             # override the engine's #SBATCH resource lines per phase (infer / eval)
+  infer: {time: "12:00:00"}  # 12 h instead of the engine's 48 h, so jobs backfill ahead of reservations
+  # eval: {mem: 64G, cpus-per-task: 8}
+
+# --- Roots -----------------------------------------------------------------------------------------------------
+benchmark_root: ${SPATIALARENA_ROOT}/benchmarks   # datasets ($BENCHMARK_AUX_ROOT)
+# benchmark_eval_root: <benchmark_root>/_evaluation   # run outputs ($BENCHMARK_EVAL_ROOT)
+# checkpoint_root: <benchmark_root>/_checkpoints      # model weights ($CHECKPOINT_ROOT)
+# method_code_root: <benchmark_root>/_model_codes     # method source code ($METHOD_CODE_ROOT)
+
+# Generated scripts, plan.json, job state and SLURM logs go to <experiment_root>/<experiment_name>/
+# (experiment_name required; experiment_root defaults to <benchmark_root>/_eval_job_scripts).
+experiment_root: ${SPATIALARENA_ROOT}/benchmarks/_eval_job_scripts
+experiment_name: example_run
+
+# --- What to run -----------------------------------------------------------------------------------------------
+# Same item format as select_datasets() / select_models(). plan() takes the cross product, filtered by the
+# task/track compatibility matrix and each method's own tracks and tasks.
+datasets:
+  - task: MonoDepth
+    dataset: marigold
+  - task: SfM
+    dataset: eth3d
+  - task: SLAM
+    dataset: tum_dynamics
+    # slam_range: short      # short | long; omit to plan every range the method takes part in
+  # - task: MVRecon
+  #   dataset: dtu
+  #   scenes: [scan24, scan37] # optional subset of scenes
+
+models:
+  - name: VGGT                 # track defaults to rgb
+  # - {name: PI_LONG, slurm_resources: {eval: {mem: 128G}}}   # per-model #SBATCH overrides, on top of the config's
+  - name: PI3_X
+    track: rgb_cameras         # one item per track; repeat the method for more tracks
+  - name: PI3_X
+    track: rgb_depth
+
+# Alternatively, list exact runs instead of the datasets x models cross product (this replaces it):
+# runs:
+#   - {task: SfM, dataset: eth3d, model: VGGT, track: rgb}
+#   - {task: SLAM, dataset: tum_dynamics, model: PI3_X, track: rgb, slam_range: long}
+
+# --- Report ----------------------------------------------------------------------------------------------------
+report:
+  output_path: ./report        # default for export_report() when called without a path

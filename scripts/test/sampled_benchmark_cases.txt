@@ -1,0 +1,8 @@
+# task|dataset|scene|interval
+VideoDepth|kitti|2011_09_26_drive_0036_sync_02|22
+VideoDepth|bonn|rgbd_bonn_synchronous|22
+VideoDepth|sintel|market_2|10
+MVRecon|eth3d|delivery_area/key000001|1
+MVRecon|dtu|scan24/key000000|1
+MVRecon|tanks_and_temples|Ignatius/key000017|1
+MVRecon|7scenes|office|2000

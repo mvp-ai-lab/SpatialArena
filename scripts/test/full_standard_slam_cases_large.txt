@@ -1,0 +1,34 @@
+# Full-standard case list generated from canonical metadata.
+# Format: task|dataset|scene|interval|order
+# full-slam large-range track: each interval is its dataset's temporal stride in the track; whole recordings, no frame cap (spatialarena/slam_protocol.py).
+SLAM|oxford_spires|bodleian-library-02|1
+SLAM|oxford_spires|christ-church-02|1
+SLAM|oxford_spires|christ-church-03|1
+SLAM|oxford_spires|christ-church-05|1
+SLAM|oxford_spires|keble-college-02|1
+SLAM|oxford_spires|keble-college-03|1
+SLAM|oxford_spires|keble-college-04|1
+SLAM|oxford_spires|keble-college-05|1
+SLAM|oxford_spires|observatory-quarter-01|1
+SLAM|oxford_spires|observatory-quarter-02|1
+SLAM|vbr|campus_train0|1
+SLAM|vbr|campus_train1|1
+SLAM|vbr|ciampino_train1|1
+SLAM|vbr|colosseo_train0|1
+SLAM|vbr|diag_train0|1
+SLAM|vbr|pincio_train0|1
+SLAM|vbr|spagna_train0|1
+SLAM|kitti_odometry|00|1
+SLAM|kitti_odometry|01|1
+SLAM|kitti_odometry|02|1
+SLAM|kitti_odometry|03|1
+SLAM|kitti_odometry|04|1
+SLAM|kitti_odometry|05|1
+SLAM|kitti_odometry|06|1
+SLAM|kitti_odometry|07|1
+SLAM|kitti_odometry|08|1
+SLAM|kitti_odometry|09|1
+SLAM|kitti_odometry|10|1
+SLAM|spatialarena|CambridgeWesthub3|1
+SLAM|spatialarena|CoalDropsYard2|1
+SLAM|spatialarena|NationalHistoryMuseumIndoor1|1

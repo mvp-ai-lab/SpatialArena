@@ -1,0 +1,262 @@
+{
+  "tracks": {
+    "MonoDepth": {
+      "CambridgeRalishLibrary": {
+        "drop": [
+          "cam0__img0_000064",
+          "cam0__img0_000080",
+          "cam0__img0_000450",
+          "cam0__img0_000456",
+          "cam0__img0_000663",
+          "cam0__img0_000785",
+          "cam1__img1_000003",
+          "cam1__img1_000229",
+          "cam1__img1_000280",
+          "cam1__img1_000396",
+          "cam1__img1_000436",
+          "cam1__img1_000446",
+          "cam1__img1_000454",
+          "cam1__img1_000655",
+          "cam1__img1_000763",
+          "cam1__img1_000803",
+          "cam1__img1_000830",
+          "cam1__img1_000909",
+          "cam1__img1_000947",
+          "cam1__img1_000957",
+          "cam1__img1_000963",
+          "cam1__img1_000976",
+          "cam2__img2_000059",
+          "cam2__img2_000072",
+          "cam2__img2_000090",
+          "cam2__img2_000097",
+          "cam2__img2_000165",
+          "cam2__img2_000267",
+          "cam2__img2_000384",
+          "cam2__img2_000395",
+          "cam2__img2_000446",
+          "cam2__img2_000602",
+          "cam2__img2_000738",
+          "cam2__img2_000755",
+          "cam2__img2_000824",
+          "cam2__img2_000849",
+          "cam2__img2_000925",
+          "cam2__img2_000931"
+        ]
+      },
+      "CambridgeSmallGarden2": {
+        "drop": [
+          "cam0__img0_000149",
+          "cam0__img0_000157",
+          "cam0__img0_000164",
+          "cam0__img0_000451",
+          "cam0__img0_000467",
+          "cam0__img0_000473",
+          "cam0__img0_000495",
+          "cam0__img0_000507",
+          "cam0__img0_000523",
+          "cam0__img0_000530",
+          "cam0__img0_000746",
+          "cam0__img0_000757",
+          "cam0__img0_000762",
+          "cam0__img0_000776",
+          "cam1__img1_000020",
+          "cam1__img1_000026",
+          "cam1__img1_000037",
+          "cam1__img1_000046",
+          "cam1__img1_000172",
+          "cam1__img1_000181",
+          "cam1__img1_000299",
+          "cam1__img1_000431",
+          "cam1__img1_000474",
+          "cam1__img1_000482",
+          "cam1__img1_000499",
+          "cam1__img1_000507",
+          "cam1__img1_000521",
+          "cam1__img1_000942",
+          "cam1__img1_000953",
+          "cam1__img1_000963",
+          "cam1__img1_000974",
+          "cam2__img2_000190"
+        ]
+      },
+      "CambridgeUpstair": {
+        "drop": [
+          "cam0__img0_000002",
+          "cam1__img1_000002",
+          "cam1__img1_000019",
+          "cam1__img1_000025",
+          "cam1__img1_000034",
+          "cam1__img1_000043",
+          "cam2__img2_000021",
+          "cam2__img2_000027",
+          "cam2__img2_000040",
+          "cam2__img2_000085"
+        ]
+      },
+      "CelestialHouseBackyard": {
+        "drop": [
+          "cam1__img1_000099",
+          "cam2__img2_000053",
+          "cam2__img2_000063"
+        ]
+      },
+      "ChrispAlley1": {
+        "drop": [
+          "cam1__img1_000227",
+          "cam2__img2_000004",
+          "cam2__img2_000019",
+          "cam2__img2_000026",
+          "cam2__img2_000034",
+          "cam2__img2_000048",
+          "cam2__img2_000056",
+          "cam2__img2_000064",
+          "cam2__img2_000076",
+          "cam2__img2_000087",
+          "cam2__img2_000093",
+          "cam2__img2_000101",
+          "cam2__img2_000117",
+          "cam2__img2_000128",
+          "cam2__img2_000138",
+          "cam2__img2_000146",
+          "cam2__img2_000154",
+          "cam2__img2_000162",
+          "cam2__img2_000170"
+        ]
+      },
+      "KingsCrossCanal2": {
+        "drop": [
+          "cam0__img0_000109",
+          "cam0__img0_000117",
+          "cam0__img0_000137",
+          "cam0__img0_000145",
+          "cam0__img0_000407",
+          "cam1__img1_000083",
+          "cam1__img1_000091",
+          "cam1__img1_000117",
+          "cam1__img1_000132",
+          "cam1__img1_000143",
+          "cam1__img1_000183",
+          "cam1__img1_000190",
+          "cam1__img1_000202",
+          "cam1__img1_000210",
+          "cam1__img1_000218",
+          "cam1__img1_000228",
+          "cam1__img1_000239",
+          "cam1__img1_000245",
+          "cam1__img1_000256",
+          "cam1__img1_000271",
+          "cam1__img1_000278",
+          "cam1__img1_000386",
+          "cam1__img1_000402",
+          "cam1__img1_000408",
+          "cam1__img1_000453",
+          "cam1__img1_000467",
+          "cam2__img2_000029",
+          "cam2__img2_000049",
+          "cam2__img2_000107",
+          "cam2__img2_000115",
+          "cam2__img2_000126",
+          "cam2__img2_000153",
+          "cam2__img2_000163",
+          "cam2__img2_000181",
+          "cam2__img2_000191",
+          "cam2__img2_000200",
+          "cam2__img2_000212",
+          "cam2__img2_000218",
+          "cam2__img2_000413",
+          "cam2__img2_000420",
+          "cam2__img2_000428",
+          "cam2__img2_000477"
+        ]
+      },
+      "KingsCrossWalk2": {
+        "drop": [
+          "cam0__img0_000147",
+          "cam1__img1_000007",
+          "cam1__img1_000147",
+          "cam1__img1_000167",
+          "cam1__img1_000183",
+          "cam1__img1_000219"
+        ]
+      },
+      "NationalHistoryMuseum2": {
+        "drop": [
+          "cam1__img1_000081",
+          "cam1__img1_000107",
+          "cam1__img1_000113"
+        ]
+      },
+      "NationalScotlandMuseum5": {
+        "drop": [
+          "cam0__img0_000240",
+          "cam0__img0_000739",
+          "cam0__img0_000750",
+          "cam1__img1_000099",
+          "cam1__img1_000215",
+          "cam1__img1_000350",
+          "cam1__img1_000462",
+          "cam1__img1_000468",
+          "cam1__img1_000490",
+          "cam1__img1_000548",
+          "cam1__img1_000572",
+          "cam2__img2_000122",
+          "cam2__img2_000344",
+          "cam2__img2_000365"
+        ]
+      },
+      "NationalScotlandMuseum6": {
+        "drop": [
+          "cam0__img0_000629",
+          "cam1__img1_000126",
+          "cam1__img1_000132",
+          "cam1__img1_000186",
+          "cam1__img1_000195",
+          "cam1__img1_000473",
+          "cam1__img1_000485",
+          "cam1__img1_000539",
+          "cam1__img1_000544",
+          "cam1__img1_000609",
+          "cam2__img2_000005",
+          "cam2__img2_000032",
+          "cam2__img2_000124",
+          "cam2__img2_000157",
+          "cam2__img2_000187",
+          "cam2__img2_000263",
+          "cam2__img2_000393",
+          "cam2__img2_000505"
+        ]
+      },
+      "NationalScotlandMuseum7": {
+        "drop": [
+          "cam0__img0_000026",
+          "cam0__img0_000106",
+          "cam0__img0_000199",
+          "cam0__img0_000215",
+          "cam0__img0_000220",
+          "cam0__img0_000234",
+          "cam1__img1_000003",
+          "cam1__img1_000017",
+          "cam1__img1_000023",
+          "cam1__img1_000111",
+          "cam2__img2_000262",
+          "cam2__img2_000269",
+          "cam2__img2_000280"
+        ]
+      },
+      "NationalScotlandMuseum8": {
+        "drop": [
+          "cam1__img1_000209",
+          "cam2__img2_000165",
+          "cam2__img2_000490",
+          "cam2__img2_000585"
+        ]
+      },
+      "StPancrasCorridor": {
+        "drop": [
+          "cam2__img2_000067"
+        ]
+      }
+    }
+  },
+  "updated": "2026-10-29T14:36:33+00:00"
+}

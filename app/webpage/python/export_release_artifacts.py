@@ -65,7 +65,7 @@ def task_rankings(data_dir: Path) -> dict[str, list[str]]:
     order = {}
     for task in ranking.get("tasks", []):
         ranked = [row for row in ranking["rows"] if (row.get("task_scores", {}).get(task) or {}).get("rank")]
-        ranked.sort(key=lambda row: row["task_scores"][task]["rank"])
+        ranked.sort(key=lambda row, task=task: row["task_scores"][task]["rank"])
         order[task] = [row["method"] for row in ranked]
     return order
 

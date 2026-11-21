@@ -1,0 +1,53 @@
+#!/bin/bash
+# Copyright (c) 2026 Yu Chen. All rights reserved.
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+
+# Pre-commit lint gate, per AGENTS.md's "Linting and tests" section.
+#
+# .pylintrc disables the Convention/Refactor/Warning categories repo-wide (too noisy for this
+# kind of research/CLI code to use as a release gate), so a plain `pylint` run only enforces
+# Error/Fatal issues. It also does not enforce its own [FORMAT] max-line-length=120, since
+# line-too-long is a Convention-category message -- checked here manually instead.
+#
+# Runs only on staged Python files (not the whole tree), so a commit is never blocked by a
+# pre-existing issue in a file this commit does not touch.
+#
+# One-time setup per clone (not tracked by git itself):
+#   git config core.hooksPath .githooks
+
+set -uo pipefail
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+mapfile -t staged_py < <(git diff --cached --name-only --diff-filter=ACM -- '*.py')
+if [ "${#staged_py[@]}" -eq 0 ]; then
+    exit 0
+fi
+
+status=0
+
+for f in "${staged_py[@]}"; do
+    [ -f "$f" ] || continue
+    if ! python -m py_compile "$f"; then
+        echo "pre-commit: $f failed to compile" >&2
+        status=1
+    fi
+    long_lines=$(awk 'length > 120 {print NR": "length" chars"}' "$f")
+    if [ -n "$long_lines" ]; then
+        echo "pre-commit: $f has lines over AGENTS.md's 120-char limit (not caught by pylint, see above):" >&2
+        echo "$long_lines" | sed 's/^/  /' >&2
+        status=1
+    fi
+done
+
+# Repo root on the path: linting a lone test file otherwise resolves spatialarena wrongly (false E0611).
+if ! PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}" python -m pylint "${staged_py[@]}"; then
+    echo "pre-commit: pylint reported an Error/Fatal issue in a staged file (see above)" >&2
+    status=1
+fi
+
+if [ "$status" -ne 0 ]; then
+    echo "pre-commit: fix the issues above, or skip this check with 'git commit --no-verify' (not recommended)" >&2
+fi
+
+exit "$status"

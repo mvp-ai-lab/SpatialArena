@@ -1,0 +1,68 @@
+# Full benchmark: VideoDepth (full-depth suite).
+# Every registered method on each track the task/track matrix (spatialarena/task_track_matrix.py) allows for
+# VideoDepth and the method supports.
+#
+#   python -m spatialarena.run_config configs/benchmark/full_videodepth.yaml plan     # the planned runs
+#   python -m spatialarena.run_config configs/benchmark/full_videodepth.yaml generate # write the job scripts for review
+#   python -m spatialarena.run_config configs/benchmark/full_videodepth.yaml coverage # compare with the canonical case lists
+#   python -m spatialarena.run_config configs/benchmark/full_videodepth.yaml submit   # submit (max_in_flight runs queued)
+#
+# Results go to the canonical report folders (spatialarena/report_layout.py); scripts and SLURM logs to
+# <experiment_root>/<experiment_name>/.
+
+job_system: slurm
+benchmark_root: ${SPATIALARENA_ROOT}/benchmarks
+experiment_root: ${SPATIALARENA_ROOT}/benchmarks/_eval_job_scripts
+experiment_name: full_videodepth
+max_in_flight: 16
+slurm_exclude: []
+# 12 h instead of the engine's 48 h inference limit: past inference jobs ran under 3 h, and a shorter limit lets
+# jobs backfill onto idle nodes ahead of an upcoming reservation instead of waiting for it to end.
+slurm_resources: {infer: {time: "12:00:00"}}
+
+datasets:
+  - {task: VideoDepth, dataset: bonn}
+  - {task: VideoDepth, dataset: kitti}
+  - {task: VideoDepth, dataset: sintel}
+  # DyCheck: 12 camera-0 scenes, up to 100 frames each (the suite's cap, sampled with seed 42 and kept in time order;
+  # docs/benchmark/dycheck_videodepth.md).
+  - {task: VideoDepth, dataset: dycheck}
+  - {task: VideoDepth, dataset: spatialarena}
+
+# The rgb_cameras ([+C]) runs plan on SpatialArena only, the one VideoDepth dataset whose released GT has camera poses
+# (TRACK_DATASETS in spatialarena/task_track_matrix.py): KITTI has only the OXTS vehicle trajectory in the IMU frame,
+# and the released GT has no Sintel or DyCheck cameras.
+models:
+  - {name: DA3-L, track: rgb, env: {SPATIAL_POLICY: shared}}
+  - {name: DA3-G, track: rgb, env: {SPATIAL_POLICY: shared}}
+  - {name: DA3-NGL, track: rgb, env: {SPATIAL_POLICY: shared}}
+  - {name: DA3-NGL, track: rgb_cameras, env: {SPATIAL_POLICY: shared}}
+  - {name: VGGT, track: rgb, env: {SPATIAL_POLICY: shared, INFER_CASE_PARALLELISM: 1}}  # ~71 GiB per 100-image batch
+  - {name: AMB3R, track: rgb}
+  - {name: PI3_X, track: rgb}
+  - {name: PI3_X, track: rgb_cameras}
+  - {name: FASTVGGT, track: rgb, env: {SPATIAL_POLICY: shared}}
+  - {name: COME, track: rgb, env: {SPATIAL_POLICY: shared}}
+  - {name: CUT3R, track: rgb, env: {SPATIAL_POLICY: shared}}
+  - {name: FAST3R, track: rgb}
+  - {name: VGGT_OMEGA, track: rgb, env: {SPATIAL_POLICY: shared-pad}}
+  - {name: MAPANYTHING, track: rgb}
+  - {name: MAPANYTHING, track: rgb_cameras}
+  - {name: OMNIVGGT, track: rgb}
+  - {name: OMNIVGGT, track: rgb_cameras}
+  - {name: DEJAVIEW, track: rgb}
+  - {name: IGGT, track: rgb, env: {INFER_CASE_PARALLELISM: 1}}  # ~73 GiB per 100-image batch
+  - {name: IGGT4D, track: rgb}
+  - {name: POW3R, track: rgb}
+  - {name: DUST3R, track: rgb}
+  - {name: MAST3R, track: rgb}
+  - {name: ROBUSTVGGT, track: rgb, env: {SPATIAL_POLICY: shared}}
+  - {name: DEPTHVLM, track: rgb}
+  - {name: VLM3, track: rgb}
+  - {name: DEPTHLM, track: rgb}
+  - {name: SENSENOVA_VISION, track: rgb}
+  - {name: QWEN3_VL, track: rgb}
+  - {name: GENCEPTION_DEPTH, track: rgb}
+  - {name: DVD, track: rgb}   # DVD v1.1 video depth (VideoDepth only)
+  - {name: DEPTHCRAFTER, track: rgb}
+  - {name: CHRONODEPTH, track: rgb}

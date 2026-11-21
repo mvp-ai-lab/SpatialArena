@@ -89,6 +89,7 @@ def pick_sample(card: DatasetCard, benchmark_root: Path) -> tuple[str, Path] | N
             continue
         try:
             scenes = spec.create_dataset(benchmark_root).list_scenes()
+        # pylint: disable-next=broad-exception-caught
         except Exception:  # noqa: BLE001 -- a missing dataset only drops its thumbnail
             continue
         ordered = sorted(scenes, key=lambda scene: scene.scene != card.thumbnail_scene)

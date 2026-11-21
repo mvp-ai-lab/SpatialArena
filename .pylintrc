@@ -21,3 +21,8 @@ disable=
 
 [FORMAT]
 max-line-length=120
+
+[CLASSES]
+# BenchmarkEvaluator.__init__ sets its state through reset() (also called to start over), so attributes first assigned
+# there are defined at construction, not "outside __init__".
+defining-attr-methods=__init__,__new__,setUp,asyncSetUp,__post_init__,reset

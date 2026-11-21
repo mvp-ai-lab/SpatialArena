@@ -1,0 +1,1202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Evaluation API - SpatialArena API Guide</title>
+  <link rel="stylesheet" href="../assets/api-docs.css">
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']]
+      },
+      svg: {
+        fontCache: 'global'
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <a class="brand" href="evaluation.html">SpatialArena</a>
+      <div class="version">Benchmark evaluation API</div>
+      <div class="nav-title">API Guide</div>
+      <nav class="nav">
+        <a class="active" href="evaluation.html">Evaluation API</a>
+      </nav>
+      <div class="nav-title">Related Docs</div>
+      <nav class="nav">
+        <a href="../../evaluation.md">Evaluation</a>
+        <a href="../../benchmark/evaluator_quickstart.md">Evaluator quickstart</a>
+        <a href="../../../app/webpage/README.md">Benchmark dashboard</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <article class="content">
+        <div class="breadcrumb">API Guide / Evaluation API</div>
+        <section class="hero">
+          <h1>Evaluation API</h1>
+          <p class="lead">
+            Evaluation code in <code>spatialarena/eval</code> reads standardized
+            benchmark datasets and standardized method outputs. It validates artifacts,
+            resolves result paths, computes depth and pose metrics, and writes JSON
+            reports that the data manager can visualize.
+          </p>
+        </section>
+
+        <h2>Evaluation Flow</h2>
+        <ol class="flow-list">
+          <li><strong>Select scenes.</strong> The dataset registry chooses benchmark task/dataset specs and materializes <code>BenchmarkSceneInfo</code> records.</li>
+          <li><strong>Resolve outputs.</strong> Result-layout helpers map experiment, task, dataset, method, and scene names to the expected output directory.</li>
+          <li><strong>Validate artifacts.</strong> Prediction validators check for depth files, sparse COLMAP models, point clouds, or metrics files.</li>
+          <li><strong>Run task evaluator.</strong> Depth, sparse pose (SfM), SLAM trajectory, mesh, or ScanNet++ evaluators load GT/predictions and compute scene-level metrics.</li>
+          <li><strong>Aggregate reports.</strong> Evaluators return per-scene results, errors, and aggregate metrics suitable for JSON files and dashboard ingestion.</li>
+        </ol>
+
+        <h2>Benchmark Evaluation Datasets</h2>
+        <p>
+          Evaluation datasets are registered in
+          <a href="../../../spatialarena/eval/dataset_registry.py"><code>spatialarena/eval/dataset_registry.py</code></a>.
+          They are canonical benchmark folders, not FoundationModels training
+          WebDataset roots. The default root is
+          <code>$SPATIALARENA_ROOT/benchmarks</code>; every dataset below
+          is addressed by a task key, dataset key, and root-relative path.
+        </p>
+        <div class="api-block">
+          <h3>Canonical Evaluation Input Record</h3>
+          <div class="source-link">Source: <a href="../../../spatialarena/eval/canonical_dataset.py"><code>spatialarena/eval/canonical_dataset.py</code></a></div>
+          <p>
+            Registry adapters do not pass raw dataset roots directly to evaluators.
+            They first materialize one <code>BenchmarkSceneInfo</code> per evaluated
+            scene. The fields below are the actual evaluator inputs.
+          </p>
+          <pre><code>BenchmarkSceneInfo(
+  dataset="...",             # dataset key in reports
+  task="...",                # MonoDepth, VideoDepth, MVRecon, SfM, SLAM (CameraPose = SfM alias)
+  scene="...",               # scene/subset/sequence name
+  root_path=...,             # canonical scene root
+  image_path=...,            # directory of evaluation RGB frames, when required
+  depth_gt_path=...,         # directory of GT depth maps, for depth metrics
+  mask_path=...,             # optional valid-pixel masks
+  sparse_gt_path=...,        # GT COLMAP model, for pose metrics
+  metadata={...},            # metadata.json scene entry
+)</code></pre>
+          <ul class="param-list">
+            <li><code>Depth evaluators</code>: require <code>image_path</code> for scene context and <code>depth_gt_path</code> for GT depth pairing; <code>mask_path</code> is applied when present.</li>
+            <li><code>Sparse pose evaluators</code>: require <code>image_path</code> and <code>sparse_gt_path</code>; method predictions are read from the method output <code>sparse/0</code>.</li>
+            <li><code>Geometry evaluators</code>: use dataset-specific mesh, point-cloud, mask, and transform sidecars in addition to the canonical scene record.</li>
+          </ul>
+        </div>
+
+        <section class="api-section">
+          <div class="api-block">
+            <h3>Marigold Monocular Depth</h3>
+            <div class="source-link">Official: <a href="https://marigoldmonodepth.github.io/">Marigold</a> | Spec: <code>MonoDepth / marigold</code>, root <code>MonoDepth/marigold</code>, adapter <a href="../../../spatialarena/eval/marigold_dataset.py"><code>DatasetMarigold</code></a></div>
+            <p>
+              Marigold packages standard monocular-depth test subsets behind a common
+              tar-backed layout. The evaluator uses a single RGB frame and one GT depth
+              map per example, with optional masks when the materialized subset provides
+              them. The suite uses the AMB3R mono-depth protocol: Marigold subsets are
+              scale-and-shift aligned before depth metrics are computed.
+            </p>
+            <pre><code>$BENCHMARK_ROOT/MonoDepth/marigold/
+  metadata.json
+  &lt;subset&gt;/
+    images/                  # image_path
+    depths/                  # depth_gt_path
+    masks/                   # mask_path, optional</code></pre>
+            <ul class="param-list">
+              <li><code>root_path</code>: <code>$BENCHMARK_ROOT/MonoDepth/marigold/&lt;subset&gt;</code>.</li>
+              <li><code>image_path</code>: <code>root_path/images</code>; raw subset names must be canonicalized or symlinked here before evaluation.</li>
+              <li><code>depth_gt_path</code>: <code>root_path/depths</code>; paired to prediction depth files by normalized frame key.</li>
+              <li><code>mask_path</code>: <code>root_path/masks</code> when available.</li>
+              <li><code>sparse_gt_path</code>: not used for MonoDepth.</li>
+            </ul>
+            <ul class="param-list">
+              <li><code>Required artifacts</code>: canonical images, GT depths, optional masks, and <code>metadata.json</code>.</li>
+              <li><code>Preparation</code>: <a href="../../../scripts/download/marigold.sh"><code>scripts/download/marigold.sh</code></a>, then <code>scripts/preprocess/materialize_marigold_sample.py --scenes nyuv2 kitti eth3d diode scannet --max_samples -1</code> (every image of each subset, 3,331 in total; materializing one subset adds it to the existing <code>metadata.json</code>).</li>
+              <li><code>Access/license</code>: follow the upstream Marigold and underlying subset terms. Our Hugging Face release ships <code>nyuv2</code>, <code>kitti</code>, <code>eth3d</code> and <code>diode</code> only: ScanNet's terms forbid redistribution, so <code>scannet</code> is rebuilt from Marigold's own download as its <code>LICENSE_NOTICE.md</code> describes. See <code>spatialarena/dataset_licenses.py</code>.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3>MonoDepth Extension Datasets (AerialMetric, HAMMER, iBims-1, Spring, Synth4K)</h3>
+            <div class="source-link">Spec: <code>MonoDepth / aerialmetric</code>, <code>hammer</code>, <code>ibims1</code>, <code>spring</code>, <code>synth4k</code>, root <code>MonoDepth/&lt;dataset&gt;</code>, adapters in <a href="../../../spatialarena/eval/monodepth_datasets.py"><code>monodepth_datasets.py</code></a></div>
+            <p>
+              Five MonoDepth datasets in one canonical layout, evaluated with the same
+              <code>standard</code> protocol as Marigold (per-image least-squares scale+shift).
+              Each scene's depth limits live in <code>metadata.json</code> (<code>min_depth</code>,
+              <code>max_depth</code>, <code>depth_scale</code>) and are read by <code>resolve_depth_config</code>;
+              per-frame pixel intrinsics, masks and source ids live in <code>materialized_full.json</code>.
+            </p>
+            <pre><code>$BENCHMARK_ROOT/MonoDepth/&lt;dataset&gt;/
+  metadata.json              # scenes + depth limits
+  &lt;scene&gt;/
+    images/                  # image_path
+    depths/                  # depth_gt_path, float32 .npy metres, 0 = invalid
+    masks/                   # mask_path, optional, 255 = evaluate
+    materialized_full.json   # per-frame records</code></pre>
+            <ul class="param-list">
+              <li><code>Scenes</code>: <code>hammer</code>, <code>ibims1</code>, <code>spring</code> (one each, MoGe's processed eval sets); <code>synth4k</code> (one per game, half of each game's scorable frames: 1,960 in total); <code>aerialmetric</code> (<code>decoupled</code>, <code>oblique</code>, <code>wild</code>, half of each site's scorable frames: 3,596 in total). Every image of a scene is scored.</li>
+              <li><code>Preparation</code>: <code>scripts/download/{moge_eval,synth4k,aerialmetric}.sh</code>, then <code>scripts/preprocess/materialize_{moge_eval,synth4k,aerialmetric}.py</code>; <code>scripts/preprocess/check_monodepth_gt.py</code> checks the result.</li>
+              <li><code>Access/license</code>: HAMMER MIT, iBims-1 and Spring CC BY 4.0; AerialMetric academic use only (Wild frames unconfirmed); Synth4K unconfirmed (game imagery). See <code>spatialarena/dataset_licenses.py</code>.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3>MPI Sintel Video Depth</h3>
+            <div class="source-link">Official: <a href="http://sintel.is.tue.mpg.de/">MPI Sintel</a> | Spec: <code>VideoDepth / sintel</code>, root <code>VideoDepth/sintel</code>, adapter <a href="../../../spatialarena/eval/sintel_dataset.py"><code>DatasetSintel</code></a></div>
+            <p>
+              Sintel is a synthetic movie-style video benchmark with dense per-frame
+              depth. It is useful for testing temporal depth prediction because each
+              scene is a rendered sequence with known camera motion and dense geometry.
+              GT depths are loaded from Sintel <code>.dpt</code> files; invalid sentinel
+              depths are masked before scoring.
+            </p>
+            <pre><code>$BENCHMARK_ROOT/VideoDepth/sintel/
+  metadata.json
+  &lt;scene&gt;/
+    images/                  # image_path
+    depths/                  # depth_gt_path, Sintel .dpt files
+    masks/                   # mask_path, optional</code></pre>
+            <ul class="param-list">
+              <li><code>root_path</code>: <code>$BENCHMARK_ROOT/VideoDepth/sintel/&lt;scene&gt;</code>.</li>
+              <li><code>image_path</code>: <code>root_path/images</code>; sequence frames used for prediction/export.</li>
+              <li><code>depth_gt_path</code>: <code>root_path/depths</code>; loaded with Sintel <code>.dpt</code> support.</li>
+              <li><code>mask_path</code>: <code>root_path/masks</code> if materialized; otherwise invalid Sintel sentinels are filtered by the depth loader.</li>
+              <li><code>sparse_gt_path</code>: not used for VideoDepth.</li>
+            </ul>
+            <ul class="param-list">
+              <li><code>Required artifacts</code>: RGB frames, <code>.dpt</code> GT depth maps, and metadata for scene enumeration.</li>
+              <li><code>Preparation</code>: <a href="../../../scripts/download/sintel.sh"><code>scripts/download/sintel.sh</code></a>.</li>
+              <li><code>Access/license</code>: follow the MPI Sintel dataset license.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3>Bonn RGB-D Dynamic Sequences</h3>
+            <div class="source-link">Official: <a href="https://www.ipb.uni-bonn.de/data/rgbd-dynamic-dataset/">Bonn RGB-D Dynamic Dataset</a> | Spec: <code>VideoDepth / bonn</code>, root <code>VideoDepth/bonn</code>, adapter <a href="../../../spatialarena/eval/bonn_dataset.py"><code>DatasetBonn</code></a></div>
+            <p>
+              Bonn contains real RGB-D videos of dynamic indoor scenes. The adapter
+              keeps RGB and depth sequences in canonical scene records and supports
+              timestamp-aware depth pairing, so methods can write predictions by frame
+              name while the evaluator still handles small RGB-D timestamp offsets.
+            </p>
+            <pre><code>$BENCHMARK_ROOT/VideoDepth/bonn/
+  metadata.json
+  &lt;sequence&gt;/
+    images/                  # image_path
+    depths/                  # depth_gt_path, millimeter-encoded GT depth
+    masks/                   # mask_path, optional</code></pre>
+            <ul class="param-list">
+              <li><code>root_path</code>: <code>$BENCHMARK_ROOT/VideoDepth/bonn/&lt;sequence&gt;</code>.</li>
+              <li><code>image_path</code>: <code>root_path/images</code>; timestamped RGB inputs should be canonicalized here.</li>
+              <li><code>depth_gt_path</code>: <code>root_path/depths</code>; evaluator applies the Bonn millimeter-to-meter scale.</li>
+              <li><code>mask_path</code>: <code>root_path/masks</code> when available.</li>
+              <li><code>sparse_gt_path</code>: not used for VideoDepth.</li>
+            </ul>
+            <ul class="param-list">
+              <li><code>Required artifacts</code>: RGB sequence, metric depth sequence encoded in millimeters, optional masks, and metadata.</li>
+              <li><code>Preparation</code>: <a href="../../../scripts/download/bonn.sh"><code>scripts/download/bonn.sh</code></a>.</li>
+              <li><code>Access/license</code>: follow the Bonn RGB-D Dynamic Dataset terms.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3>KITTI Depth</h3>
+            <div class="source-link">Official: <a href="https://www.cvlibs.net/datasets/kitti/eval_depth.php">KITTI Depth Prediction</a> | Spec: <code>VideoDepth / kitti</code>, root <code>VideoDepth/kitti</code>, adapter <a href="../../../spatialarena/eval/kitti_dataset.py"><code>DatasetKitti</code></a></div>
+            <p>
+              KITTI provides outdoor driving frames with projected sparse/dense depth
+              annotations. It stresses long-range metric scale and small vertical
+              baselines. The evaluator decodes KITTI depth PNGs with the standard
+              <code>1/256</code> depth scale before applying the selected alignment and
+              depth metrics.
+            </p>
+            <pre><code>$BENCHMARK_ROOT/VideoDepth/kitti/
+  metadata.json
+  &lt;drive_or_split_scene&gt;/
+    images/                  # image_path, left-camera RGB frames
+    depths/                  # depth_gt_path, projected KITTI GT depth PNGs
+    masks/                   # mask_path, optional</code></pre>
+            <ul class="param-list">
+              <li><code>root_path</code>: <code>$BENCHMARK_ROOT/VideoDepth/kitti/&lt;drive_or_split_scene&gt;</code>.</li>
+              <li><code>image_path</code>: <code>root_path/images</code>; left-camera RGB frames.</li>
+              <li><code>depth_gt_path</code>: <code>root_path/depths</code>; evaluator decodes projected KITTI PNG depth with scale <code>1/256</code>.</li>
+              <li><code>mask_path</code>: <code>root_path/masks</code> when projected-depth masks are materialized.</li>
+              <li><code>sparse_gt_path</code>: not used for VideoDepth.</li>
+            </ul>
+            <ul class="param-list">
+              <li><code>Required artifacts</code>: KITTI RGB frames, projected GT depth PNGs, and metadata.</li>
+              <li><code>Preparation</code>: <a href="../../../scripts/download/kitti.sh"><code>scripts/download/kitti.sh</code></a>.</li>
+              <li><code>Access/license</code>: follow KITTI dataset terms.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3>ETH3D Pose And Reconstruction</h3>
+            <div class="source-link">Official: <a href="https://www.eth3d.net/">ETH3D</a> | Specs: <code>SfM / eth3d</code>, <code>MVRecon / eth3d</code>; pose adapter <a href="../../../spatialarena/eval/pose_datasets.py"><code>DatasetEth3DPose</code></a></div>
+            <p>
+              ETH3D benchmark scenes provide calibrated image sets and sparse or dense
+              geometry depending on the task root. The SfM evaluator reads COLMAP-style
+              GT camera poses and compares predicted sparse models by matched image
+              name. MVRecon evaluation can use depth or geometry artifacts when the
+              canonical GT assets are present; <code>meadow</code> and <code>terrace</code>
+              have no GT mesh, so they are SfM-only (11 MVRecon scenes). Adapters read the
+              undistorted images (<code>canonical_image_root()</code>), not every folder
+              under <code>images/</code>.
+            </p>
+            <pre><code>$BENCHMARK_ROOT/SfM/eth3d/
+  &lt;scene&gt;/
+    images/                  # image_path when canonicalized
+    sparse/0/                # preferred sparse_gt_path
+    dslr_calibration_undistorted/ or dslr_calibration_jpg/  # fallback sparse_gt_path
+
+$BENCHMARK_ROOT/MVRecon/eth3d/
+  metadata.json
+  &lt;scene&gt;/
+    images/                  # image_path
+    depths/                  # depth_gt_path, when depth evaluation is enabled
+    masks/                   # mask_path, optional
+    sparse/0/                # sparse_gt_path, when pose evaluation is enabled</code></pre>
+            <ul class="param-list">
+              <li><code>SfM root_path</code>: <code>$BENCHMARK_ROOT/SfM/eth3d/&lt;scene&gt;</code>.</li>
+              <li><code>SfM image_path</code>: <code>root_path/images</code> when present; image names must match the GT and predicted COLMAP models.</li>
+              <li><code>SfM sparse_gt_path</code>: first valid COLMAP model among <code>root_path/sparse/0</code>, <code>root_path/dslr_calibration_undistorted</code>, and <code>root_path/dslr_calibration_jpg</code>.</li>
+              <li><code>MVRecon depth_gt_path</code>: <code>root_path/depths</code> when depth-style MVRecon evaluation is used.</li>
+              <li><code>mask_path</code>: <code>root_path/masks</code> when materialized.</li>
+            </ul>
+            <ul class="param-list">
+              <li><code>Required artifacts</code>: images, sparse COLMAP GT for pose evaluation, and depths/geometry for depth or reconstruction evaluation.</li>
+              <li><code>Preparation</code>: <a href="../../../scripts/download/eth3d.sh"><code>scripts/download/eth3d.sh</code></a> downloads each scene into <code>MVRecon/eth3d</code>, <a href="../../../scripts/preprocess/finalize_mvrecon_layout.sh"><code>finalize_mvrecon_layout.sh</code></a> copies its laser-scan depth to <code>depths/</code> and writes the metadata; <code>SfM/eth3d</code> is a symlink to it.</li>
+              <li><code>Access/license</code>: follow ETH3D benchmark terms.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3>DTU Camera Pose, Depth, And Mesh Evaluation</h3>
+            <div class="source-link">Official: <a href="https://roboimagedata.compute.dtu.dk/?page_id=36">DTU Robot Image Data</a> | Specs: <code>MVRecon / dtu</code>, <code>SfM / dtu</code>; pose adapter <a href="../../../spatialarena/eval/pose_datasets.py"><code>DatasetDTUPose</code></a></div>
+            <p>
+              DTU is a calibrated multi-view object-scan benchmark (15 scans). The same
+              scans serve SfM pose evaluation and MVRecon reconstruction, which uses the
+              MVSNet-style ObsMask/Plane filtering in <code>eval_dtu_mesh.py</code>.
+              MVRecon fusion masks each view with its image's alpha channel (the object
+              mask), and scaled ICP refines the fused points against the official laser
+              scan (<code>Points/stl/</code>), starting from the pose-based alignment.
+              <code>3DGS/dtu</code> is a compatibility symlink to <code>MVRecon/dtu</code>.
+            </p>
+            <pre><code>$BENCHMARK_ROOT/MVRecon/dtu/
+  &lt;scan&gt;/
+    images/                  # image_path
+    depths/                  # depth_gt_path, millimetre scale
+    mask/                    # object masks
+    sparse/0/                # sparse_gt_path (SfM and MVRecon)
+  Calibration/  ObsMask/  Points/   # shared DTU evaluation assets</code></pre>
+            <ul class="param-list">
+              <li><code>root_path</code>: <code>$BENCHMARK_ROOT/MVRecon/dtu/&lt;scan&gt;</code> (SfM resolves <code>SfM/dtu</code>, falling back to <code>3DGS/dtu</code>).</li>
+              <li><code>sparse_gt_path</code>: <code>root_path/sparse/0</code>; predictions must export a matching COLMAP model.</li>
+              <li><code>Geometry sidecars</code>: the shared <code>ObsMask/</code> and <code>Points/</code> folders are read by the DTU mesh evaluator.</li>
+            </ul>
+            <ul class="param-list">
+              <li><code>Preparation</code>: <a href="../../../scripts/download/dtu.sh"><code>scripts/download/dtu.sh</code></a> downloads the official zips; materializing the canonical layout (<code>scripts/preprocess/fuse_depth_map_dtu.py</code>) is not automated yet.</li>
+              <li><code>Access/license</code>: follow DTU dataset terms.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3>Tanks And Temples Pose And Geometry</h3>
+            <div class="source-link">Official: <a href="https://www.tanksandtemples.org/">Tanks and Temples</a> | Specs: <code>SfM / tanks_and_temples</code>, <code>MVRecon / tanks_and_temples</code>; pose adapter <a href="../../../spatialarena/eval/pose_datasets.py"><code>DatasetTanksAndTemplesPose</code></a></div>
+            <p>
+              Six real reconstruction scenes (Barn, Caterpillar, Courthouse, Ignatius,
+              Meetingroom, Truck) shared by SfM and MVRecon. MVRecon refines the fused
+              prediction with scaled ICP before scoring it against the GT geometry.
+              <code>3DGS/tanks_and_temples</code> (the SfM registry path) and
+              <code>SfM/tanks_and_temples</code> are symlinks to <code>MVRecon/tanks_and_temples</code>.
+            </p>
+            <pre><code>$BENCHMARK_ROOT/MVRecon/tanks_and_temples/
+  &lt;scene&gt;/
+    images/                  # image_path
+    sparse/0/                # sparse_gt_path (or distorted/sparse/0)
+    stereo/                  # geometry evaluator assets</code></pre>
+            <ul class="param-list">
+              <li><code>root_path</code>: <code>$BENCHMARK_ROOT/MVRecon/tanks_and_temples/&lt;scene&gt;</code>.</li>
+              <li><code>sparse_gt_path</code>: <code>root_path/sparse/0</code>; image names must match the predicted COLMAP model.</li>
+            </ul>
+            <ul class="param-list">
+              <li><code>Preparation</code>: downloaded through Free View Synthesis's <code>ibr3d_tat.tar.gz</code> repackaging (see <code>spatialarena/download.py</code>).</li>
+              <li><code>Access/license</code>: follow Tanks and Temples dataset terms.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3>Image Matching Challenge 2020</h3>
+            <div class="source-link">Official: <a href="https://www.cs.ubc.ca/research/image-matching-challenge/2020/">Image Matching Challenge 2020</a> | Spec: <code>SfM / imc</code>, root <code>SfM/imc</code>, adapter <a href="../../../spatialarena/eval/imc_dataset.py"><code>DatasetIMC</code></a></div>
+            <p>
+              IMC evaluates sparse reconstruction on internet landmark image
+              collections. The benchmark root stores one canonical scene per landmark
+              with COLMAP-compatible sparse GT. The sparse evaluator matches predicted
+              and GT image names, then computes relative pose and Sim(3)-aligned
+              trajectory metrics.
+            </p>
+            <pre><code>$BENCHMARK_ROOT/SfM/imc/
+  metadata.json
+  &lt;landmark_scene&gt;/
+    images/                  # image_path, internet landmark images
+    sparse/0/                # sparse_gt_path, GT COLMAP cameras/images</code></pre>
+            <ul class="param-list">
+              <li><code>root_path</code>: <code>$BENCHMARK_ROOT/SfM/imc/&lt;landmark_scene&gt;</code>.</li>
+              <li><code>image_path</code>: <code>root_path/images</code>; image names are used to match GT and predicted COLMAP poses.</li>
+              <li><code>sparse_gt_path</code>: <code>root_path/sparse/0</code>.</li>
+              <li><code>depth_gt_path</code> and <code>mask_path</code>: not used for IMC sparse-pose evaluation.</li>
+            </ul>
+            <ul class="param-list">
+              <li><code>Required artifacts</code>: image folders and GT <code>sparse/0</code> COLMAP models.</li>
+              <li><code>Preparation</code>: <a href="../../../scripts/download/imc.sh"><code>scripts/download/imc.sh</code></a>.</li>
+              <li><code>Access/license</code>: follow Image Matching Challenge dataset terms.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3>7Scenes MVRecon And SLAM</h3>
+            <div class="source-link">Official: <a href="https://www.microsoft.com/en-us/research/project/rgb-d-dataset-7-scenes/">7Scenes</a> | Specs: <code>MVRecon / 7scenes</code>, <code>SLAM / 7scenes</code>; adapters <a href="../../../spatialarena/eval/seven_scenes_dataset.py"><code>DatasetSevenScenes</code></a>, <a href="../../../spatialarena/eval/pose_datasets.py"><code>DatasetSevenScenesSLAM</code></a></div>
+            <p>
+              7Scenes is an indoor RGB-D benchmark. MVRecon uses the seven whole scenes
+              (every recording of a scene mixed in one folder) and scores fused geometry.
+              SLAM uses the 18 official <code>TestSplit.txt</code> sequences, one case per
+              continuous recording: <code>SLAM/7scenes/&lt;scene&gt;_seq-NN</code> holds
+              relative symlinks into <code>MVRecon/7scenes</code> plus that sequence's own
+              <code>sparse/0</code>, so no frames are duplicated. 7Scenes is not part of
+              the SfM track (it duplicated the old SLAM track).
+            </p>
+            <pre><code>$BENCHMARK_ROOT/MVRecon/7scenes/
+  metadata.json
+  &lt;scene&gt;/
+    images/                  # image_path, RGB frames of all recordings
+    depths/                  # depth_gt_path, RGB-D GT depth maps (mm)
+    sparse/0/                # GT poses of all recordings
+$BENCHMARK_ROOT/SLAM/7scenes/
+  metadata.json              # 18 sequences, depth_png_scale 1000
+  &lt;scene&gt;_seq-NN/
+    images/                  # relative symlinks -&gt; MVRecon/7scenes/&lt;scene&gt;/images
+    depths/                  # relative symlinks -&gt; MVRecon/7scenes/&lt;scene&gt;/depths
+    sparse/0/                # sparse_gt_path: this sequence's poses only</code></pre>
+            <ul class="param-list">
+              <li><code>MVRecon root_path</code>: <code>$BENCHMARK_ROOT/MVRecon/7scenes/&lt;scene&gt;</code>; <code>images</code>, <code>depths</code> and <code>sparse/0</code> under it.</li>
+              <li><code>SLAM root_path</code>: <code>$BENCHMARK_ROOT/SLAM/7scenes/&lt;scene&gt;_seq-NN</code>; <code>sparse_gt_path</code> is its <code>sparse/0</code>.</li>
+              <li><code>metadata</code>: scene entry from each dataset's <code>metadata.json</code>.</li>
+            </ul>
+            <ul class="param-list">
+              <li><code>Preparation</code>: <a href="../../../scripts/download/7scenes.sh"><code>scripts/download/7scenes.sh</code></a> (MVRecon), then <a href="../../../scripts/preprocess/materialize_7scenes_slam.py"><code>scripts/preprocess/materialize_7scenes_slam.py</code></a> (SLAM).</li>
+              <li><code>Access/license</code>: follow 7Scenes dataset terms.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3>TUM RGB-D Dynamic Objects (SLAM)</h3>
+            <div class="source-link">Official: <a href="https://cvg.cit.tum.de/data/datasets/rgbd-dataset">TUM RGB-D</a> | Spec: <code>SLAM / tum_dynamics</code>; adapter <a href="../../../spatialarena/eval/pose_datasets.py"><code>DatasetTUMDynamicsSLAM</code></a></div>
+            <p>
+              Nine dynamic-object sequences (people sitting and walking), 676-3,631 frames
+              each, with motion-capture ground truth associated to the RGB/depth frames
+              (<code>max_difference=0.02 s</code>). Depth PNGs keep TUM's 5000 units per
+              metre, declared as <code>depth_png_scale</code> in <code>metadata.json</code>
+              so depth priors are converted correctly.
+            </p>
+            <pre><code>$BENCHMARK_ROOT/SLAM/tum_dynamics/
+  metadata.json              # depth_png_scale 5000
+  rgbd_dataset_freiburg{2,3}_&lt;name&gt;/
+    images/  depths/  sparse/0/</code></pre>
+            <ul class="param-list">
+              <li><code>Preparation</code>: <a href="../../../scripts/download/tum_dynamics.sh"><code>scripts/download/tum_dynamics.sh</code></a>, then <a href="../../../scripts/preprocess/materialize_tum_dynamics.py"><code>materialize_tum_dynamics.py</code></a>.</li>
+              <li><code>Access/license</code>: CC BY 4.0.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3>ScanNet++ Depth And Geometry</h3>
+            <div class="source-link">Official: <a href="https://kaldir.vc.in.tum.de/scannetpp/">ScanNet++</a> | Evaluator: <a href="../../../spatialarena/eval/eval_scannetpp_depth.py"><code>spatialarena/eval/eval_scannetpp_depth.py</code></a></div>
+            <p>
+              ScanNet++ evaluation is exposed through a dedicated evaluator rather than
+              the default registry tuple. It compares predicted depth maps or generated
+              point clouds against ScanNet++ GT depth/mesh assets. This path is intended
+              for dense indoor reconstruction validation where coordinate-frame
+              handling matters: the evaluator can transform predictions into the
+              ScanNet++ mesh frame and optionally refine registration before scoring.
+            </p>
+            <pre><code>&lt;scannetpp_root&gt;/
+  &lt;scene&gt;/
+    dslr/ or iphone/         # RGB frames and camera metadata, depending protocol
+    depths/                  # GT depth maps used by depth comparison
+    scans/ or mesh/          # GT mesh/point-cloud assets
+    transforms.json or metadata sidecars  # frame/axis transforms for alignment</code></pre>
+            <ul class="param-list">
+              <li><code>scene root</code>: supplied directly through the ScanNet++ evaluator arguments rather than through the default registry tuple.</li>
+              <li><code>RGB/camera inputs</code>: used to associate method depth sidecars or predicted points with ScanNet++ frames.</li>
+              <li><code>GT depths</code>: consumed by depth comparison and point-cloud unprojection checks.</li>
+              <li><code>GT mesh/scan assets</code>: consumed by geometry comparison after evaluator-specific transform and optional ICP registration.</li>
+              <li><code>transform sidecars</code>: required to move predicted geometry into the ScanNet++ mesh frame before scoring.</li>
+            </ul>
+            <ul class="param-list">
+              <li><code>Required artifacts</code>: ScanNet++ RGB/depth/mesh GT, method depth sidecars or point-cloud outputs, and scene metadata needed for frame transforms.</li>
+              <li><code>Preparation</code>: manual ScanNet++ access and local canonicalization; keep paths consistent with the evaluator CLI arguments.</li>
+              <li><code>Access/license</code>: follow official ScanNet++ terms.</li>
+            </ul>
+          </div>
+        </section>
+
+        <h2>Benchmark Dataset Preparation</h2>
+        <p>
+          Download helpers live under <code>scripts/download/</code>. Some datasets are
+          fully automatic, while DTU, ScanNet, and account-gated datasets may need
+          manual source access before canonicalization. After download, regenerate
+          <code>metadata.json</code> and run the layout verifier so the registry and
+          evaluators see the same scene inventory.
+        </p>
+        <pre><code>export PROJECT_ROOT=~/Projects/SpatialArena
+export PYTHON=~/anaconda3/envs/si_bench/bin/python
+export BENCHMARK_ROOT=$SPATIALARENA_ROOT/benchmarks
+
+# Download benchmark datasets. Submit with sbatch for long downloads.
+bash scripts/download/marigold.sh
+bash scripts/download/sintel.sh
+bash scripts/download/bonn.sh
+bash scripts/download/kitti.sh
+bash scripts/download/7scenes.sh
+bash scripts/download/imc.sh
+
+# DTU has a helper plus manual layout notes.
+bash scripts/download/dtu.sh "$BENCHMARK_ROOT/MVRecon/dtu_raw"
+
+# Generate metadata for every benchmark dataset root.
+$PYTHON scripts/preprocess/generate_benchmark_metadata.py \
+  --benchmark_root "$BENCHMARK_ROOT"
+
+# Verify canonical images/depths/sparse assets.
+$PYTHON scripts/preprocess/verify_benchmark_datasets.py \
+  --benchmark_root "$BENCHMARK_ROOT" \
+  --only_ready</code></pre>
+
+        <h2>Method Output Contract</h2>
+        <p>
+          Benchmark evaluators expect method outputs under a task/dataset/method/scene
+          layout. New methods should export the same artifacts as the existing inference
+          wrappers in <code>scripts/inference/</code>.
+        </p>
+        <pre><code>${EXP_ROOT}/${EXP_NAME}/${TASK}/${DATASET}/${METHOD}/${SCENE}/
+  depths/                  # required for MonoDepth, VideoDepth and MVRecon evaluation
+    000000.npy             # default adapter output; evaluators also accept png|npz|pfm|dpt for external methods
+  sparse/0/                # required for SfM, SLAM and MVRecon evaluation
+    cameras.bin|txt
+    images.bin|txt
+    points3D.bin|txt       # optional for pose metrics, useful for viewers
+  pointcloud.ply           # optional dense/sparse viewer artifact
+  metrics.json             # optional method-native metrics; verifier can require it when configured</code></pre>
+
+        <p>
+          The standard case-list runner writes predictions and immediately verifies and
+          evaluates them. During scoring, adapters write numeric <code>.npy</code>
+          depth maps because metrics need metric depth values. After a case is scored,
+          <code>spatialarena/templates/_engine/run_method_case_list.sh</code> materializes colorized PNG
+          previews under
+          <code>${REPORT_DIR}/${TASK}/${DATASET}/${SCENE}/depth_visualizations</code>
+          and removes the numeric depth arrays. Set
+          <code>KEEP_DEPTH_VISUALIZATIONS=0</code> to skip PNG materialization.
+          Prediction folders are temporary by default: after the post-evaluation
+          visualization step, the runner removes the method output directory and keeps
+          verifier/evaluator reports plus PNG visualizations under <code>REPORT_DIR</code>.
+          Set <code>KEEP_PREDICTIONS=1</code> only when you need to debug or archive
+          non-depth prediction artifacts such as sparse COLMAP outputs. Adapter scratch
+          folders such as <code>_resized_input_images*</code>,
+          <code>_come_raw*</code>, and <code>_cut3r_raw*</code> are removed after a
+          successful export; set <code>KEEP_INTERMEDIATE=1</code> or pass
+          <code>--keep_intermediate</code> to an adapter when debugging raw method
+          outputs. The runner also refuses
+          <code>EXP_ROOT</code> or <code>REPORT_DIR</code> inside
+          <code>BENCHMARK_ROOT</code> unless
+          <code>ALLOW_BENCHMARK_ROOT_OUTPUT=1</code> is set for intentional debugging.
+          A case file line has four fields:
+          <code>task|dataset|scene|interval</code>. For example,
+          <code>VideoDepth|sintel|market_2|10</code> samples every tenth frame from the
+          Sintel scene.
+        </p>
+
+        <h2>Run Benchmark Scripts</h2>
+        <pre><code>export PROJECT_ROOT=~/Projects/SpatialArena
+export PYTHON=~/anaconda3/envs/si_bench/bin/python
+export BENCHMARK_ROOT=$SPATIALARENA_ROOT/benchmarks
+export BENCHMARK_EVAL_ROOT=$BENCHMARK_ROOT/_evaluation
+export EXP_ROOT=$BENCHMARK_EVAL_ROOT/artifacts
+ENGINE=spatialarena/templates/_engine
+
+# Each run is a GPU inference job, then a CPU evaluation job with the same arguments.
+# A full suite keeps one report folder per method, shared by every run (reruns
+# overwrite in place): reports/benchmark_full_reports/full-depth/&lt;METHOD_ID&gt;,
+# reports/benchmark_full_pose_reports/full-pose/&lt;METHOD_ID&gt;,
+# reports/benchmark_full_slam_reports/full-slam-&lt;range&gt;/&lt;METHOD_ID&gt;.
+# Suites: sampled, sparse, monodepth, full-depth, full-pose, full-slam.
+JOB=$(sbatch --parsable --export=NIL $ENGINE/run_method_benchmark_infer.sh VGGT_OMEGA full-depth rgb)
+sbatch --export=NIL --dependency=afterok:$JOB $ENGINE/run_method_benchmark_eval.sh VGGT_OMEGA full-depth rgb
+
+# SLAM: one range track at a time (short = stride 10, long = stride 3); only the
+# track's methods run (python -m spatialarena.slam_protocol methods short).
+sbatch --export=NIL,SLAM_RANGE=long $ENGINE/run_method_benchmark_infer.sh PI3_X full-slam rgb
+
+# Validate previously generated predictions without rerunning inference.
+$PYTHON scripts/preprocess/verify_prediction_outputs.py \
+  --benchmark_root "$BENCHMARK_ROOT" \
+  --experiment_root "$EXP_ROOT" \
+  --experiment_name benchmark_sampled_VGGT_OMEGA_manual \
+  --methods VGGT_OMEGA \
+  --tasks VideoDepth MVRecon SfM \
+  --strict</code></pre>
+
+        <h2>Metric Protocols</h2>
+        <section class="api-section">
+          <div class="api-block">
+            <h3>Depth Metrics</h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/depth_prediction_evaluator.py"><code>spatialarena/eval/depth_prediction_evaluator.py</code></a></div>
+            <p>
+              Depth evaluation pairs prediction and GT files by normalized frame key,
+              resizes predictions to GT resolution when necessary, applies GT/prediction
+              scale factors, builds a valid mask, aligns prediction depth, optionally
+              clips the aligned prediction, and scores only valid pixels.
+            </p>
+            <div class="math-block">
+              \[
+              \mathcal{V} =
+              \left\{u \mid
+                \operatorname{finite}(d_{gt}(u)) \land
+                \operatorname{finite}(d_{pred}(u)) \land
+                d_{gt}(u) \gt d_{min} \land
+                (d_{max}=\varnothing \lor d_{gt}(u) \lt d_{max}) \land
+                m(u)
+              \right\}
+              \]
+              \[
+              \hat{d}(u) = s\,d_{pred}(u) + b
+              \]
+            </div>
+            <ul class="param-list">
+              <li><code>none</code>: \(s=1\), \(b=0\).</li>
+              <li><code>median</code>: \(s=\operatorname{median}(d_{gt}[\mathcal{V}]) / \operatorname{median}(d_{pred}[\mathcal{V}])\), \(b=0\).</li>
+              <li><code>least_squares</code>: solve \(\arg\min_{s,b}\sum_{u\in\mathcal{V}}(s\,d_{pred}(u)+b-d_{gt}(u))^2\).</li>
+              <li><code>standard</code> (default): resolves task-specific defaults -- per-image least squares for MonoDepth, a sequence-level scale+shift LAD fit for VideoDepth, median for MVRecon depth -- plus dataset-specific GT scales and clipping limits. MonoDepth predictions are single-view: the engine sets <code>BENCHMARK_SINGLE_VIEW=1</code>, so multi-view models see each image on its own, and a scene that mixes image sizes runs once per size.</li>
+            </ul>
+            <div class="math-block">
+              \[
+              N = |\mathcal{V}|,\qquad e(u)=\hat{d}(u)-d_{gt}(u)
+              \]
+              \[
+              \begin{aligned}
+              \mathrm{AbsRel} &amp;= \frac{1}{N}\sum_{u\in\mathcal{V}}
+                \frac{|e(u)|}{d_{gt}(u)} \\
+              \mathrm{SqRel} &amp;= \frac{1}{N}\sum_{u\in\mathcal{V}}
+                \frac{e(u)^2}{d_{gt}(u)} \\
+              \mathrm{RMSE} &amp;= \sqrt{\frac{1}{N}\sum_{u\in\mathcal{V}} e(u)^2} \\
+              \mathrm{RMSE}_{log} &amp;= \sqrt{\frac{1}{N}\sum_{u\in\mathcal{V}}
+                \left(\log\hat{d}(u)-\log d_{gt}(u)\right)^2} \\
+              \mathrm{log10} &amp;= \frac{1}{N}\sum_{u\in\mathcal{V}}
+                \left|\log_{10}\hat{d}(u)-\log_{10}d_{gt}(u)\right|
+              \end{aligned}
+              \]
+              \[
+              \delta_\tau = \frac{1}{N}\sum_{u\in\mathcal{V}}
+              \mathbf{1}\left[
+                \max\left(\frac{\hat{d}(u)}{d_{gt}(u)},
+                          \frac{d_{gt}(u)}{\hat{d}(u)}\right) \lt \tau
+              \right],
+              \qquad \tau\in\{1.03,1.25,1.25^2,1.25^3\}
+              \]
+              \[
+              \mathrm{iRMSE} =
+              \sqrt{\frac{1}{N}\sum_{u\in\mathcal{V}}
+              \left(\frac{1}{\hat{d}(u)}-\frac{1}{d_{gt}(u)}\right)^2}
+              \]
+              \[
+              r(u)=\log\hat{d}(u)-\log d_{gt}(u),\qquad
+              \mathrm{SILog}=100\sqrt{\operatorname{mean}(r(u)^2)-\operatorname{mean}(r(u))^2}
+              \]
+            </div>
+          </div>
+
+          <div class="api-block">
+            <h3>Sparse Pose Metrics</h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/sparse_reconstruction_evaluator.py"><code>spatialarena/eval/sparse_reconstruction_evaluator.py</code></a></div>
+            <p>
+              Sparse evaluation reads GT and predicted COLMAP models, matches images by
+              filename, evaluates all image pairs or a deterministic capped subset, and
+              reports relative pose errors plus Sim(3)-aligned absolute trajectory
+              errors. COLMAP camera poses are interpreted as OpenCV world-to-camera
+              transforms.
+            </p>
+            <div class="math-block">
+              \[
+              x_{cam} = R x_{world} + t,\qquad C=-R^\top t
+              \]
+              \[
+              R_{ij}=R_jR_i^\top,\qquad t_{ij}=t_j-R_{ij}t_i
+              \]
+            </div>
+            <div class="math-block">
+              \[
+              \epsilon_R(i,j)=
+              \cos^{-1}\left(
+                \operatorname{clip}\left(\frac{\operatorname{tr}(R_{pred,ij}^{\top}R_{gt,ij})-1}{2},-1,1\right)
+              \right)\frac{180}{\pi}
+              \]
+              \[
+              \epsilon_t(i,j)=
+              \cos^{-1}\left(
+                \operatorname{clip}\left(
+                  \frac{t_{pred,ij}^{\top}t_{gt,ij}}{\|t_{pred,ij}\|\,\|t_{gt,ij}\|},
+                  -1,1
+                \right)
+              \right)\frac{180}{\pi}
+              \]
+              \[
+              \epsilon_{axis}(i,j)=\min(\epsilon_t(i,j), 180-\epsilon_t(i,j))
+              \]
+              \[
+              \epsilon_{rel}(i,j)=\max(\epsilon_R(i,j),\epsilon_t(i,j)),\qquad
+              \epsilon_{rel,axis}(i,j)=\max(\epsilon_R(i,j),\epsilon_{axis}(i,j))
+              \]
+            </div>
+            <ul class="param-list">
+              <li><code>min_baseline</code>: if the GT baseline is below this threshold, translation errors are set to zero for that pair.</li>
+              <li><code>RRA_at_T</code>: fraction of pairs with <code>rotation_error &lt; T</code> for thresholds such as 5, 15, and 30 degrees.</li>
+              <li><code>RTA_at_T</code>: fraction of pairs with <code>translation_axis_error &lt; T</code>.</li>
+              <li><code>AUC_T</code>: area under the recall curve of <code>relative_pose_error</code> from 0 to threshold <code>T</code>, normalized by <code>T</code>.</li>
+              <li><code>mAA_30</code>: mean threshold accuracy over integer thresholds up to 30 degrees using <code>max(rotation_error, translation_axis_error)</code>.</li>
+            </ul>
+            <div class="math-block">
+              \[
+              (s^\*,R_s^\*,t_s^\*) =
+              \arg\min_{s,R_s,t_s}\sum_i
+              \left\|sR_sC_{pred,i}+t_s-C_{gt,i}\right\|^2
+              \]
+              \[
+              \mathrm{ATE}_i=\left\|s^\*R_s^\*C_{pred,i}+t_s^\*-C_{gt,i}\right\|
+              \]
+              \[
+              \mathrm{ATE}_{RMSE}=\sqrt{\operatorname{mean}_i(\mathrm{ATE}_i^2)},\quad
+              \mathrm{ATE}_{mean}=\operatorname{mean}_i(\mathrm{ATE}_i),\quad
+              \mathrm{ATE}_{median}=\operatorname{median}_i(\mathrm{ATE}_i),\quad
+              \mathrm{ATE}_{std}=\operatorname{std}_i(\mathrm{ATE}_i)
+              \]
+            </div>
+          </div>
+
+          <div class="api-block">
+            <h3>Geometry Metrics</h3>
+            <div class="source-link">Sources: <a href="../../../spatialarena/eval/eval_dtu_mesh.py"><code>eval_dtu_mesh.py</code></a>, <a href="../../../spatialarena/eval/eval_tnt_mesh.py"><code>eval_tnt_mesh.py</code></a>, <a href="../../../spatialarena/eval/eval_scannetpp_depth.py"><code>eval_scannetpp_depth.py</code></a>, <a href="../../../spatialarena/eval/utils.py"><code>utils.py</code></a></div>
+            <p>
+              Mesh and dense-geometry tasks use dataset-specific registration,
+              cropping, and masks before comparing surfaces. After the evaluator brings
+              predicted geometry into the GT frame, accuracy and completeness are
+              nearest-neighbor distances between predicted and GT point sets or sampled
+              surfaces.
+            </p>
+            <div class="math-block">
+              \[
+              P=\{\text{predicted points after alignment}\},\qquad
+              G=\{\text{ground-truth points or sampled GT surface}\}
+              \]
+              \[
+              \begin{aligned}
+              \mathrm{accuracy} &amp;= \frac{1}{|P|}\sum_{p\in P}\min_{g\in G}\|p-g\| \\
+              \mathrm{completeness} &amp;= \frac{1}{|G|}\sum_{g\in G}\min_{p\in P}\|g-p\| \\
+              \mathrm{chamfer} &amp;= \frac{\mathrm{accuracy}+\mathrm{completeness}}{2}
+              \end{aligned}
+              \]
+            </div>
+            <ul class="param-list">
+              <li><code>DTU</code>: uses DTU scan masks, bounding boxes, and scan-specific point-cloud evaluation.</li>
+              <li><code>Tanks and Temples</code>: maps the prediction from the COLMAP frame into the laser-scan frame with the official <code>&lt;scene&gt;_trans.txt</code>, crops prediction and GT with the official <code>&lt;scene&gt;.json</code> volume, then refines with scaled ICP.</li>
+              <li><code>ScanNet++</code>: builds point clouds from depth sidecars when requested and can refine registration with ICP before scoring.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3>SLAM Trajectory Metrics</h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/slam_trajectory_evaluator.py"><code>spatialarena/eval/slam_trajectory_evaluator.py</code></a>; protocol: <a href="../../benchmark/slam_protocol.md"><code>docs/benchmark/slam_protocol.md</code></a></div>
+            <p>
+              A SLAM case is one recording fed whole, in order, at its range track's stride.
+              The predicted camera-to-world poses \(P_i\) are aligned to the ground truth
+              \(G_i\) with one Sim(3) \(S\) from <code>pose_alignment.ransac_irls_align_sim3</code>
+              (LMedS RANSAC over the GTSAM pose fit, then a robust refit on all frames), for both <code>rgb</code>
+              and <code>rgb_depth</code>. Errors are then computed over every returned frame.
+            </p>
+            <div class="math-block">
+              \[
+              \mathrm{ATE}=\sqrt{\tfrac{1}{N}\textstyle\sum_i \lVert \mathrm{trans}(G_i) - \mathrm{trans}(S P_i)\rVert^2}
+              \]
+              \[
+              E_i^{\Delta}=\big(G_i^{-1}G_{i+\Delta}\big)^{-1}\big(\hat P_i^{-1}\hat P_{i+\Delta}\big),\qquad
+              \mathrm{drift}=100\,\frac{\sum_i \lVert \mathrm{trans}(E_i^{1\,\mathrm{s}})\rVert}{\sum_i L_i^{1\,\mathrm{s}}}\ \%
+              \]
+            </div>
+            <ul class="param-list">
+              <li><code>ate_rmse</code> (m): primary; also <code>ate_mean</code>, <code>ate_median</code>.</li>
+              <li><code>rpe_trans_step</code>/<code>rpe_rot_step</code>, <code>rpe_trans_1s</code>/<code>rpe_rot_1s</code>: RMSE relative pose error over one input frame and over one second; pairs are formed by input-frame index, so skipped frames do not change the offset.</li>
+              <li><code>drift_pct</code>: 1-second translational RPE divided by the ground-truth path length \(L\) of the same windows (ratio of sums).</li>
+              <li><code>completeness</code>: fraction of input frames with a returned pose.</li>
+              <li>Reported alongside: <code>ate_rmse_se3</code> (scale fixed to 1), <code>alignment_scale</code>, <code>alignment_inlier_ratio</code>.</li>
+              <li>Ranking (report summarizer): mean of the ATE and drift ranks per range track and dataset, among methods that ran every sequence.</li>
+            </ul>
+          </div>
+        </section>
+
+        <h2>Canonical Dataset API</h2>
+        <section class="api-section">
+          <div class="api-block">
+            <h3><code>BenchmarkSceneInfo</code></h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/canonical_dataset.py"><code>spatialarena/eval/canonical_dataset.py:11</code></a></div>
+            <code class="api-signature">@dataclass
+BenchmarkSceneInfo(dataset, task, scene, root_path,
+                   image_path=None, depth_gt_path=None,
+                   mask_path=None, sparse_gt_path=None,
+                   metadata=None)</code>
+            <p>
+              Scene descriptor passed to evaluators. It normalizes where images, GT
+              depths, optional masks, sparse COLMAP GT, and raw metadata live for one
+              benchmark scene.
+            </p>
+            <ul class="param-list">
+              <li><code>dataset</code>: benchmark dataset key such as <code>marigold</code>, <code>sintel</code>, <code>dtu</code>, or <code>7scenes</code>.</li>
+              <li><code>task</code>: benchmark task name, for example <code>MonoDepth</code>, <code>VideoDepth</code>, <code>MVRecon</code>, <code>SfM</code> or <code>SLAM</code> (<code>CameraPose</code> is accepted as an alias of <code>SfM</code>).</li>
+              <li><code>scene</code>: scene, sequence, subset, or scan identifier.</li>
+              <li><code>root_path</code>: canonical scene root used to resolve task assets.</li>
+              <li><code>image_path</code>, <code>depth_gt_path</code>, <code>mask_path</code>, <code>sparse_gt_path</code>: optional canonical asset directories.</li>
+              <li><code>metadata</code>: raw <code>metadata.json</code> entry preserved for dataset-specific fields.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3><code>CanonicalDataset</code></h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/canonical_dataset.py"><code>spatialarena/eval/canonical_dataset.py:32</code></a></div>
+            <code class="api-signature">CanonicalDataset(data_path: Path, scenes: list[str] | None = None,
+                 task_name: str | None = None)
+metadata_path -> Path
+load_metadata() -> dict
+list_scenes() -> list[BenchmarkSceneInfo]</code>
+            <p>
+              Base adapter for benchmark roots with <code>metadata.json</code>. Dataset
+              subclasses override only what differs from the canonical
+              <code>images/</code>, <code>depths/</code>, <code>masks/</code>,
+              <code>sparse/0</code> layout.
+            </p>
+            <ul class="param-list">
+              <li><code>data_path</code>: dataset root for one benchmark task/dataset pair.</li>
+              <li><code>scenes</code>: optional list of scene names to retain.</li>
+              <li><code>task_name</code>: explicit task override when the adapter class does not define it.</li>
+              <li><strong>Returns:</strong> <code>list_scenes</code> returns scene records consumed by depth, pose, and geometry evaluators.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3><code>DatasetSpec</code>, <code>select_dataset_specs</code>, <code>describe_benchmark_scenes</code></h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/dataset_registry.py"><code>spatialarena/eval/dataset_registry.py:28</code></a>, <a href="../../../spatialarena/eval/dataset_registry.py"><code>:153</code></a>, <a href="../../../spatialarena/eval/dataset_registry.py"><code>:174</code></a></div>
+            <code class="api-signature">DatasetSpec(task, dataset, relative_path, adapter_cls=CanonicalDataset,
+            metadata_required=True)
+select_dataset_specs(tasks=None, datasets=None, include_scannet=False) -> list[DatasetSpec]
+describe_benchmark_scenes(benchmark_root=DEFAULT_BENCHMARK_ROOT,
+                          tasks=None, datasets=None, scenes=None,
+                          include_scannet=False) -> list[dict]</code>
+            <p>
+              Registry layer for benchmark evaluation. Specs define task names,
+              dataset keys, root-relative locations, adapter classes, and whether
+              <code>metadata.json</code> is mandatory. Description output is intended for
+              dataset audits and documentation generation.
+            </p>
+            <ul class="param-list">
+              <li><code>task</code>, <code>dataset</code>: logical benchmark identifiers used in reports and output paths.</li>
+              <li><code>relative_path</code>: path under <code>benchmark_root</code> for the canonical dataset.</li>
+              <li><code>adapter_cls</code>: dataset adapter used to list scenes.</li>
+              <li><code>tasks</code>, <code>datasets</code>, <code>scenes</code>: optional filters for suite-level evaluation.</li>
+              <li><code>include_scannet</code>: includes ScanNet specs that are disabled by default in some artifact checks.</li>
+              <li><strong>Returns:</strong> selected specs or serializable scene inventory records.</li>
+            </ul>
+          </div>
+        </section>
+
+        <h2>Artifact Layout API</h2>
+        <section class="api-section">
+          <div class="api-block">
+            <h3><code>method_scene_output_path</code> and <code>resolve_method_scene_output_path</code></h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/result_layout.py"><code>spatialarena/eval/result_layout.py:56</code></a>, <a href="../../../spatialarena/eval/result_layout.py"><code>:102</code></a></div>
+            <code class="api-signature">method_scene_output_path(experiment_root, experiment_name, dataset_name,
+                         method_name, scene_name, task_name=None) -> Path
+resolve_method_scene_output_path(experiment_root, experiment_name,
+                                 dataset_name, method_name, scene_name,
+                                 task_name=None) -> Path</code>
+            <p>
+              Defines and resolves the standardized method-output directory. The
+              task-namespaced layout is preferred, but legacy paths without the task
+              component are still checked for compatibility.
+            </p>
+            <ul class="param-list">
+              <li><code>experiment_root</code>: root containing one or more benchmark experiment folders.</li>
+              <li><code>experiment_name</code>: experiment folder under <code>experiment_root</code>.</li>
+              <li><code>dataset_name</code>, <code>method_name</code>, <code>scene_name</code>: path components for one evaluated method scene.</li>
+              <li><code>task_name</code>: optional task namespace; preferred for new outputs.</li>
+              <li><strong>Returns:</strong> canonical path or first existing compatible path.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3><code>PredictionRequirements</code> and <code>PredictionArtifactStatus</code></h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/prediction_artifacts.py"><code>spatialarena/eval/prediction_artifacts.py:41</code></a>, <a href="../../../spatialarena/eval/prediction_artifacts.py"><code>:49</code></a></div>
+            <code class="api-signature">PredictionRequirements(require_sparse=False, require_depths=False,
+                       require_points=False, require_metrics=False)
+PredictionArtifactStatus(...).ok -> bool
+PredictionArtifactStatus.to_dict() -> dict</code>
+            <p>
+              Lightweight validators for external method outputs. They do not import or
+              run model code; they only check whether the files required by a task exist.
+            </p>
+            <ul class="param-list">
+              <li><code>require_sparse</code>: requires a COLMAP model under <code>sparse/0</code> or legacy <code>sparse</code>.</li>
+              <li><code>require_depths</code>: requires supported depth files under <code>depths/</code>, <code>depth/</code>, <code>pred_depths/</code>, or <code>depth_maps/</code>.</li>
+              <li><code>require_points</code>: requires a known point-cloud filename or a scene-root <code>.ply</code>.</li>
+              <li><code>require_metrics</code>: requires <code>metrics.json</code>.</li>
+              <li><strong>Returns:</strong> a status object with <code>ok</code>, missing items, warnings, resolved sparse path, depth files, and point files.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3><code>validate_prediction_output</code> and <code>validate_method_scene_output</code></h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/prediction_artifacts.py"><code>spatialarena/eval/prediction_artifacts.py:122</code></a>, <a href="../../../spatialarena/eval/prediction_artifacts.py"><code>:165</code></a></div>
+            <code class="api-signature">validate_prediction_output(task, dataset, method, scene,
+                           scene_output_path, requirements=None)
+validate_method_scene_output(experiment_root, experiment_name, task,
+                             dataset, method, scene, requirements=None)</code>
+            <p>
+              Use these before metric evaluation to catch missing <code>sparse/0</code>,
+              depth predictions, point clouds, or <code>metrics.json</code> files. The
+              command-line wrapper is
+              <code>scripts/preprocess/verify_prediction_outputs.py</code>.
+            </p>
+            <ul class="param-list">
+              <li><code>task</code>, <code>dataset</code>, <code>method</code>, <code>scene</code>: report identity fields copied into the returned status.</li>
+              <li><code>scene_output_path</code>: direct path to validate.</li>
+              <li><code>experiment_root</code>, <code>experiment_name</code>: used by <code>validate_method_scene_output</code> to resolve <code>scene_output_path</code>.</li>
+              <li><code>requirements</code>: optional explicit requirements; defaults are inferred from <code>task</code>.</li>
+              <li><strong>Returns:</strong> <code>PredictionArtifactStatus</code>.</li>
+            </ul>
+          </div>
+        </section>
+
+        <h2>Depth Evaluation API</h2>
+        <section class="api-section">
+          <div class="api-block">
+            <h3><code>DepthEvaluationConfig</code></h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/depth_prediction_evaluator.py"><code>spatialarena/eval/depth_prediction_evaluator.py:28</code></a></div>
+            <code class="api-signature">DepthEvaluationConfig(alignment="standard", min_depth=1e-6,
+                      max_depth=None, gt_depth_scale=1.0,
+                      pred_depth_scale=1.0, post_clip_min=None,
+                      post_clip_max=None,
+                      require_positive_prediction=False,
+                      alignment_max_resolution=None,
+                      filter_gt_depth_range=True)</code>
+            <p>
+              Controls depth loading, GT/prediction scaling, valid-pixel masking,
+              prediction clipping, and the per-task <code>standard</code> alignment defaults.
+            </p>
+            <ul class="param-list">
+              <li><code>alignment</code>: <code>standard</code>, <code>none</code>, <code>median</code>, <code>least_squares</code>, <code>pi3_median_scale</code> / <code>scale</code>, or <code>pi3_scale_shift_lad</code> / <code>scale_shift_lad</code> / <code>scale&amp;shift</code>.</li>
+              <li><code>min_depth</code>, <code>max_depth</code>: valid GT depth range when filtering is enabled.</li>
+              <li><code>gt_depth_scale</code>, <code>pred_depth_scale</code>: multiplicative scale applied while loading depth files.</li>
+              <li><code>post_clip_min</code>, <code>post_clip_max</code>: optional clipping applied after alignment.</li>
+              <li><code>alignment_max_resolution</code>: optional downsample resolution for alignment fitting.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3><code>load_depth_map</code> and <code>pair_depth_files</code></h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/depth_prediction_evaluator.py"><code>depth_prediction_evaluator.py:127</code></a>, <a href="../../../spatialarena/eval/depth_prediction_evaluator.py"><code>:264</code></a></div>
+            <code class="api-signature">load_depth_map(path: Path, scale: float = 1.0) -> np.ndarray
+pair_depth_files(gt_files, pred_files) -> tuple[pairs, missing_gt, missing_pred, used_index_fallback]</code>
+            <p>
+              Loads <code>.npy</code>, <code>.npz</code>, <code>.pfm</code>, <code>.dpt</code>,
+              image-depth formats, and ETH3D raw-depth payloads. Pairing first matches
+              normalized frame keys and falls back to sorted one-to-one pairing when
+              counts agree.
+            </p>
+            <ul class="param-list">
+              <li><code>path</code>: depth file path.</li>
+              <li><code>scale</code>: multiplier applied after loading; use it for GT encoding factors such as KITTI projected depth.</li>
+              <li><code>gt_files</code>, <code>pred_files</code>: iterable depth paths from canonical GT and method output directories.</li>
+              <li><strong>Returns:</strong> depth array, or paired file paths plus missing-key diagnostics.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3><code>fit_depth_alignment</code>, <code>align_prediction_depth</code>, <code>compute_depth_metrics</code></h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/depth_prediction_evaluator.py"><code>depth_prediction_evaluator.py:386</code></a>, <a href="../../../spatialarena/eval/depth_prediction_evaluator.py"><code>:435</code></a>, <a href="../../../spatialarena/eval/depth_prediction_evaluator.py"><code>:545</code></a></div>
+            <code class="api-signature">fit_depth_alignment(pred_values, gt_values, alignment) -> tuple[scale, shift]
+align_prediction_depth(prediction, ground_truth, valid_mask,
+                       alignment, max_resolution=None) -> np.ndarray
+compute_depth_metrics(prediction, ground_truth, valid_mask,
+                      min_depth=1e-6) -> dict[str, float]</code>
+            <p>
+              Supports <code>none</code>, <code>median</code>, and
+              <code>least_squares</code> depth alignment. Metrics include AbsRel, SqRel,
+              RMSE, log RMSE, log10, delta accuracy, inverse RMSE, and SILog.
+            </p>
+            <ul class="param-list">
+              <li><code>pred_values</code>, <code>gt_values</code>: flattened valid pixels used to fit scale/shift.</li>
+              <li><code>prediction</code>, <code>ground_truth</code>: full 2D depth maps before metric computation.</li>
+              <li><code>valid_mask</code>: boolean mask selecting pixels included in alignment and metrics.</li>
+              <li><code>max_resolution</code>: optional downsample bound for fitting only; metrics still use full arrays.</li>
+              <li><strong>Returns:</strong> alignment parameters, aligned prediction map, or metric dictionary depending on the function.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3><code>evaluate_depth_scene</code> and <code>run_depth_evaluation</code></h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/depth_prediction_evaluator.py"><code>depth_prediction_evaluator.py:697</code></a>, <a href="../../../spatialarena/eval/depth_prediction_evaluator.py"><code>:847</code></a></div>
+            <code class="api-signature">evaluate_depth_scene(scene_info, prediction_scene_path,
+                     config=None) -> dict
+run_depth_evaluation(benchmark_root, experiment_root, experiment_name,
+                     methods, tasks, datasets, scenes, include_scannet,
+                     config) -> dict</code>
+            <p>
+              Scene evaluation returns file counts, alignment settings, missing-frame
+              diagnostics, valid-pixel counts, and metrics. Suite evaluation iterates
+              across selected dataset specs and aggregates results with scene errors
+              preserved in the JSON report.
+            </p>
+            <ul class="param-list">
+              <li><code>scene_info</code>: canonical scene record with GT depth path and optional mask path.</li>
+              <li><code>prediction_scene_path</code>: method output directory for one scene.</li>
+              <li><code>benchmark_root</code>, <code>experiment_root</code>, <code>experiment_name</code>: suite-level roots and experiment identity.</li>
+              <li><code>methods</code>, <code>tasks</code>, <code>datasets</code>, <code>scenes</code>: selection filters.</li>
+              <li><strong>Returns:</strong> scene report or suite report with aggregate metrics, scene results, and errors.</li>
+            </ul>
+          </div>
+        </section>
+
+        <h2>Sparse Pose Evaluation API</h2>
+        <section class="api-section">
+          <div class="api-block">
+            <h3><code>CameraPose</code> and <code>read_colmap_poses</code></h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/sparse_reconstruction_evaluator.py"><code>spatialarena/eval/sparse_reconstruction_evaluator.py:34</code></a>, <a href="../../../spatialarena/eval/sparse_reconstruction_evaluator.py"><code>:159</code></a></div>
+            <code class="api-signature">CameraPose(name, qvec, tvec).rotation -> np.ndarray
+CameraPose(name, qvec, tvec).center -> np.ndarray
+read_colmap_poses(sparse_model_path: Path) -> dict[str, CameraPose]</code>
+            <p>
+              Reads COLMAP <code>images.bin</code> or <code>images.txt</code> and exposes
+              rotation matrices and camera centers. The evaluator intentionally avoids a
+              <code>pycolmap</code> dependency for artifact-only validation.
+            </p>
+            <ul class="param-list">
+              <li><code>name</code>: image name as stored in COLMAP.</li>
+              <li><code>qvec</code>, <code>tvec</code>: COLMAP world-to-camera quaternion and translation.</li>
+              <li><code>sparse_model_path</code>: directory containing <code>images.bin</code> or <code>images.txt</code>.</li>
+              <li><strong>Returns:</strong> image-name to <code>CameraPose</code> mapping.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3><code>SparseEvaluationConfig</code></h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/sparse_reconstruction_evaluator.py"><code>sparse_reconstruction_evaluator.py:49</code></a></div>
+            <code class="api-signature">SparseEvaluationConfig(min_baseline=1e-8, max_pairs=0,
+                       auc_thresholds=(3, 5, 10, 20, 30),
+                       rra_thresholds=(5, 15, 30),
+                       rta_thresholds=(5, 15, 30))</code>
+            <p>
+              Controls pair filtering and threshold reporting. <code>max_pairs=0</code>
+              evaluates all matched image pairs; positive values evaluate a deterministic
+              subset for speed.
+            </p>
+            <ul class="param-list">
+              <li><code>min_baseline</code>: GT baseline below which translation-direction error is treated as zero.</li>
+              <li><code>max_pairs</code>: deterministic cap on evaluated image pairs.</li>
+              <li><code>auc_thresholds</code>: relative pose error thresholds for AUC reporting.</li>
+              <li><code>rra_thresholds</code>, <code>rta_thresholds</code>: recall thresholds for relative rotation and translation-axis accuracy.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3><code>align_points_similarity</code> and absolute trajectory metrics</h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/sparse_reconstruction_evaluator.py"><code>sparse_reconstruction_evaluator.py:219</code></a>, <a href="../../../spatialarena/eval/sparse_reconstruction_evaluator.py"><code>:254</code></a></div>
+            <code class="api-signature">align_points_similarity(source_points, target_points)
+    -> tuple[aligned_points, scale, rotation, translation]
+compute_absolute_trajectory_metrics(gt_poses, pred_poses,
+                                    matched_names) -> dict[str, float]</code>
+            <p>
+              <code>compute_absolute_trajectory_metrics</code> aligns the predicted trajectory to GT
+              with the pose-aware Sim(3) <code>pose_alignment.ransac_irls_align_sim3</code> (LMedS RANSAC
+              over the GTSAM pose fit, then a robust refit on all cameras) and reports ATE RMSE, mean, median, and standard
+              deviation. <code>align_points_similarity</code> is the plain center-only Umeyama fit it
+              replaced; it is kept for comparison and is degenerate on near-collinear trajectories.
+            </p>
+            <ul class="param-list">
+              <li><code>source_points</code>: predicted camera centers or points to align.</li>
+              <li><code>target_points</code>: GT camera centers or points in the target coordinate frame.</li>
+              <li><code>gt_poses</code>, <code>pred_poses</code>: matched COLMAP pose dictionaries.</li>
+              <li><code>matched_names</code>: image names included in ATE alignment and error computation.</li>
+              <li><strong>Returns:</strong> aligned points and Sim(3), or ATE metrics.</li>
+            </ul>
+          </div>
+
+          <div class="api-block">
+            <h3><code>compute_relative_pose_metrics</code> and <code>run_sparse_evaluation</code></h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/sparse_reconstruction_evaluator.py"><code>sparse_reconstruction_evaluator.py:274</code></a>, <a href="../../../spatialarena/eval/sparse_reconstruction_evaluator.py"><code>:437</code></a></div>
+            <code class="api-signature">compute_relative_pose_metrics(gt_poses, pred_poses, config=None) -> dict
+run_sparse_evaluation(benchmark_root, experiment_root, experiment_name,
+                      methods, tasks, datasets, scenes, include_scannet,
+                      config) -> dict</code>
+            <p>
+              Computes relative rotation error, translation-direction error,
+              axis-symmetric translation error, AUC, threshold recalls, AMB3R-style
+              <code>mAA_30</code>, and Sim(3)-aligned ATE. It also reports matched image
+              counts so missing or renamed images are visible.
+            </p>
+            <ul class="param-list">
+              <li><code>gt_poses</code>, <code>pred_poses</code>: COLMAP pose dictionaries keyed by image name.</li>
+              <li><code>config</code>: optional <code>SparseEvaluationConfig</code>.</li>
+              <li><code>benchmark_root</code>, <code>experiment_root</code>, <code>experiment_name</code>: suite roots and experiment identity.</li>
+              <li><code>methods</code>, <code>tasks</code>, <code>datasets</code>, <code>scenes</code>: suite selection filters.</li>
+              <li><strong>Returns:</strong> per-scene and aggregate sparse pose report.</li>
+            </ul>
+          </div>
+        </section>
+
+        <h2>SLAM Evaluation API</h2>
+        <section class="api-section">
+          <div class="api-block">
+            <h3><code>slam_protocol</code></h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/slam_protocol.py"><code>spatialarena/slam_protocol.py</code></a></div>
+            <code class="api-signature">SLAM_RANGES = {"short": {"stride": 10, "max_frames": 364}, "long": {"stride": 3, "max_frames": 1211}}
+range_stride(slam_range) -> int
+in_range_track(method, slam_range, track="rgb") -> bool
+method_slam_ranges(method, track="rgb") -> list[str]
+range_track_methods(slam_range, track="rgb") -> list[str]
+alignment_for_track(track) -> str
+dataset_fps(dataset) -> float</code>
+            <p>
+              The single definition of the SLAM protocol: range tracks and strides, the
+              measured H200 single-pass frame budgets, which methods are in each track
+              (a method joins a track when its budget covers the track's longest input;
+              long-sequence systems such as VGGT-Long, Pi-Long and VGGT-SLAM are in both),
+              the excluded methods, the alignment per input track, and dataset frame rates.
+              The engine, the evaluator API's planning, the case-list generator and the
+              trajectory evaluator all read it. Its CLI (<code>python -m
+              spatialarena.slam_protocol stride|check|methods|alignment</code>) serves
+              <code>run_method_case_list.sh</code>.
+            </p>
+          </div>
+
+          <div class="api-block">
+            <h3><code>trajectory_metrics</code>, <code>evaluate_slam_scene</code>, <code>run_slam_evaluation</code></h3>
+            <div class="source-link">Source: <a href="../../../spatialarena/eval/slam_trajectory_evaluator.py"><code>spatialarena/eval/slam_trajectory_evaluator.py</code></a></div>
+            <code class="api-signature">SlamEvaluationConfig(stride=1, alignment="sim3", slam_range="")
+fit_alignment(gt_c2w, pred_c2w, *, with_scale) -> Sim3Estimate
+trajectory_metrics(gt_c2w, pred_c2w, *, frames_per_second, alignment, valid=None) -> dict
+evaluate_slam_scene(scene_info, prediction_scene_path, *, config) -> dict
+run_slam_evaluation(*, benchmark_root, experiment_root, experiment_name, methods,
+                    datasets, scenes, config) -> dict</code>
+            <p>
+              <code>trajectory_metrics</code> takes [N, 4, 4] camera-to-world poses over the
+              N input frames and a mask of the frames with a predicted pose.
+              <code>evaluate_slam_scene</code> derives the input frames from the scene's
+              ground truth and the stride, matches predictions by image name, and returns
+              the scene result (metrics, completeness, the adapter's <code>runtime</code>).
+              <code>run_slam_evaluation</code> writes the same report schema as the other
+              evaluators to <code>eval_slam.json</code>.
+            </p>
+          </div>
+        </section>
+
+        <h2>Geometry Evaluators</h2>
+        <p>
+          Mesh and dense-geometry evaluators live beside the standardized artifact
+          evaluators. They are task-specific because their GT assets and protocols
+          differ substantially.
+        </p>
+        <ul class="compact-list">
+          <li><a href="../../../spatialarena/eval/eval_dtu_mesh.py"><code>spatialarena/eval/eval_dtu_mesh.py</code></a>: DTU mesh evaluation and optional coordinate-frame alignment.</li>
+          <li><a href="../../../spatialarena/eval/eval_tnt_mesh.py"><code>spatialarena/eval/eval_tnt_mesh.py</code></a>: Tanks and Temples mesh evaluation with trajectory alignment and ICP refinement utilities.</li>
+          <li><a href="../../../spatialarena/eval/eval_scannetpp_depth.py"><code>spatialarena/eval/eval_scannetpp_depth.py</code></a>: ScanNet++ depth/geometry evaluation, point-cloud collection, ICP registration, and aggregate reporting.</li>
+          <li><a href="../../../spatialarena/eval/utils.py"><code>spatialarena/eval/utils.py</code></a>: shared legacy helpers for reconstruction processing, Sim(3), absolute/relative pose errors, recall, AUC, accuracy, and completion.</li>
+        </ul>
+
+        <h2>Command-Line Examples</h2>
+        <pre><code># Verify external-method artifacts without running an evaluator.
+python scripts/preprocess/verify_prediction_outputs.py \
+  --benchmark_root $SPATIALARENA_ROOT/benchmarks \
+  --experiment_root $BENCHMARK_EVAL_ROOT/artifacts/full_standard \
+  --experiment_name benchmark_full-depth_VGGT_OMEGA \
+  --methods VGGT_OMEGA \
+  --tasks MonoDepth VideoDepth \
+  --strict
+
+# MonoDepth depth metrics.
+python -m spatialarena.eval.eval_mono_depth \
+  --benchmark_root $SPATIALARENA_ROOT/benchmarks \
+  --experiment_root $BENCHMARK_EVAL_ROOT/artifacts/full_standard \
+  --experiment_name benchmark_full-depth_VGGT_OMEGA \
+  --methods VGGT_OMEGA \
+  --datasets marigold \
+  --alignment standard \
+  --output_path ~/tmp/eval_mono_depth.json
+
+# VideoDepth depth metrics use the same evaluator core.
+python -m spatialarena.eval.eval_video_depth \
+  --experiment_root $BENCHMARK_EVAL_ROOT/artifacts/full_standard \
+  --experiment_name benchmark_full-depth_VGGT_OMEGA \
+  --methods VGGT_OMEGA \
+  --datasets sintel bonn kitti
+
+python -m spatialarena.eval.eval_mvdepth \
+  --experiment_root $BENCHMARK_EVAL_ROOT/artifacts/full_standard \
+  --experiment_name benchmark_full-depth_VGGT_OMEGA \
+  --methods VGGT_OMEGA \
+  --datasets eth3d dtu tanks_and_temples
+
+# Sparse COLMAP pose metrics.
+python -m spatialarena.eval.sparse_reconstruction_evaluator \
+  --benchmark_root $SPATIALARENA_ROOT/benchmarks \
+  --experiment_root $BENCHMARK_EVAL_ROOT/artifacts/full_standard \
+  --experiment_name benchmark_full-pose_VGGT_OMEGA \
+  --methods VGGT_OMEGA \
+  --tasks SfM \
+  --output_path ~/tmp/eval_sparse.json
+
+# SLAM trajectory metrics (one range track; the SfM evaluator refuses SLAM).
+python -m spatialarena.eval.slam_trajectory_evaluator \
+  --benchmark_root $SPATIALARENA_ROOT/benchmarks \
+  --experiment_root $BENCHMARK_EVAL_ROOT/artifacts/full_standard \
+  --experiment_name benchmark_full-slam-short_PI3_X \
+  --methods PI3_X \
+  --datasets 7scenes tum_dynamics \
+  --stride 10 --slam_range short \
+  --output_path ~/tmp/eval_slam.json</code></pre>
+
+        <h2>Report Schema</h2>
+        <p>
+          Depth, sparse and SLAM evaluators return a dictionary with
+          <code>num_scene_results</code>, <code>num_errors</code>, aggregate
+          <code>metrics</code>, per-scene <code>scene_results</code>, and structured
+          <code>errors</code>. Keeping errors inside the report is intentional: batch
+          evaluation can continue across other scenes while still making missing
+          artifacts or invalid files visible to the data manager.
+        </p>
+        <p>
+          Every scene result also carries <code>runtime</code>, copied from the adapter's
+          <code>metrics.json</code> by <code>prediction_artifacts.read_adapter_runtime</code>:
+          <code>inference_seconds</code>, <code>model_load_seconds</code>,
+          <code>peak_gpu_memory_mib</code> and <code>runtime_scope</code>
+          (<code>after_model_load</code> for instrumented adapters, <code>legacy</code> for
+          older predictions, <code>subprocess_wall</code> for the long-sequence SLAM systems).
+          <code>scripts/test/summarize_benchmark_reports.py</code> aggregates it per method
+          and dataset.
+        </p>
+
+      </article>
+    </main>
+  </div>
+</body>
+</html>

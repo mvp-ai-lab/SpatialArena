@@ -1,0 +1,51 @@
+# MindCloud benchmark scene selection and per-track protocols
+# (FeedForward-Benchmark's docs/mindcloud_benchmark_scene_selection.md).
+# Read by scripts/preprocess/materialize_spatialarena.py. Scene names are the released recordings without their
+# -YYYYMMDD-HHMMSS suffix. Every random choice (MonoDepth images, VideoDepth clips and cameras, MVRecon views) is
+# drawn from `seed` and the scene name, so re-running the materializer reproduces it.
+
+seed: 0
+lidar_depth_scale: 100.0  # lidar_depth/<cam>/<stem>.png: uint16 centimetres
+
+monodepth:
+  # Own scenes; MonoDepth also samples every VideoDepth and MVRecon scene.
+  scenes: [CambridgeUpstair, NationalScotlandMuseum5, KingsCrossIsleOfFlowers, KingsCrossWalk2, KingsCrossCanal2,
+           CambridgeSmallGarden2]
+  sample_from: [videodepth, mvrecon]
+  fraction: 0.10          # of the scene's images, drawn from those above the scene's median GGGS render PSNR
+  min_depth: 0.1
+  max_depth: 100.0
+
+videodepth:
+  scenes: [NationalScotlandMuseum8, NationalScotlandMuseum6, CambridgeRalishLibrary, StPancrasCorridor,
+           ChrispAlley1, CelestialHouseBackyard, ChrispMarket]
+  clip_frames: [100, 500]  # consecutive rig frames per clip, drawn uniformly; one random camera per clip
+  whole: [CambridgeRalishLibrary, StPancrasCorridor]  # one sequence: long (1,021) / short (140 frames)
+
+mvrecon:
+  views: 0                # every posed image of the 3 cameras (N > 0: N views drawn from them)
+  scenes:
+    YorminsterTheChapteraofRoof: {setting: indoor, eval_threshold: 0.05}
+    StPancrasStatue1: {setting: indoor, eval_threshold: 0.05}
+    NationalScotlandMuseum7: {setting: indoor, eval_threshold: 0.05}
+    NationalHistoryMuseum2: {setting: outdoor, eval_threshold: 0.25}
+    ChrispAlley2: {setting: outdoor, eval_threshold: 0.25}
+    CambridgeSmallGarden1: {setting: outdoor, eval_threshold: 0.25}
+
+sfm:
+  scenes: [CambridgeUpstair, YorminsterTheChapteraofRoof, BankUndergroundStation, ChrispAlley2, StGilesCathedralStatue,
+           DugaldStewartMonument, CanaryWharfBuilding1]
+
+slam:
+  frame_rate_hz: 5.0
+  # All sequences sit directly under SLAM/; each one's range (short / long / large) is recorded in its scene.json.
+  # RGB+D sequences carry the frames' sparse LiDAR depth; RGB-only (crowded) sequences carry none.
+  sequences:
+    - {scene: GridironBuildingFloor5, range: short, camera: 1, input: rgb_depth}
+    - {scene: CambridgeSmallGarden2, range: short, camera: 1, input: rgb_depth}
+    - {scene: EdinburghCastle1, range: short, camera: 0, input: rgb}
+    - {scene: ArtHouse, range: long, camera: 1, input: rgb_depth}
+    - {scene: StPancrasOutside, range: long, camera: 2, input: rgb}
+    - {scene: NationalHistoryMuseumIndoor1, range: large, camera: 0, input: rgb}
+    - {scene: CambridgeWesthub3, range: large, camera: 1, input: rgb}
+    - {scene: CoalDropsYard2, range: large, camera: 1, input: rgb}

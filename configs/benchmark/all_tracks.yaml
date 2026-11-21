@@ -1,0 +1,126 @@
+# Full benchmark: every task, every track (MonoDepth, VideoDepth, MVRecon, SfM and SLAM in one config).
+# Every registered method on each track it supports for at least one task. plan() pairs each (method, track) only
+# with the tasks and datasets that track runs on (spatialarena/task_track_matrix.py: e.g. rgb_cameras only on
+# MVRecon and VideoDepth SpatialArena, MVRecon rgb_depth only on 7scenes/dtu/eth3d) and makes one SLAM run per range
+# track.
+# The per-task configs (full_<task>.yaml) plan the same runs, split by task.
+#
+#   python -m spatialarena.run_config configs/benchmark/all_tracks.yaml plan     # the planned runs
+#   python -m spatialarena.run_config configs/benchmark/all_tracks.yaml generate # write the job scripts for review
+#   python -m spatialarena.run_config configs/benchmark/all_tracks.yaml coverage # compare with the canonical case lists
+#   python -m spatialarena.run_config configs/benchmark/all_tracks.yaml submit   # submit (max_in_flight runs queued)
+#
+# Results go to the canonical report folders (spatialarena/report_layout.py); scripts and SLURM logs to
+# <experiment_root>/<experiment_name>/.
+
+job_system: slurm
+benchmark_root: ${SPATIALARENA_ROOT}/benchmarks
+experiment_root: ${SPATIALARENA_ROOT}/benchmarks/_eval_job_scripts
+experiment_name: all_tracks
+max_in_flight: 16
+slurm_exclude: []
+# 12 h instead of the engine's 48 h inference limit: past inference jobs ran under 3 h, and a shorter limit lets
+# jobs backfill onto idle nodes ahead of an upcoming reservation instead of waiting for it to end.
+slurm_resources: {infer: {time: "12:00:00"}}
+
+datasets:
+  - {task: MonoDepth, dataset: marigold}
+  - {task: MonoDepth, dataset: aerialmetric}
+  - {task: MonoDepth, dataset: hammer}
+  - {task: MonoDepth, dataset: ibims1}
+  - {task: MonoDepth, dataset: spring}
+  - {task: MonoDepth, dataset: synth4k}
+  - {task: MonoDepth, dataset: spatialarena}
+  - {task: VideoDepth, dataset: bonn}
+  - {task: VideoDepth, dataset: kitti}
+  - {task: VideoDepth, dataset: sintel}
+  - {task: VideoDepth, dataset: dycheck}
+  - {task: VideoDepth, dataset: spatialarena}
+  - {task: MVRecon, dataset: 7scenes}
+  - {task: MVRecon, dataset: dtu}
+  - {task: MVRecon, dataset: eth3d}
+  - {task: MVRecon, dataset: hiroom}
+  - {task: MVRecon, dataset: nrgbd}
+  - {task: MVRecon, dataset: scannetpp}
+  - {task: MVRecon, dataset: tanks_and_temples}
+  - {task: MVRecon, dataset: spatialarena}
+  - {task: SfM, dataset: dtu}
+  - {task: SfM, dataset: eth3d}
+  - {task: SfM, dataset: hiroom}
+  - {task: SfM, dataset: imc}
+  - {task: SfM, dataset: scannetpp}
+  - {task: SfM, dataset: tanks_and_temples}
+  - {task: SfM, dataset: texturepoorsfm}
+  - {task: SfM, dataset: spatialarena}
+  # SLAM evaluation is light (camera-pose metrics): 64G instead of the engine's 320G default, which
+  # would leave one SLAM eval job at a time on the single cpu node (see configs/benchmark/full_slam.yaml).
+  - {task: SLAM, dataset: 7scenes, slurm_resources: &slam_eval {eval: {mem: 64G, cpus-per-task: 8}}}
+  - {task: SLAM, dataset: tum_dynamics, slurm_resources: *slam_eval}
+  - {task: SLAM, dataset: oxford_spires, slurm_resources: *slam_eval}
+  - {task: SLAM, dataset: vbr, slurm_resources: *slam_eval}
+  - {task: SLAM, dataset: kitti_odometry, slurm_resources: *slam_eval}
+  - {task: SLAM, dataset: spatialarena, slurm_resources: *slam_eval}
+
+models:
+  - {name: DA3-L, track: rgb, env: {SPATIAL_POLICY: shared}}
+  - {name: DA3-G, track: rgb, env: {SPATIAL_POLICY: shared}}
+  - {name: DA3-NGL, track: rgb, env: {SPATIAL_POLICY: shared}}
+  - {name: DA3-NGL, track: rgb_cameras, env: {SPATIAL_POLICY: shared}}
+  - {name: VGGT, track: rgb, env: {SPATIAL_POLICY: shared, INFER_CASE_PARALLELISM: 1}}  # ~71 GiB per 100-image batch
+  - {name: AMB3R, track: rgb}
+  - {name: PI3_X, track: rgb}
+  - {name: PI3_X, track: rgb_depth}
+  - {name: PI3_X, track: rgb_cameras}
+  - {name: FASTVGGT, track: rgb, env: {SPATIAL_POLICY: shared}}
+  - {name: COME, track: rgb, env: {SPATIAL_POLICY: shared}}
+  - {name: CUT3R, track: rgb, env: {SPATIAL_POLICY: shared}}
+  - {name: FAST3R, track: rgb}
+  - {name: VGGT_OMEGA, track: rgb, env: {SPATIAL_POLICY: shared-pad}}
+  - {name: MAPANYTHING, track: rgb}
+  - {name: MAPANYTHING, track: rgb_depth}
+  - {name: MAPANYTHING, track: rgb_cameras}
+  - {name: OMNIVGGT, track: rgb}
+  - {name: OMNIVGGT, track: rgb_depth}
+  - {name: OMNIVGGT, track: rgb_cameras}
+  - {name: DEJAVIEW, track: rgb}
+  - {name: IGGT, track: rgb, env: {INFER_CASE_PARALLELISM: 1}}  # ~73 GiB per 100-image batch
+  - {name: IGGT4D, track: rgb}
+  - {name: POW3R, track: rgb}
+  - {name: DUST3R, track: rgb}
+  - {name: MAST3R, track: rgb}
+  - {name: ROBUSTVGGT, track: rgb, env: {SPATIAL_POLICY: shared}}
+  - {name: DEPTHVLM, track: rgb}
+  - {name: VLM3, track: rgb}
+  - {name: DEPTHLM, track: rgb}
+  - {name: SENSENOVA_VISION, track: rgb}
+  - {name: QWEN3_VL, track: rgb}
+  - {name: GENCEPTION_DEPTH, track: rgb}
+  - {name: GENCEPTION_POSE, track: rgb}
+  # Official single-image MonoDepth baselines (scripts/inference/single_image_depth.py; MonoDepth only).
+  - {name: MOGE, track: rgb}
+  - {name: MOGE2, track: rgb}
+  - {name: MOGE3, track: rgb}
+  - {name: MARIGOLD, track: rgb}
+  - {name: MARIGOLD_V1_1, track: rgb}
+  # Marigold V2: native size except Marigold's ETH3D subset at 1008x672, one call per size group, 96 GB (as in
+  # full_monodepth.yaml; docs/benchmark/depth_methods.md).
+  - name: MARIGOLD_V2
+    track: rgb
+    env: {MARIGOLD_V2_SCENE_SIZES: marigold/eth3d=1008x672, MAX_IMAGES_PER_RUN: 0}
+    slurm_resources: {infer: {mem: 96G}}
+  - {name: LOTUS_D, track: rgb}
+  - {name: DEPTH_PRO, track: rgb}
+  - {name: UNIDEPTH_V2, track: rgb}
+  - {name: INFINIDEPTH, track: rgb}
+  - {name: DVD, track: rgb}   # DVD v1.1 video depth (VideoDepth only)
+  - {name: DEPTHCRAFTER, track: rgb}   # video diffusion depth (VideoDepth only)
+  - {name: CHRONODEPTH, track: rgb}   # video diffusion depth (VideoDepth only)
+  - {name: VGGT_LONG, track: rgb, slurm_resources: {eval: {mem: 128G, cpus-per-task: 16}}}  # + chunk alignment
+  - {name: PI_LONG, track: rgb, slurm_resources: {eval: {mem: 128G, cpus-per-task: 16}}}  # + chunk alignment
+  - {name: VGGT_SLAM, track: rgb}
+  - {name: LOGER, track: rgb}
+  - {name: ZIPMAP, track: rgb}
+  - {name: LINGBOT_MAP, track: rgb}
+  - {name: R3, track: rgb}
+  - {name: SCAL3R, track: rgb}
+  - {name: ABOT_RECON, track: rgb}

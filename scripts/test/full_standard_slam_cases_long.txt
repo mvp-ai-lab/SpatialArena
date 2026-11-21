@@ -1,0 +1,32 @@
+# Full-standard case list generated from canonical metadata.
+# Format: task|dataset|scene|interval|order
+# full-slam long-range track: each interval is its dataset's temporal stride in the track; whole recordings, no frame cap (spatialarena/slam_protocol.py).
+SLAM|7scenes|chess_seq-03|3
+SLAM|7scenes|chess_seq-05|3
+SLAM|7scenes|fire_seq-03|3
+SLAM|7scenes|fire_seq-04|3
+SLAM|7scenes|heads_seq-01|3
+SLAM|7scenes|office_seq-02|3
+SLAM|7scenes|office_seq-06|3
+SLAM|7scenes|office_seq-07|3
+SLAM|7scenes|office_seq-09|3
+SLAM|7scenes|pumpkin_seq-01|3
+SLAM|7scenes|pumpkin_seq-07|3
+SLAM|7scenes|redkitchen_seq-03|3
+SLAM|7scenes|redkitchen_seq-04|3
+SLAM|7scenes|redkitchen_seq-06|3
+SLAM|7scenes|redkitchen_seq-12|3
+SLAM|7scenes|redkitchen_seq-14|3
+SLAM|7scenes|stairs_seq-01|3
+SLAM|7scenes|stairs_seq-04|3
+SLAM|tum_dynamics|rgbd_dataset_freiburg2_desk_with_person|3
+SLAM|tum_dynamics|rgbd_dataset_freiburg3_sitting_static|3
+SLAM|tum_dynamics|rgbd_dataset_freiburg3_sitting_xyz|3
+SLAM|tum_dynamics|rgbd_dataset_freiburg3_sitting_halfsphere|3
+SLAM|tum_dynamics|rgbd_dataset_freiburg3_sitting_rpy|3
+SLAM|tum_dynamics|rgbd_dataset_freiburg3_walking_static|3
+SLAM|tum_dynamics|rgbd_dataset_freiburg3_walking_xyz|3
+SLAM|tum_dynamics|rgbd_dataset_freiburg3_walking_halfsphere|3
+SLAM|tum_dynamics|rgbd_dataset_freiburg3_walking_rpy|3
+SLAM|spatialarena|ArtHouse|1
+SLAM|spatialarena|StPancrasOutside|1

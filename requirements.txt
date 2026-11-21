@@ -1,0 +1,33 @@
+numpy
+easydict
+h5py
+# httpx2 (huggingface_hub 2.x) decodes brotli with this; an older brotlicffi in the environment breaks downloads.
+Brotli==1.2.1
+huggingface_hub==2.4.0
+imageio
+joblib
+matplotlib==3.11.2
+numpy-quaternion
+open3d==0.20.0
+opencv-python==5.1.0.95
+OpenEXR
+pillow
+plyfile==1.1.5
+pycolmap
+PyYAML
+requests
+safetensors
+scikit-learn
+scipy
+# torch/torchvision: install the build for your CUDA (or CPU) from https://pytorch.org first; this only requires one.
+torch
+torchvision
+tqdm
+trimesh==5.2.1
+tyro==1.0.17
+viser==1.1.1
+webdataset==1.0.2
+websockets==16.1.1  # viser 1.1.1 needs <17
+# tests (pytest test/)
+jinja2
+pytest

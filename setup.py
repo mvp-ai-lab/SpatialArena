@@ -1,0 +1,55 @@
+# Copyright (c) 2026 Yu Chen. All rights reserved.
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+
+from setuptools import find_packages, setup
+
+setup(
+    name="spatialarena",
+    version="0.1.0",
+    author="Yu Chen",
+    license="PolyForm-Noncommercial-1.0.0",
+    license_files=["LICENSE", "NOTICE"],
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Intended Audience :: Science/Research",
+        "License :: Other/Proprietary License",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.10",
+        "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    ],
+    packages=find_packages(include=["spatialarena", "spatialarena.*"]),
+    package_dir={"spatialarena": "spatialarena"},
+    python_requires=">=3.10",
+    # `pip install .[board]`: the interactive terminal progress board (progress_mode="board").
+    extras_require={"board": ["textual>=0.80"], "test": ["jinja2", "pytest"]},
+    install_requires=[
+        "numpy",
+        "easydict",
+        "Brotli>=1.2",
+        "h5py",
+        "huggingface_hub>=2.4",
+        "imageio",
+        "joblib",
+        "matplotlib",
+        "numpy-quaternion",
+        "open3d",
+        "opencv-python",
+        "OpenEXR",
+        "pillow",
+        "plyfile",
+        "pycolmap",
+        "PyYAML",
+        "requests",
+        "safetensors",
+        "scikit-learn",
+        "scipy",
+        "torch",
+        "torchvision",
+        "tqdm",
+        "trimesh",
+        "tyro",
+        "viser",
+        "webdataset>=1.0.2",
+        "websockets<17",
+    ],
+)
