@@ -30,8 +30,14 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-
 # This script is based on an original implementation by True Price.
+"""COLMAP SQLite database access (COLMAP's scripts/python/database.py).
+
+`COLMAPDatabase` creates COLMAP's tables and inserts cameras, images, pose
+priors, keypoints, descriptors, matches and two-view geometries, so a COLMAP
+database can be built from known data (see tnt_to_colmap.py). Running this file
+directly writes, reads back and deletes a small example database.
+"""
 
 import sqlite3
 import sys
@@ -101,39 +107,39 @@ CREATE_MATCHES_TABLE = """CREATE TABLE IF NOT EXISTS matches (
     data BLOB)"""
 
 CREATE_NAME_INDEX = (
-    "CREATE UNIQUE INDEX IF NOT EXISTS index_name ON images(name)"
-)
+    "CREATE UNIQUE INDEX IF NOT EXISTS index_name ON images(name)")
 
-CREATE_ALL = "; ".join(
-    [
-        CREATE_CAMERAS_TABLE,
-        CREATE_IMAGES_TABLE,
-        CREATE_POSE_PRIORS_TABLE,
-        CREATE_KEYPOINTS_TABLE,
-        CREATE_DESCRIPTORS_TABLE,
-        CREATE_MATCHES_TABLE,
-        CREATE_TWO_VIEW_GEOMETRIES_TABLE,
-        CREATE_NAME_INDEX,
-    ]
-)
+CREATE_ALL = "; ".join([
+    CREATE_CAMERAS_TABLE,
+    CREATE_IMAGES_TABLE,
+    CREATE_POSE_PRIORS_TABLE,
+    CREATE_KEYPOINTS_TABLE,
+    CREATE_DESCRIPTORS_TABLE,
+    CREATE_MATCHES_TABLE,
+    CREATE_TWO_VIEW_GEOMETRIES_TABLE,
+    CREATE_NAME_INDEX,
+])
 
 
 def image_ids_to_pair_id(image_id1, image_id2):
+    """Returns COLMAP's pair id for two image ids, in either order."""
     if image_id1 > image_id2:
         image_id1, image_id2 = image_id2, image_id1
     return image_id1 * MAX_IMAGE_ID + image_id2
 
 
 def pair_id_to_image_ids(pair_id):
+    """Splits a COLMAP pair id into its (smaller, larger) image ids."""
     image_id2 = pair_id % MAX_IMAGE_ID
     image_id1 = (pair_id - image_id2) / MAX_IMAGE_ID
     return image_id1, image_id2
 
 
 def array_to_blob(array):
+    """Serializes an array to the bytes stored in a SQLite BLOB."""
     if IS_PYTHON3:
-        # ``ndarray.tostring`` was removed from newer NumPy versions.
-        # ``tobytes`` has identical SQLite BLOB semantics and remains
+        # `ndarray.tostring` was removed from newer NumPy versions.
+        # `tobytes` has identical SQLite BLOB semantics and remains
         # available across supported NumPy releases.
         return np.asarray(array).tobytes()
     else:
@@ -141,6 +147,7 @@ def array_to_blob(array):
 
 
 def blob_to_array(blob, dtype, shape=(-1,)):
+    """Reads a SQLite BLOB back as an array of `dtype` and `shape`."""
     if IS_PYTHON3:
         return np.fromstring(blob, dtype=dtype).reshape(*shape)
     else:
@@ -148,35 +155,36 @@ def blob_to_array(blob, dtype, shape=(-1,)):
 
 
 class COLMAPDatabase(sqlite3.Connection):
+    """A SQLite connection with COLMAP's schema and insert helpers.
+
+    The `create_*` attributes create COLMAP's tables (`create_tables` all of
+    them) and the `add_*` methods insert rows.
+    """
+
+    # Kept as a static method: callers use `COLMAPDatabase.connect(path)`.
     @staticmethod
     def connect(database_path):
+        """Opens `database_path` as a COLMAPDatabase."""
         return sqlite3.connect(database_path, factory=COLMAPDatabase)
 
     def __init__(self, *args, **kwargs):
-        super(COLMAPDatabase, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self.create_tables = lambda: self.executescript(CREATE_ALL)
         self.create_cameras_table = lambda: self.executescript(
-            CREATE_CAMERAS_TABLE
-        )
+            CREATE_CAMERAS_TABLE)
         self.create_descriptors_table = lambda: self.executescript(
-            CREATE_DESCRIPTORS_TABLE
-        )
+            CREATE_DESCRIPTORS_TABLE)
         self.create_images_table = lambda: self.executescript(
-            CREATE_IMAGES_TABLE
-        )
+            CREATE_IMAGES_TABLE)
         self.create_pose_priors_table = lambda: self.executescript(
-            CREATE_POSE_PRIORS_TABLE
-        )
+            CREATE_POSE_PRIORS_TABLE)
         self.create_two_view_geometries_table = lambda: self.executescript(
-            CREATE_TWO_VIEW_GEOMETRIES_TABLE
-        )
+            CREATE_TWO_VIEW_GEOMETRIES_TABLE)
         self.create_keypoints_table = lambda: self.executescript(
-            CREATE_KEYPOINTS_TABLE
-        )
+            CREATE_KEYPOINTS_TABLE)
         self.create_matches_table = lambda: self.executescript(
-            CREATE_MATCHES_TABLE
-        )
+            CREATE_MATCHES_TABLE)
         self.create_name_index = lambda: self.executescript(CREATE_NAME_INDEX)
 
     def add_camera(
@@ -188,6 +196,19 @@ class COLMAPDatabase(sqlite3.Connection):
         prior_focal_length=False,
         camera_id=None,
     ):
+        """Inserts a camera.
+
+        Args:
+            model: The COLMAP camera model id.
+            width: The image width in pixels.
+            height: The image height in pixels.
+            params: The camera parameters of the model.
+            prior_focal_length: Whether the focal length is a trusted prior.
+            camera_id: The camera id; None lets SQLite assign one.
+
+        Returns:
+            The camera id.
+        """
         params = np.asarray(params, np.float64)
         cursor = self.execute(
             "INSERT INTO cameras VALUES (?, ?, ?, ?, ?, ?)",
@@ -208,14 +229,24 @@ class COLMAPDatabase(sqlite3.Connection):
         camera_id,
         image_id=None,
     ):
-        cursor = self.execute(
-            "INSERT INTO images VALUES (?, ?, ?)", (image_id, name, camera_id)
-        )
+        """Inserts an image and returns its id (assigned when None)."""
+        cursor = self.execute("INSERT INTO images VALUES (?, ?, ?)",
+                              (image_id, name, camera_id))
         return cursor.lastrowid
 
-    def add_pose_prior(
-        self, image_id, position, coordinate_system=-1, position_covariance=None
-    ):
+    def add_pose_prior(self,
+                       image_id,
+                       position,
+                       coordinate_system=-1,
+                       position_covariance=None):
+        """Inserts a position prior; a missing covariance is stored as NaN.
+
+        Args:
+            image_id: The image id.
+            position: The 3D position.
+            coordinate_system: COLMAP's coordinate system id (-1 undefined).
+            position_covariance: The 3x3 covariance, or None.
+        """
         position = np.asarray(position, dtype=np.float64)
         if position_covariance is None:
             position_covariance = np.full((3, 3), np.nan, dtype=np.float64)
@@ -230,6 +261,7 @@ class COLMAPDatabase(sqlite3.Connection):
         )
 
     def add_keypoints(self, image_id, keypoints):
+        """Inserts an image's Nx2, Nx4 or Nx6 keypoints."""
         assert len(keypoints.shape) == 2
         assert keypoints.shape[1] in [2, 4, 6]
 
@@ -240,6 +272,7 @@ class COLMAPDatabase(sqlite3.Connection):
         )
 
     def add_descriptors(self, image_id, descriptors):
+        """Inserts an image's uint8 descriptors."""
         descriptors = np.ascontiguousarray(descriptors, np.uint8)
         self.execute(
             "INSERT INTO descriptors VALUES (?, ?, ?, ?)",
@@ -247,6 +280,7 @@ class COLMAPDatabase(sqlite3.Connection):
         )
 
     def add_matches(self, image_id1, image_id2, matches):
+        """Inserts Nx2 keypoint matches between two images."""
         assert len(matches.shape) == 2
         assert matches.shape[1] == 2
 
@@ -261,17 +295,31 @@ class COLMAPDatabase(sqlite3.Connection):
         )
 
     def add_two_view_geometry(
-        self,
-        image_id1,
-        image_id2,
-        matches,
-        F=np.eye(3),
-        E=np.eye(3),
-        H=np.eye(3),
-        qvec=np.array([1.0, 0.0, 0.0, 0.0]),
-        tvec=np.zeros(3),
-        config=2,
+            self,
+            image_id1,
+            image_id2,
+            matches,
+            F=np.eye(3),
+            E=np.eye(3),
+            H=np.eye(3),
+            qvec=np.array([1.0, 0.0, 0.0, 0.0]),
+            tvec=np.zeros(3),
+            config=2,
     ):
+        """Inserts verified matches and the two-view geometry of an image pair.
+
+        Args:
+            image_id1: The first image id.
+            image_id2: The second image id.
+            matches: Nx2 keypoint index matches, ordered as (image_id1,
+                image_id2).
+            F: The fundamental matrix.
+            E: The essential matrix.
+            H: The homography.
+            qvec: The relative rotation quaternion.
+            tvec: The relative translation.
+            config: COLMAP's two-view geometry configuration id.
+        """
         assert len(matches.shape) == 2
         assert matches.shape[1] == 2
 
@@ -286,10 +334,9 @@ class COLMAPDatabase(sqlite3.Connection):
         qvec = np.asarray(qvec, dtype=np.float64)
         tvec = np.asarray(tvec, dtype=np.float64)
         self.execute(
-            "INSERT INTO two_view_geometries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (pair_id,)
-            + matches.shape
-            + (
+            ("INSERT INTO two_view_geometries "
+             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"),
+            (pair_id,) + matches.shape + (
                 array_to_blob(matches),
                 config,
                 array_to_blob(F),
@@ -302,8 +349,9 @@ class COLMAPDatabase(sqlite3.Connection):
 
 
 def example_usage():
-    import argparse
-    import os
+    """Writes, reads back and checks an example database, then deletes it."""
+    import argparse  # pylint: disable=import-outside-toplevel
+    import os  # pylint: disable=import-outside-toplevel
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--database_path", default="database.db")
@@ -366,10 +414,10 @@ def example_usage():
 
     # Create dummy matches.
 
-    M = 50
-    matches12 = np.random.randint(num_keypoints, size=(M, 2))
-    matches23 = np.random.randint(num_keypoints, size=(M, 2))
-    matches34 = np.random.randint(num_keypoints, size=(M, 2))
+    num_matches = 50
+    matches12 = np.random.randint(num_keypoints, size=(num_matches, 2))
+    matches23 = np.random.randint(num_keypoints, size=(num_matches, 2))
+    matches34 = np.random.randint(num_keypoints, size=(num_matches, 2))
 
     db.add_matches(image_id1, image_id2, matches12)
     db.add_matches(image_id2, image_id3, matches23)
@@ -391,7 +439,7 @@ def example_usage():
     db.add_pose_prior(*pose_prior2)
     db.add_pose_prior(*pose_prior3)
 
-    # Convert unset covariance to nan matrix for later check
+    # Convert unset covariance to nan matrix for later check.
     pose_prior1[3] = np.full((3, 3), np.nan, dtype=np.float64)
     pose_prior2[3] = np.full((3, 3), np.nan, dtype=np.float64)
 
@@ -417,10 +465,9 @@ def example_usage():
 
     # Read and check keypoints.
 
-    keypoints = dict(
-        (image_id, blob_to_array(data, np.float32, (-1, 2)))
-        for image_id, data in db.execute("SELECT image_id, data FROM keypoints")
-    )
+    keypoints = dict((image_id, blob_to_array(data, np.float32, (-1, 2)))
+                     for image_id, data in db.execute(
+                         "SELECT image_id, data FROM keypoints"))
 
     assert np.allclose(keypoints[image_id1], keypoints1)
     assert np.allclose(keypoints[image_id2], keypoints2)
@@ -431,14 +478,13 @@ def example_usage():
 
     matches = dict(
         (pair_id_to_image_ids(pair_id), blob_to_array(data, np.uint32, (-1, 2)))
-        for pair_id, data in db.execute("SELECT pair_id, data FROM matches")
-    )
+        for pair_id, data in db.execute("SELECT pair_id, data FROM matches"))
 
     assert np.all(matches[(image_id1, image_id2)] == matches12)
     assert np.all(matches[(image_id2, image_id3)] == matches23)
     assert np.all(matches[(image_id3, image_id4)] == matches34)
 
-    # Read and check pose_priors
+    # Read and check pose_priors.
 
     rows = db.execute("SELECT * FROM pose_priors")
 

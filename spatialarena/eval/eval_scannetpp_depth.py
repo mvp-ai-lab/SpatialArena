@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Strict ScanNet++ depth and point-cloud evaluation.
 
 This evaluator follows the ScanNet++ path used by CoMe's ``eval_SCN.py``:
@@ -19,8 +18,8 @@ import os
 import sys
 import time
 import zlib
-from dataclasses import dataclass
-from pathlib import Path
+import dataclasses
+import pathlib
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -28,57 +27,62 @@ import open3d as o3d
 import trimesh
 from PIL import Image
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
+ROOT_DIR = pathlib.Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from spatialarena.eval.tnt_tools.evaluation import write_color_distances
-from spatialarena.eval.scene_files import (
-    DEPTH_EXTENSIONS,
-    MASK_EXTENSIONS,
-    SceneCamera,
-    find_sidecar_file,
-    list_scene_dirs,
-    load_depth_map,
-    load_scene_cameras,
-    parse_scene_ids,
-    scale_intrinsics_between_sizes,
-    write_json,
-)
+# The repository root must be on sys.path (above) before these imports.
+from spatialarena.eval import scene_files
+from spatialarena.eval.tnt_tools import evaluation as tnt_evaluation
 
 MAX_POINT_NUMBER = 4e6
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class SourcePointCloud:
+    """A predicted point cloud to evaluate, with how it was sampled.
+
+    Attributes:
+        name: Variant name, e.g. "unmasked" or "tsdf_masked".
+        pcd: The points.
+        sampling: JSON-ready description of how the points were made.
+    """
     name: str
     pcd: o3d.geometry.PointCloud
     sampling: Dict[str, object]
 
 
 def needs_pointcloud_sources(args: argparse.Namespace) -> bool:
+    """Whether `--depth_geometry` asks for unprojected point clouds."""
     return args.depth_geometry in {"pointcloud", "both"}
 
 
 def needs_tsdf_sources(args: argparse.Namespace) -> bool:
+    """Whether `--depth_geometry` asks for TSDF meshes."""
     return args.depth_geometry in {"tsdf", "both"}
 
 
-def source_variant_name(base_name: str, geometry_name: str, args: argparse.Namespace) -> str:
+def source_variant_name(base_name: str, geometry_name: str,
+                        args: argparse.Namespace) -> str:
+    """Prefixes the variant with the geometry when both geometries are built."""
     if args.depth_geometry == "both":
         return f"{geometry_name}_{base_name}"
     return base_name
 
 
 def parse_float_list(value: str) -> List[float]:
+    """Parses a comma-separated list of floats."""
     return [float(item.strip()) for item in value.split(",") if item.strip()]
 
 
 def stable_scene_seed(seed: int, scene_id: str) -> int:
+    """Returns a per-scene seed that does not depend on the Python hash seed."""
     return (int(seed) + zlib.adler32(scene_id.encode("utf-8"))) % (2**32)
 
 
-def select_frame_indices(num_frames: int, max_frames: Optional[int]) -> List[int]:
+def select_frame_indices(num_frames: int,
+                         max_frames: Optional[int]) -> List[int]:
+    """Returns up to `max_frames` evenly spaced frame indices (all if None)."""
     if max_frames is None or max_frames >= num_frames:
         return list(range(num_frames))
     if max_frames <= 0:
@@ -87,37 +91,60 @@ def select_frame_indices(num_frames: int, max_frames: Optional[int]) -> List[int
 
 
 def read_scene_scale(scene_id: str, args: argparse.Namespace) -> float:
+    """Reads the scene's metric scale from `--scale_json_root` (1 without one).
+
+    Raises:
+        ValueError: If the scale root or the scale key is missing.
+        FileNotFoundError: If the scene's scale JSON is missing.
+    """
     if args.scale_source == "none":
         return 1.0
     if not args.scale_json_root:
-        raise ValueError("--scale_json_root is required unless --scale_source none")
-    scene_json = Path(args.scale_json_root) / "scenes" / f"{scene_id}.json"
+        raise ValueError(
+            "--scale_json_root is required unless --scale_source none")
+    scene_json = pathlib.Path(
+        args.scale_json_root) / "scenes" / f"{scene_id}.json"
     if not scene_json.exists():
-        raise FileNotFoundError(f"Missing scale JSON for {scene_id}: {scene_json}")
+        raise FileNotFoundError(
+            f"Missing scale JSON for {scene_id}: {scene_json}")
     with scene_json.open("r", encoding="utf-8") as file:
         payload = json.load(file)
-    key = "gt_oracle_scale" if args.scale_source == "oracle" else "estimated_scale"
+    if args.scale_source == "oracle":
+        key = "gt_oracle_scale"
+    else:
+        key = "estimated_scale"
     if payload.get(key) is None:
         raise ValueError(f"Missing scale key {key!r} in {scene_json}")
     return float(payload[key])
 
 
-def resolve_scene_dirs(args: argparse.Namespace) -> List[Path]:
-    return list_scene_dirs(
-        dataset_root=Path(args.colmap_root),
-        scene_ids=parse_scene_ids(args.scene_ids),
+def resolve_scene_dirs(args: argparse.Namespace) -> List[pathlib.Path]:
+    """Lists the COLMAP scene folders selected by the scene id arguments."""
+    return scene_files.list_scene_dirs(
+        dataset_root=pathlib.Path(args.colmap_root),
+        scene_ids=scene_files.parse_scene_ids(args.scene_ids),
         scene_ids_file=args.scene_ids_file,
     )
 
 
-def scannetpp_gt_mesh_path(dataset_dir: Path) -> Path:
+def scannetpp_gt_mesh_path(dataset_dir: pathlib.Path) -> pathlib.Path:
+    """Returns the scene's ScanNet++ GT mesh path.
+
+    Raises:
+        FileNotFoundError: If the mesh is missing.
+    """
     gt_path = dataset_dir / "scans" / "mesh_aligned_0.05.ply"
     if not gt_path.exists():
         raise FileNotFoundError(f"Missing ScanNet++ GT mesh: {gt_path}")
     return gt_path
 
 
-def load_gt_point_cloud(dataset_dir: Path) -> o3d.geometry.PointCloud:
+def load_gt_point_cloud(dataset_dir: pathlib.Path) -> o3d.geometry.PointCloud:
+    """Loads the GT mesh as a point cloud (its vertices and colors).
+
+    Raises:
+        ValueError: If the mesh has no vertices.
+    """
     gt_path = scannetpp_gt_mesh_path(dataset_dir)
     gt_pcd = o3d.io.read_point_cloud(str(gt_path))
     if len(gt_pcd.points) > 0:
@@ -134,10 +161,23 @@ def load_gt_point_cloud(dataset_dir: Path) -> o3d.geometry.PointCloud:
 
 
 def load_reconstruction_point_cloud(
-    ply_path: Path,
+    ply_path: pathlib.Path,
     add_face_centers: bool = True,
     input_scale: float = 1.0,
 ) -> SourcePointCloud:
+    """Loads a reconstruction PLY (mesh or point cloud) as a point cloud.
+
+    Args:
+        ply_path: The reconstruction.
+        add_face_centers: Add the mesh face centers to the vertices.
+        input_scale: Scale applied to the points.
+
+    Returns:
+        The finite points, as the "ply" source.
+
+    Raises:
+        FileNotFoundError: If the PLY is missing.
+    """
     if not ply_path.exists():
         raise FileNotFoundError(f"Missing reconstruction PLY: {ply_path}")
 
@@ -181,11 +221,13 @@ def load_reconstruction_point_cloud(
     )
 
 
-def camera_intrinsics_for_depth(camera: SceneCamera, depth_shape: Tuple[int, int]) -> np.ndarray:
+def camera_intrinsics_for_depth(camera: scene_files.SceneCamera,
+                                depth_shape: Tuple[int, int]) -> np.ndarray:
+    """Returns the camera's intrinsics scaled to the depth map size."""
     height, width = depth_shape
     intrinsics = camera.intrinsics
     if (height, width) != (camera.height, camera.width):
-        intrinsics = scale_intrinsics_between_sizes(
+        intrinsics = scene_files.scale_intrinsics_between_sizes(
             intrinsics,
             source_size=(camera.width, camera.height),
             target_size=(width, height),
@@ -193,11 +235,14 @@ def camera_intrinsics_for_depth(camera: SceneCamera, depth_shape: Tuple[int, int
     return intrinsics.astype(np.float32, copy=False)
 
 
-def load_mask(mask_path: Path, target_shape: Tuple[int, int]) -> np.ndarray:
+def load_mask(mask_path: pathlib.Path, target_shape: Tuple[int,
+                                                           int]) -> np.ndarray:
+    """Loads a mask image (nonzero = keep), resized to `target_shape`."""
     mask_image = Image.open(mask_path).convert("L")
     target_height, target_width = target_shape
     if mask_image.size != (target_width, target_height):
-        mask_image = mask_image.resize((target_width, target_height), Image.NEAREST)
+        mask_image = mask_image.resize((target_width, target_height),
+                                       Image.NEAREST)
     return np.asarray(mask_image) > 0
 
 
@@ -206,21 +251,24 @@ def resize_depth_to_shape(
     target_shape: Tuple[int, int],
     mode: str,
 ) -> np.ndarray:
+    """Resizes a depth map to `target_shape` ("nearest" or bilinear)."""
     if depth.shape == target_shape:
         return depth.astype(np.float32, copy=False)
 
     target_height, target_width = target_shape
-    resampling = (
-        Image.Resampling.NEAREST
-        if mode == "nearest"
-        else Image.Resampling.BILINEAR
-    )
+    if mode == "nearest":
+        resampling = Image.Resampling.NEAREST
+    else:
+        resampling = Image.Resampling.BILINEAR
     depth_image = Image.fromarray(depth.astype(np.float32), mode="F")
-    resized = depth_image.resize((target_width, target_height), resample=resampling)
+    resized = depth_image.resize((target_width, target_height),
+                                 resample=resampling)
     return np.asarray(resized, dtype=np.float32)
 
 
-def resize_bool_mask_to_shape(mask: np.ndarray, target_shape: Tuple[int, int]) -> np.ndarray:
+def resize_bool_mask_to_shape(mask: np.ndarray,
+                              target_shape: Tuple[int, int]) -> np.ndarray:
+    """Resizes a boolean mask to `target_shape` (nearest)."""
     if mask.shape == target_shape:
         return mask.astype(bool, copy=False)
     target_height, target_width = target_shape
@@ -232,14 +280,22 @@ def resize_bool_mask_to_shape(mask: np.ndarray, target_shape: Tuple[int, int]) -
     return np.asarray(mask_image) > 0
 
 
-def load_scannetpp_depth_meters(depth_path: Path, depth_scale: float) -> np.ndarray:
+def load_scannetpp_depth_meters(depth_path: pathlib.Path,
+                                depth_scale: float) -> np.ndarray:
+    """Loads a ScanNet++ GT depth PNG in metres.
+
+    Raises:
+        FileNotFoundError: If the depth file is missing.
+    """
     if not depth_path.exists():
         raise FileNotFoundError(f"Missing ScanNet++ GT depth: {depth_path}")
     depth = np.asarray(Image.open(depth_path), dtype=np.float32)
     return depth / float(depth_scale)
 
 
-def valid_depth_mask(depth: np.ndarray, min_depth: float, max_depth: float) -> np.ndarray:
+def valid_depth_mask(depth: np.ndarray, min_depth: float,
+                     max_depth: float) -> np.ndarray:
+    """Finite depths above `min_depth` and below `max_depth` (if > 0)."""
     valid = np.isfinite(depth) & (depth > min_depth)
     if max_depth > 0:
         valid &= depth < max_depth
@@ -253,12 +309,9 @@ def valid_depth_pair_mask(
     max_depth: float,
     extra_mask: Optional[np.ndarray] = None,
 ) -> np.ndarray:
-    valid = (
-        np.isfinite(predicted_depth)
-        & np.isfinite(gt_depth)
-        & (predicted_depth > min_depth)
-        & (gt_depth > min_depth)
-    )
+    """Pixels where both depths are valid and `extra_mask` holds."""
+    valid = (np.isfinite(predicted_depth) & np.isfinite(gt_depth) &
+             (predicted_depth > min_depth) & (gt_depth > min_depth))
     if max_depth > 0:
         valid &= (predicted_depth < max_depth) & (gt_depth < max_depth)
     if extra_mask is not None:
@@ -267,6 +320,7 @@ def valid_depth_pair_mask(
 
 
 def new_depth_metric_accumulator() -> Dict[str, float]:
+    """Returns empty sums for the pooled depth metrics."""
     return {
         "num_frames": 0,
         "num_valid_frames": 0,
@@ -285,6 +339,11 @@ def update_depth_metric_accumulator(
     gt_depth: np.ndarray,
     valid: np.ndarray,
 ) -> Dict[str, object]:
+    """Adds one frame's valid pixels to the sums.
+
+    Returns:
+        The frame's own depth metrics (None values without valid pixels).
+    """
     accumulator["num_frames"] += 1
     num_pixels = int(valid.sum())
     if num_pixels == 0:
@@ -333,6 +392,15 @@ def finalize_depth_metric_accumulator(
     accumulator: Dict[str, float],
     include_sums: bool,
 ) -> Dict[str, object]:
+    """Turns the pooled sums into depth metrics.
+
+    Args:
+        accumulator: The pooled sums.
+        include_sums: Keep the raw sums under "_sums" for later pooling.
+
+    Returns:
+        The depth metrics.
+    """
     num_pixels = int(accumulator["num_pixels"])
     result = {
         "num_frames": int(accumulator["num_frames"]),
@@ -366,17 +434,33 @@ def finalize_depth_metric_accumulator(
 def unproject_depth_points(
     depth: np.ndarray,
     valid: np.ndarray,
-    camera: SceneCamera,
+    camera: scene_files.SceneCamera,
     points_per_frame: int,
     scale: float,
     scale_application: str,
     rng: np.random.Generator,
 ) -> np.ndarray:
+    """Unprojects (a sample of) the valid depth pixels to world points.
+
+    Args:
+        depth: The predicted depth map.
+        valid: The pixels to unproject.
+        camera: The frame's COLMAP camera.
+        points_per_frame: Sample at most this many pixels (0: all).
+        scale: The scene's metric scale.
+        scale_application: "depth" scales the depths, "world" the points.
+        rng: Random generator for the pixel sample.
+
+    Returns:
+        [N, 3] float32 world points.
+    """
     flat_indices = np.flatnonzero(valid.reshape(-1))
     if flat_indices.size == 0:
         return np.zeros((0, 3), dtype=np.float32)
     if points_per_frame > 0 and flat_indices.size > points_per_frame:
-        flat_indices = rng.choice(flat_indices, size=points_per_frame, replace=False)
+        flat_indices = rng.choice(flat_indices,
+                                  size=points_per_frame,
+                                  replace=False)
 
     width = depth.shape[1]
     ys, xs = np.divmod(flat_indices, width)
@@ -401,6 +485,7 @@ def downsample_points(
     max_points: Optional[int],
     rng: np.random.Generator,
 ) -> np.ndarray:
+    """Randomly keeps at most `max_points` points (all if None or <= 0)."""
     if max_points is None or max_points <= 0 or points.shape[0] <= max_points:
         return points
     indices = rng.choice(points.shape[0], size=max_points, replace=False)
@@ -408,8 +493,10 @@ def downsample_points(
 
 
 def make_point_cloud(points: np.ndarray) -> o3d.geometry.PointCloud:
+    """Wraps [N, 3] points in an Open3D point cloud."""
     pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(points.astype(np.float64, copy=False))
+    pcd.points = o3d.utility.Vector3dVector(
+        points.astype(np.float64, copy=False))
     return pcd
 
 
@@ -418,6 +505,7 @@ def mesh_points_with_face_centers(
     max_points: Optional[int],
     rng: np.random.Generator,
 ) -> np.ndarray:
+    """Returns a mesh's finite vertices and face centers, downsampled."""
     vertices = np.asarray(mesh.vertices, dtype=np.float32)
     triangles = np.asarray(mesh.triangles, dtype=np.int64)
     chunks = []
@@ -433,6 +521,7 @@ def mesh_points_with_face_centers(
 
 
 def make_tsdf_volume(args: argparse.Namespace):
+    """Creates the TSDF volume configured by the arguments."""
     return o3d.pipelines.integration.ScalableTSDFVolume(
         voxel_length=float(args.tsdf_voxel_length),
         sdf_trunc=float(args.tsdf_sdf_trunc),
@@ -445,6 +534,7 @@ def scaled_depth_for_geometry(
     scale: float,
     scale_application: str,
 ) -> np.ndarray:
+    """Returns a float32 copy of `depth` with the metric scale applied."""
     depth_metric = depth.astype(np.float32, copy=True)
     if scale_application in {"depth", "world"}:
         depth_metric *= float(scale)
@@ -452,10 +542,11 @@ def scaled_depth_for_geometry(
 
 
 def tsdf_extrinsic(
-    camera: SceneCamera,
+    camera: scene_files.SceneCamera,
     scale: float,
     scale_application: str,
 ) -> np.ndarray:
+    """Returns the world-to-camera matrix, scaled for "world" scaling."""
     w2c = camera.w2c.astype(np.float64, copy=True)
     if scale_application == "world":
         w2c[:3, 3] *= float(scale)
@@ -466,10 +557,11 @@ def integrate_depth_into_tsdf(
     volume,
     depth: np.ndarray,
     valid: np.ndarray,
-    camera: SceneCamera,
+    camera: scene_files.SceneCamera,
     scale: float,
     args: argparse.Namespace,
 ) -> None:
+    """Integrates the valid metric depth of one frame into `volume`."""
     depth_metric = scaled_depth_for_geometry(
         depth=depth,
         scale=scale,
@@ -511,8 +603,21 @@ def tsdf_volume_to_source(
     sampling: Dict[str, object],
     args: argparse.Namespace,
     rng: np.random.Generator,
-    mesh_output_path: Optional[Path] = None,
+    mesh_output_path: Optional[pathlib.Path] = None,
 ) -> SourcePointCloud:
+    """Extracts the TSDF mesh and samples its points as a source.
+
+    Args:
+        volume: The TSDF volume.
+        name: Source variant name.
+        sampling: Sampling description; updated in place.
+        args: Parsed arguments.
+        rng: Random generator for the point sample.
+        mesh_output_path: Where to write the mesh, if given.
+
+    Returns:
+        The source point cloud.
+    """
     mesh = volume.extract_triangle_mesh()
     mesh.remove_duplicated_vertices()
     mesh.remove_degenerate_triangles()
@@ -536,21 +641,81 @@ def tsdf_volume_to_source(
         "tsdf_sdf_trunc": float(args.tsdf_sdf_trunc),
         "tsdf_depth_trunc": float(args.tsdf_depth_trunc),
     })
-    return SourcePointCloud(name=name, pcd=make_point_cloud(points), sampling=sampling)
+    return SourcePointCloud(name=name,
+                            pcd=make_point_cloud(points),
+                            sampling=sampling)
 
 
-def scannetpp_gt_depth_path(dataset_dir: Path, image_name: str) -> Path:
-    return dataset_dir / "iphone" / "depth" / Path(image_name).with_suffix(".png").name
+def scannetpp_gt_depth_path(dataset_dir: pathlib.Path,
+                            image_name: str) -> pathlib.Path:
+    """Returns the ScanNet++ iPhone GT depth PNG of an image."""
+    depth_name = pathlib.Path(image_name).with_suffix(".png").name
+    return dataset_dir / "iphone" / "depth" / depth_name
+
+
+def _find_required_sidecar(directory: pathlib.Path, image_name: str, extensions,
+                           label: str, scene_id: str) -> pathlib.Path:
+    """Finds the sidecar file of an image, e.g. its predicted depth.
+
+    Raises:
+        FileNotFoundError: If the image has no sidecar file.
+    """
+    path = scene_files.find_sidecar_file(directory, image_name, extensions)
+    if path is None:
+        raise FileNotFoundError(f"Missing {label} for {scene_id}/{image_name} "
+                                f"under {directory}")
+    return path
+
+
+def _load_predicted_depth(depth_path: pathlib.Path,
+                          args: argparse.Namespace) -> np.ndarray:
+    """Loads a predicted depth sidecar as configured by the arguments."""
+    return scene_files.load_depth_map(
+        depth_path,
+        npz_key=args.npz_key,
+        png_depth_scale=args.predicted_png_depth_scale,
+        allow_rgb_depth_png=args.allow_rgb_depth_png,
+    )
+
+
+def _mask_dir(scene_dir: pathlib.Path,
+              args: argparse.Namespace) -> Optional[pathlib.Path]:
+    """Returns the scene's depth mask folder, or None without --mask_folder.
+
+    Raises:
+        FileNotFoundError: If the mask folder is missing.
+    """
+    if args.mask_folder:
+        mask_dir = scene_dir / args.mask_folder
+    else:
+        mask_dir = None
+    if mask_dir is not None and not mask_dir.exists():
+        raise FileNotFoundError(f"Missing depth mask folder: {mask_dir}")
+    return mask_dir
 
 
 def compute_scene_depth_metrics(
-    scene_dir: Path,
-    dataset_dir: Path,
+    scene_dir: pathlib.Path,
+    dataset_dir: pathlib.Path,
     scale: float,
     args: argparse.Namespace,
 ) -> Tuple[Dict[str, object], List[Dict[str, object]]]:
+    """Compares the scaled predicted depth maps with the ScanNet++ GT depth.
+
+    Args:
+        scene_dir: The COLMAP scene folder with the predicted depths.
+        dataset_dir: The ScanNet++ scene folder.
+        scale: The scene's metric scale.
+        args: Parsed arguments.
+
+    Returns:
+        (depth metrics per variant, per-frame records).
+
+    Raises:
+        FileNotFoundError: If a predicted depth or mask is missing.
+    """
     scene_id = scene_dir.name
-    cameras = load_scene_cameras(
+    cameras = scene_files.load_scene_cameras(
         scene_dir=scene_dir,
         image_folder=args.image_folder,
         model_folder=args.model_folder,
@@ -558,9 +723,7 @@ def compute_scene_depth_metrics(
     depth_dir = scene_dir / args.depth_folder
     if not depth_dir.exists():
         raise FileNotFoundError(f"Missing predicted depth folder: {depth_dir}")
-    mask_dir = scene_dir / args.mask_folder if args.mask_folder else None
-    if mask_dir is not None and not mask_dir.exists():
-        raise FileNotFoundError(f"Missing depth mask folder: {mask_dir}")
+    mask_dir = _mask_dir(scene_dir, args)
 
     accumulators = {"unmasked": new_depth_metric_accumulator()}
     if mask_dir is not None:
@@ -570,17 +733,10 @@ def compute_scene_depth_metrics(
     frame_stats = []
     for camera_index in frame_indices:
         camera = cameras[camera_index]
-        depth_path = find_sidecar_file(depth_dir, camera.image_name, DEPTH_EXTENSIONS)
-        if depth_path is None:
-            raise FileNotFoundError(
-                f"Missing predicted depth for {scene_id}/{camera.image_name} under {depth_dir}"
-            )
-        depth = load_depth_map(
-            depth_path,
-            npz_key=args.npz_key,
-            png_depth_scale=args.predicted_png_depth_scale,
-            allow_rgb_depth_png=args.allow_rgb_depth_png,
-        )
+        depth_path = _find_required_sidecar(depth_dir, camera.image_name,
+                                            scene_files.DEPTH_EXTENSIONS,
+                                            "predicted depth", scene_id)
+        depth = _load_predicted_depth(depth_path, args)
         predicted_metric_depth = scaled_depth_for_geometry(
             depth=depth,
             scale=scale,
@@ -604,26 +760,26 @@ def compute_scene_depth_metrics(
             min_depth=args.min_depth,
             max_depth=args.max_depth,
         )
+        unmasked_metrics = update_depth_metric_accumulator(
+            accumulators["unmasked"],
+            predicted_depth=predicted_metric_depth,
+            gt_depth=gt_metric_depth,
+            valid=valid,
+        )
         frame_record = {
             "image_name": camera.image_name,
             "depth_path": str(depth_path),
             "gt_depth_path": str(gt_depth_path),
-            "unmasked": update_depth_metric_accumulator(
-                accumulators["unmasked"],
-                predicted_depth=predicted_metric_depth,
-                gt_depth=gt_metric_depth,
-                valid=valid,
-            ),
+            "unmasked": unmasked_metrics,
         }
 
         if mask_dir is not None:
-            mask_path = find_sidecar_file(mask_dir, camera.image_name, MASK_EXTENSIONS)
-            if mask_path is None:
-                raise FileNotFoundError(
-                    f"Missing depth mask for {scene_id}/{camera.image_name} under {mask_dir}"
-                )
+            mask_path = _find_required_sidecar(mask_dir, camera.image_name,
+                                               scene_files.MASK_EXTENSIONS,
+                                               "depth mask", scene_id)
             mask = load_mask(mask_path, target_shape=depth.shape)
-            mask = resize_bool_mask_to_shape(mask, target_shape=gt_metric_depth.shape)
+            mask = resize_bool_mask_to_shape(mask,
+                                             target_shape=gt_metric_depth.shape)
             masked_valid = valid & mask
             frame_record["mask_path"] = str(mask_path)
             frame_record["masked"] = update_depth_metric_accumulator(
@@ -632,11 +788,11 @@ def compute_scene_depth_metrics(
                 gt_depth=gt_metric_depth,
                 valid=masked_valid,
             )
-            frame_record["mask_keep_ratio"] = (
-                float(masked_valid.sum() / max(valid.sum(), 1))
-                if valid.any()
-                else None
-            )
+            if valid.any():
+                frame_record["mask_keep_ratio"] = float(masked_valid.sum() /
+                                                        max(valid.sum(), 1))
+            else:
+                frame_record["mask_keep_ratio"] = None
         else:
             frame_record["mask_path"] = None
 
@@ -653,6 +809,7 @@ def crop_point_cloud(
     pcd: o3d.geometry.PointCloud,
     crop_volume: o3d.geometry.AxisAlignedBoundingBox,
 ) -> o3d.geometry.PointCloud:
+    """Crops a point cloud to `crop_volume`."""
     if hasattr(crop_volume, "crop_point_cloud"):
         return crop_volume.crop_point_cloud(pcd)
     return pcd.crop(crop_volume)
@@ -663,18 +820,32 @@ def crop_and_downsample(
     crop_volume: o3d.geometry.AxisAlignedBoundingBox,
     downsample_method: str = "voxel",
     voxel_size: float = 0.01,
-    trans: np.ndarray = np.eye(4),
+    trans: Optional[np.ndarray] = None,
 ) -> o3d.geometry.PointCloud:
+    """Transforms, crops and downsamples a copy of a point cloud.
+
+    Args:
+        pcd: The point cloud.
+        crop_volume: The crop box.
+        downsample_method: "voxel" or "uniform" (to at most MAX_POINT_NUMBER).
+        voxel_size: Voxel size for "voxel".
+        trans: Transform applied first; defaults to identity.
+
+    Returns:
+        The processed copy.
+    """
+    if trans is None:
+        trans = np.eye(4)
     pcd_copy = copy.deepcopy(pcd)
     pcd_copy.transform(trans)
     pcd_crop = crop_point_cloud(pcd_copy, crop_volume)
     if downsample_method == "voxel":
         return pcd_crop.voxel_down_sample(voxel_size)
     if downsample_method == "uniform":
-        n_points = len(pcd_crop.points)
-        if n_points > MAX_POINT_NUMBER:
-            ds_rate = int(round(n_points / float(MAX_POINT_NUMBER)))
-            return pcd_crop.uniform_down_sample(ds_rate)
+        num_points = len(pcd_crop.points)
+        if num_points > MAX_POINT_NUMBER:
+            downsample_rate = int(round(num_points / float(MAX_POINT_NUMBER)))
+            return pcd_crop.uniform_down_sample(downsample_rate)
     return pcd_crop
 
 
@@ -688,8 +859,14 @@ def registration_vol_ds(
     max_itr: int,
     verbose: bool = True,
 ):
+    """Refines `init_trans` by point-to-point ICP on voxel-downsampled clouds.
+
+    Returns:
+        The ICP result, with its transformation composed with `init_trans`.
+    """
     if verbose:
-        print(f"[Registration] voxel_size: {voxel_size:f}, threshold: {threshold:f}")
+        print(f"[Registration] voxel_size: {voxel_size:f}, "
+              f"threshold: {threshold:f}")
         o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Debug)
     source_eval = crop_and_downsample(
         source,
@@ -704,16 +881,17 @@ def registration_vol_ds(
         downsample_method="voxel",
         voxel_size=voxel_size,
     )
-    reg = o3d.pipelines.registration.registration_icp(
+    icp_result = o3d.pipelines.registration.registration_icp(
         source_eval,
         target_eval,
         threshold,
         np.eye(4),
         o3d.pipelines.registration.TransformationEstimationPointToPoint(True),
-        o3d.pipelines.registration.ICPConvergenceCriteria(1e-6, max_iteration=max_itr),
+        o3d.pipelines.registration.ICPConvergenceCriteria(
+            1e-6, max_iteration=max_itr),
     )
-    reg.transformation = reg.transformation @ init_trans
-    return reg
+    icp_result.transformation = icp_result.transformation @ init_trans
+    return icp_result
 
 
 def registration_unif(
@@ -725,6 +903,11 @@ def registration_unif(
     max_itr: int,
     verbose: bool = True,
 ):
+    """Refines `init_trans` by point-to-point ICP on uniformly sampled clouds.
+
+    Returns:
+        The ICP result, with its transformation composed with `init_trans`.
+    """
     if verbose:
         print(f"[Registration] threshold: {threshold:f}")
         o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Debug)
@@ -739,25 +922,73 @@ def registration_unif(
         crop_volume,
         downsample_method="uniform",
     )
-    reg = o3d.pipelines.registration.registration_icp(
+    icp_result = o3d.pipelines.registration.registration_icp(
         source_eval,
         target_eval,
         threshold,
         np.eye(4),
         o3d.pipelines.registration.TransformationEstimationPointToPoint(True),
-        o3d.pipelines.registration.ICPConvergenceCriteria(1e-6, max_iteration=max_itr),
+        o3d.pipelines.registration.ICPConvergenceCriteria(
+            1e-6, max_iteration=max_itr),
     )
-    reg.transformation = reg.transformation @ init_trans
-    return reg
+    icp_result.transformation = icp_result.transformation @ init_trans
+    return icp_result
+
+
+def _concatenate_points(chunks: List[np.ndarray]) -> np.ndarray:
+    """Concatenates [N, 3] point chunks (an empty float32 array if none)."""
+    if chunks:
+        return np.concatenate(chunks, axis=0)
+    return np.zeros((0, 3), dtype=np.float32)
+
+
+def _mean_mask_keep_ratio(
+        frame_stats: List[Dict[str, object]]) -> Optional[float]:
+    """Mean of the frames' mask keep ratios, or None if no frame has one."""
+    keep_ratios = [
+        frame["mask_keep_ratio"]
+        for frame in frame_stats
+        if frame["mask_keep_ratio"] is not None
+    ]
+    if keep_ratios:
+        return float(np.mean(keep_ratios))
+    return None
+
+
+def _tsdf_mesh_path(args: argparse.Namespace, scene_id: str,
+                    file_name: str) -> Optional[pathlib.Path]:
+    """Returns the TSDF mesh path, or None without --write_tsdf_meshes."""
+    if not args.write_tsdf_meshes:
+        return None
+    mesh_dir = pathlib.Path(
+        args.output_dir) / "scenes" / scene_id / "tsdf_meshes"
+    return mesh_dir / file_name
 
 
 def collect_depth_source_point_clouds(
-    scene_dir: Path,
+    scene_dir: pathlib.Path,
     scale: float,
     args: argparse.Namespace,
 ) -> List[SourcePointCloud]:
+    """Builds the source point clouds of a scene from its predicted depths.
+
+    Depending on `--depth_geometry`, the depths are unprojected to point clouds,
+    fused into TSDF meshes or both; with `--mask_folder`, masked variants are
+    built too.
+
+    Args:
+        scene_dir: The COLMAP scene folder with the predicted depths.
+        scale: The scene's metric scale.
+        args: Parsed arguments.
+
+    Returns:
+        The sources.
+
+    Raises:
+        FileNotFoundError: If a predicted depth or mask is missing.
+    """
     scene_id = scene_dir.name
-    cameras = load_scene_cameras(
+    cameras = scene_files.load_scene_cameras(
         scene_dir=scene_dir,
         image_folder=args.image_folder,
         model_folder=args.model_folder,
@@ -765,9 +996,7 @@ def collect_depth_source_point_clouds(
     depth_dir = scene_dir / args.depth_folder
     if not depth_dir.exists():
         raise FileNotFoundError(f"Missing predicted depth folder: {depth_dir}")
-    mask_dir = scene_dir / args.mask_folder if args.mask_folder else None
-    if mask_dir is not None and not mask_dir.exists():
-        raise FileNotFoundError(f"Missing depth mask folder: {mask_dir}")
+    mask_dir = _mask_dir(scene_dir, args)
 
     rng = np.random.default_rng(stable_scene_seed(args.seed, scene_id))
     frame_indices = select_frame_indices(len(cameras), args.max_frames)
@@ -775,31 +1004,26 @@ def collect_depth_source_point_clouds(
     tsdf_enabled = needs_tsdf_sources(args)
     unmasked_chunks: List[np.ndarray] = []
     masked_chunks: List[np.ndarray] = []
-    unmasked_volume = make_tsdf_volume(args) if tsdf_enabled else None
-    masked_volume = make_tsdf_volume(args) if tsdf_enabled and mask_dir is not None else None
+    unmasked_volume = None
+    if tsdf_enabled:
+        unmasked_volume = make_tsdf_volume(args)
+    masked_volume = None
+    if tsdf_enabled and mask_dir is not None:
+        masked_volume = make_tsdf_volume(args)
     frame_stats = []
 
     for camera_index in frame_indices:
         camera = cameras[camera_index]
-        depth_path = find_sidecar_file(depth_dir, camera.image_name, DEPTH_EXTENSIONS)
-        if depth_path is None:
-            raise FileNotFoundError(
-                f"Missing predicted depth for {scene_id}/{camera.image_name} under {depth_dir}"
-            )
-        depth = load_depth_map(
-            depth_path,
-            npz_key=args.npz_key,
-            png_depth_scale=args.predicted_png_depth_scale,
-            allow_rgb_depth_png=args.allow_rgb_depth_png,
-        )
+        depth_path = _find_required_sidecar(depth_dir, camera.image_name,
+                                            scene_files.DEPTH_EXTENSIONS,
+                                            "predicted depth", scene_id)
+        depth = _load_predicted_depth(depth_path, args)
         valid = valid_depth_mask(depth, args.min_depth, args.max_depth)
         mask = None
         if mask_dir is not None:
-            mask_path = find_sidecar_file(mask_dir, camera.image_name, MASK_EXTENSIONS)
-            if mask_path is None:
-                raise FileNotFoundError(
-                    f"Missing depth mask for {scene_id}/{camera.image_name} under {mask_dir}"
-                )
+            mask_path = _find_required_sidecar(mask_dir, camera.image_name,
+                                               scene_files.MASK_EXTENSIONS,
+                                               "depth mask", scene_id)
             mask = load_mask(mask_path, target_shape=depth.shape)
         else:
             mask_path = None
@@ -857,43 +1081,40 @@ def collect_depth_source_point_clouds(
             masked_count = None
 
         valid_count = int(valid.sum())
+        if masked_count is not None:
+            mask_keep_ratio = float(masked_count / max(valid_count, 1))
+        else:
+            mask_keep_ratio = None
         frame_stats.append({
             "image_name": camera.image_name,
             "depth_path": str(depth_path),
             "mask_path": str(mask_path) if mask_path is not None else None,
             "valid_pixels": valid_count,
             "masked_valid_pixels": masked_count,
-            "mask_keep_ratio": (
-                float(masked_count / max(valid_count, 1))
-                if masked_count is not None
-                else None
-            ),
+            "mask_keep_ratio": mask_keep_ratio,
             "unmasked_points": unmasked_points_count,
             "masked_points": masked_points_count,
         })
 
     sources = []
+    if args.scale_application == "depth":
+        scale_definition = "metric_depth = scale * predicted_depth"
+    else:
+        scale_definition = "metric_points = scale * colmap_points"
     base_sampling = {
         "num_cameras": len(cameras),
         "frame_indices": [int(index) for index in frame_indices],
         "scale": float(scale),
         "scale_source": args.scale_source,
         "scale_application": args.scale_application,
-        "scale_definition": (
-            "metric_depth = scale * predicted_depth"
-            if args.scale_application == "depth"
-            else "metric_points = scale * colmap_points"
-        ),
+        "scale_definition": scale_definition,
         "frame_stats": frame_stats,
     }
 
     if pointcloud_enabled:
-        unmasked_all = (
-            np.concatenate(unmasked_chunks, axis=0)
-            if unmasked_chunks
-            else np.zeros((0, 3), dtype=np.float32)
-        )
-        unmasked_all = downsample_points(unmasked_all, args.max_source_points, rng)
+        unmasked_all = _concatenate_points(unmasked_chunks)
+        unmasked_all = downsample_points(unmasked_all, args.max_source_points,
+                                         rng)
         unmasked_sampling = dict(base_sampling)
         unmasked_sampling.update({
             "geometry": "pointcloud",
@@ -905,45 +1126,27 @@ def collect_depth_source_point_clouds(
                 name=source_variant_name("unmasked", "pointcloud", args),
                 pcd=make_point_cloud(unmasked_all),
                 sampling=unmasked_sampling,
-            )
-        )
+            ))
 
     if pointcloud_enabled and mask_dir is not None:
-        masked_all = (
-            np.concatenate(masked_chunks, axis=0)
-            if masked_chunks
-            else np.zeros((0, 3), dtype=np.float32)
-        )
+        masked_all = _concatenate_points(masked_chunks)
         masked_all = downsample_points(masked_all, args.max_source_points, rng)
-        keep_ratios = [
-            frame["mask_keep_ratio"]
-            for frame in frame_stats
-            if frame["mask_keep_ratio"] is not None
-        ]
         masked_sampling = dict(base_sampling)
         masked_sampling.update({
             "geometry": "pointcloud",
             "num_points": int(masked_all.shape[0]),
             "points_per_frame": int(args.points_per_frame),
             "mask_folder": args.mask_folder,
-            "mean_mask_keep_ratio": (
-                float(np.mean(keep_ratios)) if keep_ratios else None
-            ),
+            "mean_mask_keep_ratio": _mean_mask_keep_ratio(frame_stats),
         })
         sources.append(
             SourcePointCloud(
                 name=source_variant_name("masked", "pointcloud", args),
                 pcd=make_point_cloud(masked_all),
                 sampling=masked_sampling,
-            )
-        )
+            ))
 
     if tsdf_enabled and unmasked_volume is not None:
-        mesh_dir = (
-            Path(args.output_dir) / "scenes" / scene_id / "tsdf_meshes"
-            if args.write_tsdf_meshes
-            else None
-        )
         sources.append(
             tsdf_volume_to_source(
                 volume=unmasked_volume,
@@ -951,28 +1154,16 @@ def collect_depth_source_point_clouds(
                 sampling=dict(base_sampling),
                 args=args,
                 rng=rng,
-                mesh_output_path=(mesh_dir / "unmasked.ply") if mesh_dir else None,
-            )
-        )
+                mesh_output_path=_tsdf_mesh_path(args, scene_id,
+                                                 "unmasked.ply"),
+            ))
 
     if tsdf_enabled and masked_volume is not None:
-        keep_ratios = [
-            frame["mask_keep_ratio"]
-            for frame in frame_stats
-            if frame["mask_keep_ratio"] is not None
-        ]
         masked_sampling = dict(base_sampling)
         masked_sampling.update({
             "mask_folder": args.mask_folder,
-            "mean_mask_keep_ratio": (
-                float(np.mean(keep_ratios)) if keep_ratios else None
-            ),
+            "mean_mask_keep_ratio": _mean_mask_keep_ratio(frame_stats),
         })
-        mesh_dir = (
-            Path(args.output_dir) / "scenes" / scene_id / "tsdf_meshes"
-            if args.write_tsdf_meshes
-            else None
-        )
         sources.append(
             tsdf_volume_to_source(
                 volume=masked_volume,
@@ -980,22 +1171,26 @@ def collect_depth_source_point_clouds(
                 sampling=masked_sampling,
                 args=args,
                 rng=rng,
-                mesh_output_path=(mesh_dir / "masked.ply") if mesh_dir else None,
-            )
-        )
+                mesh_output_path=_tsdf_mesh_path(args, scene_id, "masked.ply"),
+            ))
     return sources
 
 
 def come_initial_transform() -> np.ndarray:
+    """Returns CoMe's axis transform of PLY inputs into the mesh frame."""
     transform = np.eye(4, dtype=np.float64)
-    transform[:3, :3] = (
-        o3d.geometry.TriangleMesh.create_coordinate_frame()
-        .get_rotation_matrix_from_xyz((0.0, np.pi, np.pi / 2.0))
-    )
+    frame = o3d.geometry.TriangleMesh.create_coordinate_frame()
+    transform[:3, :3] = frame.get_rotation_matrix_from_xyz(
+        (0.0, np.pi, np.pi / 2.0))
     return transform
 
 
 def initial_transform(args: argparse.Namespace) -> np.ndarray:
+    """Returns the initial transform selected by `--initial_transform`.
+
+    Raises:
+        ValueError: On an unsupported choice.
+    """
     if args.initial_transform == "auto":
         if args.mode == "ply":
             return come_initial_transform()
@@ -1014,11 +1209,28 @@ def compute_histogram_metrics(
     crop_volume: o3d.geometry.AxisAlignedBoundingBox,
     voxel_size: float,
     thresholds: Sequence[float],
-    output_dir: Optional[Path],
+    output_dir: Optional[pathlib.Path],
     scene_name: str,
     variant_name: str,
     write_visualizations: bool,
 ) -> Dict[str, object]:
+    """Computes distance statistics and P/R/F-score of a source against the GT.
+
+    Args:
+        source: The source point cloud.
+        target: The GT point cloud.
+        transform: Transform of the source into the GT frame.
+        crop_volume: Crop box applied to both clouds.
+        voxel_size: Voxel size of the downsampling.
+        thresholds: Distance thresholds in metres.
+        output_dir: Where to write the distance artifacts, if given.
+        scene_name: Scene name of the artifact files.
+        variant_name: Source variant name of the artifact files.
+        write_visualizations: Also write color-coded error clouds.
+
+    Returns:
+        The metrics; status "empty" if a cloud is empty after cropping.
+    """
     source_eval = copy.deepcopy(source)
     source_eval.transform(transform)
     source_eval = crop_point_cloud(source_eval, crop_volume)
@@ -1037,24 +1249,26 @@ def compute_histogram_metrics(
         }
 
     source_to_target = np.asarray(
-        source_eval.compute_point_cloud_distance(target_eval), dtype=np.float64
-    )
+        source_eval.compute_point_cloud_distance(target_eval), dtype=np.float64)
     target_to_source = np.asarray(
-        target_eval.compute_point_cloud_distance(source_eval), dtype=np.float64
-    )
+        target_eval.compute_point_cloud_distance(source_eval), dtype=np.float64)
 
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
-        np.savetxt(output_dir / f"{scene_name}_{variant_name}.source_to_target.txt", source_to_target)
-        np.savetxt(output_dir / f"{scene_name}_{variant_name}.target_to_source.txt", target_to_source)
+        np.savetxt(
+            output_dir / f"{scene_name}_{variant_name}.source_to_target.txt",
+            source_to_target)
+        np.savetxt(
+            output_dir / f"{scene_name}_{variant_name}.target_to_source.txt",
+            target_to_source)
         if write_visualizations:
-            write_color_distances(
+            tnt_evaluation.write_color_distances(
                 str(output_dir / f"{scene_name}_{variant_name}.precision.ply"),
                 source_eval,
                 source_to_target,
                 max_distance=3.0 * max(thresholds),
             )
-            write_color_distances(
+            tnt_evaluation.write_color_distances(
                 str(output_dir / f"{scene_name}_{variant_name}.recall.ply"),
                 target_eval,
                 target_to_source,
@@ -1065,8 +1279,11 @@ def compute_histogram_metrics(
     for threshold in thresholds:
         precision = float(np.mean(source_to_target < threshold))
         recall = float(np.mean(target_to_source < threshold))
-        denom = precision + recall
-        fscore = 0.0 if denom <= 0.0 else 2.0 * precision * recall / denom
+        denominator = precision + recall
+        if denominator <= 0.0:
+            fscore = 0.0
+        else:
+            fscore = 2.0 * precision * recall / denominator
         threshold_metrics[f"{threshold:g}m"] = {
             "threshold": float(threshold),
             "precision": precision,
@@ -1074,6 +1291,7 @@ def compute_histogram_metrics(
             "fscore": float(fscore),
         }
 
+    chamfer_mean = 0.5 * (source_to_target.mean() + target_to_source.mean())
     return {
         "status": "ok",
         "num_source_points": int(len(source.points)),
@@ -1086,17 +1304,28 @@ def compute_histogram_metrics(
         "target_to_source_mean": float(target_to_source.mean()),
         "target_to_source_median": float(np.median(target_to_source)),
         "target_to_source_p90": float(np.percentile(target_to_source, 90)),
-        "chamfer_mean": float(0.5 * (source_to_target.mean() + target_to_source.mean())),
+        "chamfer_mean": float(chamfer_mean),
         "thresholds": threshold_metrics,
     }
 
 
 def evaluate_source_against_scannetpp(
-    dataset_dir: Path,
+    dataset_dir: pathlib.Path,
     source: SourcePointCloud,
-    out_dir: Path,
+    out_dir: pathlib.Path,
     args: argparse.Namespace,
 ) -> Dict[str, object]:
+    """Aligns a source to the ScanNet++ GT mesh by ICP and evaluates it.
+
+    Args:
+        dataset_dir: The ScanNet++ scene folder.
+        source: The source point cloud.
+        out_dir: Folder of the distance artifacts.
+        args: Parsed arguments.
+
+    Returns:
+        The metrics with the transforms, ICP details and sampling.
+    """
     gt_pcd = load_gt_point_cloud(dataset_dir)
     crop_volume = gt_pcd.get_axis_aligned_bounding_box()
     init_transform = initial_transform(args)
@@ -1107,47 +1336,57 @@ def evaluate_source_against_scannetpp(
         trajectory_transform = init_transform
         icp = {"enabled": False}
     else:
-        d_tau = float(args.distance_tau)
-        r2 = registration_vol_ds(
+        tau = float(args.distance_tau)
+        coarse_registration = registration_vol_ds(
             source_for_icp,
             gt_pcd,
             np.eye(4),
             crop_volume,
-            d_tau,
-            d_tau * 80.0,
+            tau,
+            tau * 80.0,
             args.icp_iterations,
             verbose=args.verbose,
         )
-        r3 = registration_vol_ds(
+        medium_registration = registration_vol_ds(
             source_for_icp,
             gt_pcd,
-            r2.transformation,
+            coarse_registration.transformation,
             crop_volume,
-            d_tau / 2.0,
-            d_tau * 20.0,
+            tau / 2.0,
+            tau * 20.0,
             args.icp_iterations,
             verbose=args.verbose,
         )
-        r = registration_unif(
+        final_registration = registration_unif(
             source_for_icp,
             gt_pcd,
-            r3.transformation,
+            medium_registration.transformation,
             crop_volume,
-            2.0 * d_tau,
+            2.0 * tau,
             args.icp_iterations,
             verbose=args.verbose,
         )
-        trajectory_transform = r.transformation @ init_transform
+        trajectory_transform = (
+            final_registration.transformation @ init_transform)
         icp = {
-            "enabled": True,
-            "fitness": float(r.fitness),
-            "inlier_rmse": float(r.inlier_rmse),
-            "coarse_transform": r2.transformation.tolist(),
-            "medium_transform": r3.transformation.tolist(),
-            "final_transform_after_initial": r.transformation.tolist(),
+            "enabled":
+                True,
+            "fitness":
+                float(final_registration.fitness),
+            "inlier_rmse":
+                float(final_registration.inlier_rmse),
+            "coarse_transform":
+                coarse_registration.transformation.tolist(),
+            "medium_transform":
+                medium_registration.transformation.tolist(),
+            "final_transform_after_initial":
+                final_registration.transformation.tolist(),
         }
 
-    metrics_dir = out_dir / "artifacts" if args.write_distance_artifacts else None
+    if args.write_distance_artifacts:
+        metrics_dir = out_dir / "artifacts"
+    else:
+        metrics_dir = None
     metrics = compute_histogram_metrics(
         source=source.pcd,
         target=gt_pcd,
@@ -1167,13 +1406,17 @@ def evaluate_source_against_scannetpp(
     return metrics
 
 
-def process_depth_scene(scene_dir: Path, args: argparse.Namespace) -> Dict[str, object]:
+def process_depth_scene(scene_dir: pathlib.Path,
+                        args: argparse.Namespace) -> Dict[str, object]:
+    """Evaluates one scene in depth mode and writes its metrics.json."""
     start = time.time()
     scene_id = scene_dir.name
-    dataset_dir = Path(args.scannetpp_root) / scene_id
+    dataset_dir = pathlib.Path(args.scannetpp_root) / scene_id
     scale = read_scene_scale(scene_id, args)
-    scene_out_dir = Path(args.output_dir) / "scenes" / scene_id
-    sources = collect_depth_source_point_clouds(scene_dir, scale=scale, args=args)
+    scene_out_dir = pathlib.Path(args.output_dir) / "scenes" / scene_id
+    sources = collect_depth_source_point_clouds(scene_dir,
+                                                scale=scale,
+                                                args=args)
     depth_metrics = None
     depth_metric_frame_stats = None
     if args.compute_depth_metrics:
@@ -1209,35 +1452,47 @@ def process_depth_scene(scene_dir: Path, args: argparse.Namespace) -> Dict[str, 
     }
     if depth_metrics is not None:
         result["depth_metric_metadata"] = {
-            "gt_depth_scale": float(args.gt_depth_scale),
-            "resize_mode": args.depth_metric_resize_mode,
-            "metric_definition": "predicted_metric_depth = scale * predicted_depth",
-            "delta1_definition": "mean(max(pred / gt, gt / pred) < 1.25)",
+            "gt_depth_scale":
+                float(args.gt_depth_scale),
+            "resize_mode":
+                args.depth_metric_resize_mode,
+            "metric_definition":
+                "predicted_metric_depth = scale * predicted_depth",
+            "delta1_definition":
+                "mean(max(pred / gt, gt / pred) < 1.25)",
         }
         result["depth_metrics"] = depth_metrics
         result["depth_metric_frame_stats"] = depth_metric_frame_stats
-    write_json(scene_out_dir / "metrics.json", result)
+    scene_files.write_json(scene_out_dir / "metrics.json", result)
     return result
 
 
-def resolve_scene_ply(scene_id: str, args: argparse.Namespace) -> Path:
+def resolve_scene_ply(scene_id: str, args: argparse.Namespace) -> pathlib.Path:
+    """Returns the reconstruction PLY of a scene in ply mode.
+
+    Raises:
+        ValueError: If neither --input_ply nor --input_ply_root is given.
+    """
     if args.input_ply:
-        return Path(args.input_ply)
+        return pathlib.Path(args.input_ply)
     if not args.input_ply_root:
-        raise ValueError("--input_ply or --input_ply_root is required in ply mode")
-    return Path(args.input_ply_root) / scene_id / args.input_ply_name
+        raise ValueError(
+            "--input_ply or --input_ply_root is required in ply mode")
+    return pathlib.Path(args.input_ply_root) / scene_id / args.input_ply_name
 
 
-def process_ply_scene(scene_id: str, args: argparse.Namespace) -> Dict[str, object]:
+def process_ply_scene(scene_id: str,
+                      args: argparse.Namespace) -> Dict[str, object]:
+    """Evaluates one scene in ply mode and writes its metrics.json."""
     start = time.time()
-    dataset_dir = Path(args.scannetpp_root) / scene_id
+    dataset_dir = pathlib.Path(args.scannetpp_root) / scene_id
     ply_path = resolve_scene_ply(scene_id, args)
     source = load_reconstruction_point_cloud(
         ply_path=ply_path,
         add_face_centers=args.add_face_centers,
         input_scale=args.input_scale,
     )
-    scene_out_dir = Path(args.output_dir) / "scenes" / scene_id
+    scene_out_dir = pathlib.Path(args.output_dir) / "scenes" / scene_id
     metrics = evaluate_source_against_scannetpp(
         dataset_dir=dataset_dir,
         source=source,
@@ -1250,10 +1505,12 @@ def process_ply_scene(scene_id: str, args: argparse.Namespace) -> Dict[str, obje
         "mode": "ply",
         "dataset_dir": str(dataset_dir),
         "input_ply": str(ply_path),
-        "evaluations": {"ply": metrics},
+        "evaluations": {
+            "ply": metrics
+        },
         "seconds": round(time.time() - start, 4),
     }
-    write_json(scene_out_dir / "metrics.json", result)
+    scene_files.write_json(scene_out_dir / "metrics.json", result)
     return result
 
 
@@ -1261,6 +1518,7 @@ def average_evaluation_metrics(
     scene_stats: Sequence[Dict[str, object]],
     variant: str,
 ) -> Dict[str, object]:
+    """Averages one variant's evaluation metrics over the successful scenes."""
     metrics = []
     for scene in scene_stats:
         if scene.get("status") != "ok":
@@ -1271,31 +1529,30 @@ def average_evaluation_metrics(
     if not metrics:
         return {}
 
+    def mean_of(key: str) -> float:
+        return float(np.mean([metric[key] for metric in metrics]))
+
+    def threshold_mean_of(threshold_key: str, key: str) -> float:
+        return float(
+            np.mean([
+                metric["thresholds"][threshold_key][key] for metric in metrics
+            ]))
+
     summary = {
         "num_scenes": len(metrics),
-        "mean_source_to_target": float(np.mean([m["source_to_target_mean"] for m in metrics])),
-        "mean_target_to_source": float(np.mean([m["target_to_source_mean"] for m in metrics])),
-        "mean_chamfer": float(np.mean([m["chamfer_mean"] for m in metrics])),
-        "mean_num_source_eval_points": float(
-            np.mean([m["num_source_eval_points"] for m in metrics])
-        ),
-        "mean_num_target_eval_points": float(
-            np.mean([m["num_target_eval_points"] for m in metrics])
-        ),
+        "mean_source_to_target": mean_of("source_to_target_mean"),
+        "mean_target_to_source": mean_of("target_to_source_mean"),
+        "mean_chamfer": mean_of("chamfer_mean"),
+        "mean_num_source_eval_points": mean_of("num_source_eval_points"),
+        "mean_num_target_eval_points": mean_of("num_target_eval_points"),
         "thresholds": {},
     }
     for threshold_key in metrics[0].get("thresholds", {}):
         summary["thresholds"][threshold_key] = {
             "threshold": metrics[0]["thresholds"][threshold_key]["threshold"],
-            "precision": float(
-                np.mean([m["thresholds"][threshold_key]["precision"] for m in metrics])
-            ),
-            "recall": float(
-                np.mean([m["thresholds"][threshold_key]["recall"] for m in metrics])
-            ),
-            "fscore": float(
-                np.mean([m["thresholds"][threshold_key]["fscore"] for m in metrics])
-            ),
+            "precision": threshold_mean_of(threshold_key, "precision"),
+            "recall": threshold_mean_of(threshold_key, "recall"),
+            "fscore": threshold_mean_of(threshold_key, "fscore"),
         }
     return summary
 
@@ -1304,6 +1561,7 @@ def add_depth_metric_sums(
     accumulator: Dict[str, float],
     metric: Dict[str, object],
 ) -> None:
+    """Adds a scene's pooled depth metric sums to `accumulator`."""
     sums = metric.get("_sums")
     if not isinstance(sums, dict):
         return
@@ -1318,6 +1576,7 @@ def average_depth_metric_variant(
     scene_stats: Sequence[Dict[str, object]],
     variant: str,
 ) -> Dict[str, object]:
+    """Pools one variant's depth metrics over the successful scenes."""
     accumulator = new_depth_metric_accumulator()
     num_scenes = 0
     for scene in scene_stats:
@@ -1339,11 +1598,14 @@ def depth_metric_delta(
     unmasked: Dict[str, object],
     masked: Dict[str, object],
 ) -> Dict[str, object]:
+    """Returns the masked minus unmasked depth metrics."""
+    num_valid_frames_delta = (int(masked["num_valid_frames"]) -
+                              int(unmasked["num_valid_frames"]))
     delta = {
-        "num_pixels_delta": int(masked["num_pixels"]) - int(unmasked["num_pixels"]),
-        "num_valid_frames_delta": (
-            int(masked["num_valid_frames"]) - int(unmasked["num_valid_frames"])
-        ),
+        "num_pixels_delta":
+            int(masked["num_pixels"]) - int(unmasked["num_pixels"]),
+        "num_valid_frames_delta":
+            num_valid_frames_delta,
     }
     for key in ("abs_rel", "mae", "rmse", "log_rmse", "delta1"):
         if masked.get(key) is None or unmasked.get(key) is None:
@@ -1353,11 +1615,12 @@ def depth_metric_delta(
     return delta
 
 
-def aggregate_depth_metrics(scene_stats: Sequence[Dict[str, object]]) -> Dict[str, object]:
+def aggregate_depth_metrics(
+        scene_stats: Sequence[Dict[str, object]]) -> Dict[str, object]:
+    """Pools the scenes' depth metrics per variant."""
     ok = [scene for scene in scene_stats if scene.get("status") == "ok"]
     variants = sorted({
-        variant
-        for scene in ok
+        variant for scene in ok
         for variant in scene.get("depth_metrics", {}).keys()
     })
     aggregate = {
@@ -1372,11 +1635,41 @@ def aggregate_depth_metrics(scene_stats: Sequence[Dict[str, object]]) -> Dict[st
     return aggregate
 
 
-def aggregate_results(scene_stats: Sequence[Dict[str, object]]) -> Dict[str, object]:
+def _evaluation_delta(masked: Dict[str, object],
+                      unmasked: Dict[str, object]) -> Dict[str, object]:
+    """Returns the masked minus unmasked evaluation summary."""
+
+    def difference(key: str) -> float:
+        return masked[key] - unmasked[key]
+
+    def threshold_difference(threshold_key: str, key: str) -> float:
+        return (masked["thresholds"][threshold_key][key] -
+                unmasked["thresholds"][threshold_key][key])
+
+    delta = {
+        "mean_chamfer_delta": difference("mean_chamfer"),
+        "mean_source_to_target_delta": difference("mean_source_to_target"),
+        "mean_target_to_source_delta": difference("mean_target_to_source"),
+        "thresholds": {},
+    }
+    for key in masked["thresholds"]:
+        if key not in unmasked["thresholds"]:
+            continue
+        delta["thresholds"][key] = {
+            "threshold": masked["thresholds"][key]["threshold"],
+            "precision_delta": threshold_difference(key, "precision"),
+            "recall_delta": threshold_difference(key, "recall"),
+            "fscore_delta": threshold_difference(key, "fscore"),
+        }
+    return delta
+
+
+def aggregate_results(
+        scene_stats: Sequence[Dict[str, object]]) -> Dict[str, object]:
+    """Aggregates the scenes' results, with masked minus unmasked deltas."""
     ok = [scene for scene in scene_stats if scene.get("status") == "ok"]
     variants = sorted({
-        variant
-        for scene in ok
+        variant for scene in ok
         for variant in scene.get("evaluations", {}).keys()
     })
     aggregate = {
@@ -1392,45 +1685,17 @@ def aggregate_results(scene_stats: Sequence[Dict[str, object]]) -> Dict[str, obj
     for prefix in ("pointcloud", "tsdf"):
         delta_pairs.append((f"{prefix}_unmasked", f"{prefix}_masked"))
     for unmasked_key, masked_key in delta_pairs:
-        if masked_key not in aggregate["variants"] or unmasked_key not in aggregate["variants"]:
+        variants = aggregate["variants"]
+        if masked_key not in variants or unmasked_key not in variants:
             continue
-        masked = aggregate["variants"][masked_key]
-        unmasked = aggregate["variants"][unmasked_key]
+        masked = variants[masked_key]
+        unmasked = variants[unmasked_key]
         if masked and unmasked:
-            delta = {
-                "mean_chamfer_delta": masked["mean_chamfer"] - unmasked["mean_chamfer"],
-                "mean_source_to_target_delta": (
-                    masked["mean_source_to_target"] - unmasked["mean_source_to_target"]
-                ),
-                "mean_target_to_source_delta": (
-                    masked["mean_target_to_source"] - unmasked["mean_target_to_source"]
-                ),
-                "thresholds": {},
-            }
-            for key in masked["thresholds"]:
-                if key not in unmasked["thresholds"]:
-                    continue
-                delta["thresholds"][key] = {
-                    "threshold": masked["thresholds"][key]["threshold"],
-                    "precision_delta": (
-                        masked["thresholds"][key]["precision"]
-                        - unmasked["thresholds"][key]["precision"]
-                    ),
-                    "recall_delta": (
-                        masked["thresholds"][key]["recall"]
-                        - unmasked["thresholds"][key]["recall"]
-                    ),
-                    "fscore_delta": (
-                        masked["thresholds"][key]["fscore"]
-                        - unmasked["thresholds"][key]["fscore"]
-                    ),
-                }
-            delta_key = (
-                "masked_minus_unmasked"
-                if unmasked_key == "unmasked"
-                else f"{masked_key}_minus_{unmasked_key}"
-            )
-            aggregate[delta_key] = delta
+            if unmasked_key == "unmasked":
+                delta_key = "masked_minus_unmasked"
+            else:
+                delta_key = f"{masked_key}_minus_{unmasked_key}"
+            aggregate[delta_key] = _evaluation_delta(masked, unmasked)
     depth_metrics = aggregate_depth_metrics(ok)
     if depth_metrics:
         aggregate["depth_metrics"] = depth_metrics
@@ -1444,7 +1709,18 @@ def run_evaluation(
     view_crop: bool = False,
     distance_tau: float = 0.05,
 ) -> Dict[str, object]:
-    """CoMe-style single-scene ScanNet++ PLY evaluation entry point."""
+    """Evaluates one ScanNet++ PLY CoMe-style (single-scene entry point).
+
+    Args:
+        dataset_dir: The ScanNet++ scene folder.
+        ply_path: The reconstruction PLY.
+        out_dir: Output folder of results.json and the distance artifacts.
+        view_crop: Also write color-coded error clouds.
+        distance_tau: ICP and F-score distance threshold in metres.
+
+    Returns:
+        The metrics.
+    """
     args = argparse.Namespace(
         distance_tau=distance_tau,
         fscore_thresholds_m=[distance_tau],
@@ -1456,33 +1732,40 @@ def run_evaluation(
         write_distance_artifacts=True,
         write_visualizations=bool(view_crop),
     )
-    dataset_path = Path(dataset_dir)
-    output_path = Path(out_dir)
+    dataset_path = pathlib.Path(dataset_dir)
+    output_path = pathlib.Path(out_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    source = load_reconstruction_point_cloud(Path(ply_path))
+    source = load_reconstruction_point_cloud(pathlib.Path(ply_path))
     metrics = evaluate_source_against_scannetpp(
         dataset_dir=dataset_path,
         source=source,
         out_dir=output_path,
         args=args,
     )
-    write_json(output_path / "results.json", {
-        "scene_id": dataset_path.name,
-        "input_ply": str(ply_path),
-        "evaluations": {"ply": metrics},
-    })
+    scene_files.write_json(
+        output_path / "results.json", {
+            "scene_id": dataset_path.name,
+            "input_ply": str(ply_path),
+            "evaluations": {
+                "ply": metrics
+            },
+        })
     return metrics
 
 
 def parse_args() -> argparse.Namespace:
+    """Parses the command line."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--scannetpp_root",
-        default=os.path.expanduser(os.environ.get("SCANNETPP_ROOT", "~/datasets/scannetpp/raw")),
+        default=os.path.expanduser(
+            os.environ.get("SCANNETPP_ROOT", "~/datasets/scannetpp/raw")),
     )
     parser.add_argument(
         "--colmap_root",
-        default=os.path.expanduser(os.environ.get("SCANNETPP_COLMAP_ROOT", "~/datasets/scannetpp/colmap")),
+        default=os.path.expanduser(
+            os.environ.get("SCANNETPP_COLMAP_ROOT",
+                           "~/datasets/scannetpp/colmap")),
     )
     parser.add_argument("--scene_ids", default=None)
     parser.add_argument("--scene_ids_file", default=None)
@@ -1491,7 +1774,8 @@ def parse_args() -> argparse.Namespace:
         "--depth_geometry",
         choices=["pointcloud", "tsdf", "both"],
         default="pointcloud",
-        help="Geometry to build from depth sidecars before ScanNet++ mesh evaluation.",
+        help=("Geometry to build from depth sidecars before ScanNet++ mesh "
+              "evaluation."),
     )
     parser.add_argument("--image_folder", default="images_4")
     parser.add_argument("--model_folder", default="0")
@@ -1507,7 +1791,8 @@ def parse_args() -> argparse.Namespace:
         "--scale_application",
         choices=["depth", "world"],
         default="depth",
-        help="Apply the scene scale to predicted depths only, or to fully unprojected COLMAP points.",
+        help=("Apply the scene scale to predicted depths only, or to fully "
+              "unprojected COLMAP points."),
     )
     parser.add_argument("--npz_key", default=None)
     parser.add_argument("--predicted_png_depth_scale", type=float, default=1.0)
@@ -1518,7 +1803,8 @@ def parse_args() -> argparse.Namespace:
         "--compute_depth_metrics",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="Compare predicted metric depth maps against ScanNet++ GT depth PNGs.",
+        help=("Compare predicted metric depth maps against ScanNet++ GT depth "
+              "PNGs."),
     )
     parser.add_argument("--gt_depth_scale", type=float, default=1000.0)
     parser.add_argument(
@@ -1537,7 +1823,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input_ply_root", default=None)
     parser.add_argument("--input_ply_name", default="point_cloud.ply")
     parser.add_argument("--input_scale", type=float, default=1.0)
-    parser.add_argument("--add_face_centers", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--add_face_centers",
+                        action=argparse.BooleanOptionalAction,
+                        default=True)
     parser.add_argument("--distance_tau", type=float, default=0.05)
     parser.add_argument(
         "--fscore_thresholds_m",
@@ -1548,7 +1836,8 @@ def parse_args() -> argparse.Namespace:
         "--initial_transform",
         choices=["auto", "come", "none"],
         default="auto",
-        help="Use 'auto' to keep raw COLMAP depth points unchanged and apply CoMe's axis transform to PLY inputs.",
+        help=("Use 'auto' to keep raw COLMAP depth points unchanged and apply "
+              "CoMe's axis transform to PLY inputs."),
     )
     parser.add_argument("--skip_icp", action="store_true")
     parser.add_argument("--icp_iterations", type=int, default=20)
@@ -1561,10 +1850,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Runs the ScanNet++ evaluation CLI and writes metrics.json."""
     args = parse_args()
     if args.max_frames is not None and args.max_frames < 0:
         args.max_frames = None
-    output_dir = Path(args.output_dir)
+    output_dir = pathlib.Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     if args.mode == "depth":
@@ -1572,7 +1862,8 @@ def main() -> None:
         scene_stats = []
         for scene_dir in scene_dirs:
             try:
-                print(f"Evaluating {scene_dir.name} depth {args.depth_geometry}")
+                print(
+                    f"Evaluating {scene_dir.name} depth {args.depth_geometry}")
                 scene_stats.append(process_depth_scene(scene_dir, args))
             except Exception as exc:  # pylint: disable=broad-except
                 print(f"FAILED {scene_dir.name}: {exc}")
@@ -1582,14 +1873,16 @@ def main() -> None:
                     "error": repr(exc),
                 })
     else:
-        scene_ids = parse_scene_ids(args.scene_ids)
+        scene_ids = scene_files.parse_scene_ids(args.scene_ids)
         if args.scene_ids_file:
-            with Path(args.scene_ids_file).open("r", encoding="utf-8") as file:
+            with pathlib.Path(args.scene_ids_file).open(
+                    "r", encoding="utf-8") as file:
                 scene_ids.extend(line.strip() for line in file if line.strip())
         if not scene_ids:
             if not args.input_ply:
-                raise ValueError("PLY mode requires --scene_ids, --scene_ids_file, or --input_ply")
-            scene_ids = [Path(args.input_ply).parent.name]
+                raise ValueError("PLY mode requires --scene_ids, "
+                                 "--scene_ids_file, or --input_ply")
+            scene_ids = [pathlib.Path(args.input_ply).parent.name]
         scene_stats = []
         for scene_id in sorted(set(scene_ids)):
             try:
@@ -1603,21 +1896,21 @@ def main() -> None:
                     "error": repr(exc),
                 })
 
+    if args.scale_json_root:
+        scale_json_root = str(pathlib.Path(args.scale_json_root).resolve())
+    else:
+        scale_json_root = None
     payload = {
         "parameters": {
             "mode": args.mode,
             "depth_geometry": args.depth_geometry,
-            "scannetpp_root": str(Path(args.scannetpp_root).resolve()),
-            "colmap_root": str(Path(args.colmap_root).resolve()),
+            "scannetpp_root": str(pathlib.Path(args.scannetpp_root).resolve()),
+            "colmap_root": str(pathlib.Path(args.colmap_root).resolve()),
             "image_folder": args.image_folder,
             "model_folder": args.model_folder,
             "depth_folder": args.depth_folder,
             "mask_folder": args.mask_folder,
-            "scale_json_root": (
-                str(Path(args.scale_json_root).resolve())
-                if args.scale_json_root
-                else None
-            ),
+            "scale_json_root": scale_json_root,
             "scale_source": args.scale_source,
             "scale_application": args.scale_application,
             "compute_depth_metrics": args.compute_depth_metrics,
@@ -1639,7 +1932,7 @@ def main() -> None:
         "aggregate": aggregate_results(scene_stats),
         "scene_stats": scene_stats,
     }
-    write_json(output_dir / "metrics.json", payload)
+    scene_files.write_json(output_dir / "metrics.json", payload)
     print(f"Metrics written to: {output_dir / 'metrics.json'}")
 
 

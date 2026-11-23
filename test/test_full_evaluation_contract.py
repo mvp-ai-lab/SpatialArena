@@ -6,13 +6,15 @@ import sys
 from pathlib import Path
 
 
-def test_full_standard_pose_case_generation_includes_texturepoorsfm(tmp_path: Path) -> None:
+def test_full_standard_pose_case_generation_includes_texturepoorsfm(
+        tmp_path: Path) -> None:
     benchmark_root = tmp_path / "benchmarks"
     scene_name = "1000__10bag000"
     scene_root = benchmark_root / "SfM" / "texturepoorsfm" / scene_name
     (scene_root / "images").mkdir(parents=True)
     (scene_root / "sparse" / "0").mkdir(parents=True)
-    (benchmark_root / "SfM" / "texturepoorsfm").mkdir(parents=True, exist_ok=True)
+    (benchmark_root / "SfM" / "texturepoorsfm").mkdir(parents=True,
+                                                      exist_ok=True)
     (benchmark_root / "SfM" / "texturepoorsfm" / "metadata.json").write_text(
         """{
   "dataset_name": "texturepoorsfm",
@@ -28,8 +30,7 @@ def test_full_standard_pose_case_generation_includes_texturepoorsfm(tmp_path: Pa
     }
   ]
 }
-"""
-        % (
+""" % (
             benchmark_root / "SfM" / "texturepoorsfm",
             scene_name,
             benchmark_root / "SfM" / "texturepoorsfm",
@@ -57,11 +58,15 @@ def test_full_standard_pose_case_generation_includes_texturepoorsfm(tmp_path: Pa
         text=True,
     )
 
-    lines = [line for line in output.read_text(encoding="utf-8").splitlines() if line and not line.startswith("#")]
+    lines = [
+        line for line in output.read_text(encoding="utf-8").splitlines()
+        if line and not line.startswith("#")
+    ]
     assert lines == [f"SfM|texturepoorsfm|{scene_name}|1"]
 
 
-def test_full_evaluation_contract_no_longer_mentions_doppelgangers_catalog() -> None:
+def test_full_evaluation_contract_no_longer_mentions_doppelgangers_catalog(
+) -> None:
     contract = Path(__file__).resolve().parents[1] / "docs" / "evaluation.md"
     text = contract.read_text(encoding="utf-8")
 
@@ -70,7 +75,8 @@ def test_full_evaluation_contract_no_longer_mentions_doppelgangers_catalog() -> 
     assert "doppelgangers" not in text
 
 
-def test_checked_in_full_standard_pose_case_list_includes_texturepoorsfm() -> None:
+def test_checked_in_full_standard_pose_case_list_includes_texturepoorsfm(
+) -> None:
     """texturepoorsfm has 1020 bags over 17 objects, and bags of one object share
     frames. The v2 split holds out whole objects: the benchmark uses 30 bags from
     the 5 test objects only, so no benchmark frame can appear in training."""
@@ -78,16 +84,22 @@ def test_checked_in_full_standard_pose_case_list_includes_texturepoorsfm() -> No
 
     repo_root = Path(__file__).resolve().parents[1]
     split = json.loads(
-        (repo_root / "scripts" / "preprocess" / "assets" / "texturepoorsfm_split_v2.json").read_text(encoding="utf-8")
-    )
+        (repo_root / "scripts" / "preprocess" / "assets" /
+         "texturepoorsfm_split_v2.json").read_text(encoding="utf-8"))
     case_file = repo_root / "scripts" / "test" / "full_standard_sfm_cases.txt"
     text = case_file.read_text(encoding="utf-8")
 
-    texturepoorsfm_lines = [line for line in text.splitlines() if line.startswith("SfM|texturepoorsfm|")]
-    assert [line.split("|")[2] for line in texturepoorsfm_lines] == split["benchmark_scenes"]
+    texturepoorsfm_lines = [
+        line for line in text.splitlines()
+        if line.startswith("SfM|texturepoorsfm|")
+    ]
+    assert [line.split("|")[2] for line in texturepoorsfm_lines
+           ] == split["benchmark_scenes"]
     assert len(texturepoorsfm_lines) == 30
 
-    objects = {line.split("|")[2].split("__")[0] for line in texturepoorsfm_lines}
+    objects = {
+        line.split("|")[2].split("__")[0] for line in texturepoorsfm_lines
+    }
     assert objects == set(split["test_objects"])
     assert not objects & set(split["train_objects"])
     assert "doppelgangers" not in text

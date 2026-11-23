@@ -33,7 +33,8 @@ def test_resolve_sparse_model_prefers_canonical_sparse_zero(tmp_path):
     write_colmap_stub(scene_output / "sparse")
     write_colmap_stub(scene_output / "sparse" / "0")
 
-    assert resolve_sparse_model_path(scene_output) == scene_output / "sparse" / "0"
+    assert resolve_sparse_model_path(
+        scene_output) == scene_output / "sparse" / "0"
 
 
 def test_resolve_sparse_model_accepts_legacy_sparse_root(tmp_path):
@@ -44,13 +45,17 @@ def test_resolve_sparse_model_accepts_legacy_sparse_root(tmp_path):
     assert has_colmap_model_files(scene_output / "sparse")
 
 
-def test_resolve_sparse_model_from_any_accepts_scene_sparse_and_sparse_zero(tmp_path):
+def test_resolve_sparse_model_from_any_accepts_scene_sparse_and_sparse_zero(
+        tmp_path):
     scene_output = tmp_path / "scene_a"
     write_colmap_stub(scene_output / "sparse" / "0")
 
-    assert resolve_sparse_model_path_from_any(scene_output) == scene_output / "sparse" / "0"
-    assert resolve_sparse_model_path_from_any(scene_output / "sparse") == scene_output / "sparse" / "0"
-    assert resolve_sparse_model_path_from_any(scene_output / "sparse" / "0") == scene_output / "sparse" / "0"
+    assert resolve_sparse_model_path_from_any(
+        scene_output) == scene_output / "sparse" / "0"
+    assert resolve_sparse_model_path_from_any(
+        scene_output / "sparse") == scene_output / "sparse" / "0"
+    assert resolve_sparse_model_path_from_any(
+        scene_output / "sparse" / "0") == scene_output / "sparse" / "0"
 
 
 def test_method_scene_output_path_keeps_legacy_contract_without_task(tmp_path):

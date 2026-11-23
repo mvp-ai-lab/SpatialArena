@@ -58,10 +58,20 @@ def test_select_datasets_replace_vs_append():
     bench.select_datasets([{"task": "SfM", "dataset": "eth3d"}])
     assert bench._selected_datasets == [{"task": "SfM", "dataset": "eth3d"}]  # pylint: disable=protected-access
 
-    bench.select_datasets([{"task": "MonoDepth", "dataset": "marigold"}], append=True)
+    bench.select_datasets([{
+        "task": "MonoDepth",
+        "dataset": "marigold"
+    }],
+                          append=True)
     assert bench._selected_datasets == [  # pylint: disable=protected-access
-        {"task": "SfM", "dataset": "eth3d"},
-        {"task": "MonoDepth", "dataset": "marigold"},
+        {
+            "task": "SfM",
+            "dataset": "eth3d"
+        },
+        {
+            "task": "MonoDepth",
+            "dataset": "marigold"
+        },
     ]
 
 
@@ -80,8 +90,15 @@ def test_select_models_accepts_alias():
 def test_select_models_custom_adapter_requires_name_track_command():
     bench = BenchmarkEvaluator()
     with pytest.raises(ValueError):
-        bench.select_models([{"name": "Custom", "command": "python x.py"}])  # missing track
-    bench.select_models([{"name": "Custom", "track": "rgb", "command": "python x.py"}])
+        bench.select_models([{
+            "name": "Custom",
+            "command": "python x.py"
+        }])  # missing track
+    bench.select_models([{
+        "name": "Custom",
+        "track": "rgb",
+        "command": "python x.py"
+    }])
     assert bench._selected_models[0]["command"] == "python x.py"  # pylint: disable=protected-access
 
 
@@ -89,9 +106,17 @@ def test_select_runs_requires_task_dataset_model():
     bench = BenchmarkEvaluator()
     with pytest.raises(ValueError):
         bench.select_runs([{"task": "MonoDepth", "dataset": "marigold"}])
-    bench.select_runs([{"task": "MonoDepth", "dataset": "marigold", "model": "VGGT"}])
+    bench.select_runs([{
+        "task": "MonoDepth",
+        "dataset": "marigold",
+        "model": "VGGT"
+    }])
     # pylint: disable-next=protected-access
-    assert bench._selected_runs == [{"task": "MonoDepth", "dataset": "marigold", "model": "VGGT"}]
+    assert bench._selected_runs == [{
+        "task": "MonoDepth",
+        "dataset": "marigold",
+        "model": "VGGT"
+    }]
 
 
 def test_reset_clears_selection_but_keeps_object_reusable():
@@ -122,48 +147,93 @@ def test_job_scripts_default_to_the_benchmark_root():
 def test_plan_default_product_filters_by_task_track_matrix(tmp_path):
     bench = _bench(tmp_path)
     bench.select_datasets([
-        {"task": "MonoDepth", "dataset": "marigold"},
-        {"task": "MVRecon", "dataset": "dtu"},
+        {
+            "task": "MonoDepth",
+            "dataset": "marigold"
+        },
+        {
+            "task": "MVRecon",
+            "dataset": "dtu"
+        },
     ])
     bench.select_models([{"name": "PI3_X", "track": "rgb_cameras"}])
     plan = bench.plan()
     assert isinstance(plan, EvaluationPlan)
     # MonoDepth+rgb_cameras is excluded by the matrix even though PI3_X supports rgb_cameras.
-    assert plan.selected_runs == [
-        {"task": "MVRecon", "dataset": "dtu", "model": "PI3_X", "track": "rgb_cameras"}
-    ]
+    assert plan.selected_runs == [{
+        "task": "MVRecon",
+        "dataset": "dtu",
+        "model": "PI3_X",
+        "track": "rgb_cameras"
+    }]
 
 
-
-def test_plan_runs_mvrecon_rgb_depth_only_on_datasets_with_sparse_gt_depth(tmp_path):
+def test_plan_runs_mvrecon_rgb_depth_only_on_datasets_with_sparse_gt_depth(
+        tmp_path):
     """MVRecon rgb_depth is planned on DTU (sparse GT depth), not on HiRoom (dense GT depth: nothing left)."""
     bench = _bench(tmp_path)
-    bench.select_datasets([{"task": "MVRecon", "dataset": "dtu"}, {"task": "MVRecon", "dataset": "hiroom"}])
-    bench.select_models([{"name": "PI3_X", "track": "rgb_depth"}, {"name": "PI3_X", "track": "rgb"}])
-    runs = [(run["dataset"], run["track"]) for run in bench.plan().selected_runs]
+    bench.select_datasets([{
+        "task": "MVRecon",
+        "dataset": "dtu"
+    }, {
+        "task": "MVRecon",
+        "dataset": "hiroom"
+    }])
+    bench.select_models([{
+        "name": "PI3_X",
+        "track": "rgb_depth"
+    }, {
+        "name": "PI3_X",
+        "track": "rgb"
+    }])
+    runs = [(run["dataset"], run["track"]) for run in bench.plan().selected_runs
+           ]
     assert runs == [("dtu", "rgb_depth"), ("dtu", "rgb"), ("hiroom", "rgb")]
+
 
 def test_plan_default_track_is_rgb_when_unspecified(tmp_path):
     bench = _bench(tmp_path)
     bench.select_datasets([{"task": "SfM", "dataset": "eth3d"}])
     bench.select_models([{"name": "VGGT"}])
     plan = bench.plan()
-    assert plan.selected_runs == [{"task": "SfM", "dataset": "eth3d", "model": "VGGT", "track": "rgb"}]
+    assert plan.selected_runs == [{
+        "task": "SfM",
+        "dataset": "eth3d",
+        "model": "VGGT",
+        "track": "rgb"
+    }]
 
 
 def test_plan_expands_slam_into_its_range_tracks(tmp_path):
     bench = _bench(tmp_path)
     bench.select_datasets([{"task": "SLAM", "dataset": "tum_dynamics"}])
-    bench.select_models([{"name": "PI3_X"}, {"name": "VGGT"}, {"name": "MAPANYTHING"}, {"name": "VGGT_SLAM"},
-                         {"name": "GENCEPTION_POSE"}])
-    runs = {(run["model"], run["slam_range"]) for run in bench.plan().selected_runs}
+    bench.select_models([{
+        "name": "PI3_X"
+    }, {
+        "name": "VGGT"
+    }, {
+        "name": "MAPANYTHING"
+    }, {
+        "name": "VGGT_SLAM"
+    }, {
+        "name": "GENCEPTION_POSE"
+    }])
+    runs = {
+        (run["model"], run["slam_range"]) for run in bench.plan().selected_runs
+    }
     # PI3_X and VGGT-SLAM fit both ranges, VGGT (400 frames) only the short one; MapAnything (budget below both) is
     # attempted on both; GenCeption-Pose is not on the SLAM track.
-    assert runs == {("PI3_X", "short"), ("PI3_X", "long"), ("VGGT", "short"), ("MAPANYTHING", "short"),
-                    ("MAPANYTHING", "long"), ("VGGT_SLAM", "short"), ("VGGT_SLAM", "long")}
+    assert runs == {("PI3_X", "short"), ("PI3_X", "long"), ("VGGT", "short"),
+                    ("MAPANYTHING", "short"), ("MAPANYTHING", "long"),
+                    ("VGGT_SLAM", "short"), ("VGGT_SLAM", "long")}
 
-    bench.select_datasets([{"task": "SLAM", "dataset": "tum_dynamics", "slam_range": "long"}])
-    assert {run["model"] for run in bench.plan().selected_runs} == {"PI3_X", "MAPANYTHING", "VGGT_SLAM"}
+    bench.select_datasets([{
+        "task": "SLAM",
+        "dataset": "tum_dynamics",
+        "slam_range": "long"
+    }])
+    assert {run["model"] for run in bench.plan().selected_runs
+           } == {"PI3_X", "MAPANYTHING", "VGGT_SLAM"}
 
 
 def test_plan_is_read_only_and_does_not_mutate_selection(tmp_path):
@@ -182,7 +252,11 @@ def test_plan_respects_explicit_select_runs_over_cartesian_product(tmp_path):
     bench.select_models([{"name": "VGGT"}, {"name": "DA3-G"}])
     bench.select_runs([{"task": "SfM", "dataset": "eth3d", "model": "DA3-G"}])
     plan = bench.plan()
-    assert plan.selected_runs == [{"task": "SfM", "dataset": "eth3d", "model": "DA3-G"}]
+    assert plan.selected_runs == [{
+        "task": "SfM",
+        "dataset": "eth3d",
+        "model": "DA3-G"
+    }]
 
 
 def test_validate_returns_structured_report(tmp_path):
@@ -197,33 +271,49 @@ def test_validate_returns_structured_report(tmp_path):
 
 def test_validate_errors_on_unsupported_track(tmp_path):
     bench = _bench(tmp_path)
-    bench.select_models([{"name": "VGGT", "track": "rgb_cameras"}])  # VGGT is rgb-only
+    bench.select_models([{
+        "name": "VGGT",
+        "track": "rgb_cameras"
+    }])  # VGGT is rgb-only
     report = bench.validate()
     assert report.ok is False
-    assert any("does not support track" in issue.message for issue in report.issues)
+    assert any(
+        "does not support track" in issue.message for issue in report.issues)
 
 
 def test_validate_errors_when_nothing_survives_task_track_filtering(tmp_path):
     bench = _bench(tmp_path)
     bench.select_datasets([{"task": "MonoDepth", "dataset": "marigold"}])
-    bench.select_models([{"name": "PI3_X", "track": "rgb_cameras"}])  # excluded by the matrix for MonoDepth
+    bench.select_models([{
+        "name": "PI3_X",
+        "track": "rgb_cameras"
+    }])  # excluded by the matrix for MonoDepth
     report = bench.validate()
     assert report.ok is False
-    assert any("nothing would be evaluated" in issue.message for issue in report.issues)
+    assert any("nothing would be evaluated" in issue.message
+               for issue in report.issues)
 
 
 def test_validate_warns_on_empty_selection(tmp_path):
     bench = _bench(tmp_path)
     report = bench.validate()
-    assert any(issue.scope == "dataset" and issue.level == "warning" for issue in report.issues)
-    assert any(issue.scope == "model" and issue.level == "warning" for issue in report.issues)
+    assert any(issue.scope == "dataset" and issue.level == "warning"
+               for issue in report.issues)
+    assert any(issue.scope == "model" and issue.level == "warning"
+               for issue in report.issues)
 
 
 def test_validate_skips_checkpoint_checks_for_custom_adapters(tmp_path):
     bench = _bench(tmp_path)
-    bench.select_models([{"name": "Custom", "track": "rgb", "command": "python x.py"}])
+    bench.select_models([{
+        "name": "Custom",
+        "track": "rgb",
+        "command": "python x.py"
+    }])
     report = bench.validate()
-    assert not any(issue.scope == "model" and "checkpoint" in issue.message.lower() for issue in report.issues)
+    assert not any(
+        issue.scope == "model" and "checkpoint" in issue.message.lower()
+        for issue in report.issues)
 
 
 def test_export_report_requires_a_finished_report(tmp_path):
@@ -281,18 +371,34 @@ report:
     assert bench.experiment_root == Path("/tmp/exp_root")
     assert bench.experiment_name == "benchmark_full"
     assert bench._selected_datasets == [  # pylint: disable=protected-access
-        {"task": "MonoDepth", "dataset": "marigold"},
-        {"task": "SfM", "dataset": "imc"},
+        {
+            "task": "MonoDepth",
+            "dataset": "marigold"
+        },
+        {
+            "task": "SfM",
+            "dataset": "imc"
+        },
     ]
     # pylint: disable-next=protected-access
-    assert bench._selected_models == [{"name": "VGGT"}, {"name": "PI3_X", "track": "rgb_depth"}]
+    assert bench._selected_models == [{
+        "name": "VGGT"
+    }, {
+        "name": "PI3_X",
+        "track": "rgb_depth"
+    }]
     assert bench.report_config == {"output_path": "./report"}
 
 
 def test_configure_loads_json(tmp_path):
     config_path = tmp_path / "config.json"
     config_path.write_text(
-        json.dumps({"experiment_name": "from_json", "models": [{"name": "VGGT"}]}),
+        json.dumps({
+            "experiment_name": "from_json",
+            "models": [{
+                "name": "VGGT"
+            }]
+        }),
         encoding="utf-8",
     )
     bench = BenchmarkEvaluator(experiment_root=tmp_path)
@@ -317,7 +423,8 @@ def test_configure_call_time_override_wins_over_file(tmp_path):
     assert bench.experiment_name == "from_override"
 
 
-def test_configure_env_var_used_when_no_explicit_or_file_value(tmp_path, monkeypatch):
+def test_configure_env_var_used_when_no_explicit_or_file_value(
+        tmp_path, monkeypatch):
     config_path = tmp_path / "config.yaml"
     config_path.write_text("experiment_name: demo\n", encoding="utf-8")
     monkeypatch.setenv("BENCHMARK_EVAL_ROOT", "/env/eval/root")
@@ -328,7 +435,8 @@ def test_configure_env_var_used_when_no_explicit_or_file_value(tmp_path, monkeyp
 
 @pytest.mark.parametrize("evaluate_only", [False, True])
 # pylint: disable-next=unused-argument
-def test_native_evaluate_runs_infer_then_eval_as_subprocesses(tmp_path, monkeypatch, evaluate_only):
+def test_native_evaluate_runs_infer_then_eval_as_subprocesses(
+        tmp_path, monkeypatch, evaluate_only):
     import sys
     from unittest.mock import MagicMock, patch
 
@@ -343,10 +451,21 @@ def test_native_evaluate_runs_infer_then_eval_as_subprocesses(tmp_path, monkeypa
 
     bench = _bench(tmp_path, job_system="native")
     bench.evaluate_only = evaluate_only
-    bench.select_runs([{"task": "MonoDepth", "dataset": "marigold", "model": "VGGT", "scenes": ["nyuv2"]}])
+    bench.select_runs([{
+        "task": "MonoDepth",
+        "dataset": "marigold",
+        "model": "VGGT",
+        "scenes": ["nyuv2"]
+    }])
 
     fake_generated = GeneratedRunScripts(
-        work_item={"task": "MonoDepth", "dataset": "marigold", "model": "VGGT", "track": "rgb", "suite": "full-depth"},
+        work_item={
+            "task": "MonoDepth",
+            "dataset": "marigold",
+            "model": "VGGT",
+            "track": "rgb",
+            "suite": "full-depth"
+        },
         case_file=Path("/fake/cases.txt"),
         infer_script=Path("/fake/infer.sh"),
         eval_script=Path("/fake/eval.sh"),
@@ -367,7 +486,11 @@ def test_native_evaluate_runs_infer_then_eval_as_subprocesses(tmp_path, monkeypa
     calls = []
 
     # pylint: disable-next=unused-argument
-    def fake_popen(cmd, env=None, **kwargs):  # native mode polls Popen.wait() to update its progress bars
+    def fake_popen(
+            cmd,
+            env=None,
+            **kwargs
+    ):  # native mode polls Popen.wait() to update its progress bars
         calls.append(cmd)
         process = MagicMock(returncode=0)
         process.wait.return_value = 0
@@ -379,21 +502,25 @@ def test_native_evaluate_runs_infer_then_eval_as_subprocesses(tmp_path, monkeypa
         report = bench.evaluate(progress="none")
 
     # infer before eval; evaluate_only (predictions already exist) runs only the evaluation phase
-    assert [c[1] for c in calls] == (["/fake/eval.sh"] if evaluate_only else ["/fake/infer.sh", "/fake/eval.sh"])
+    assert [c[1] for c in calls] == (["/fake/eval.sh"] if evaluate_only else
+                                     ["/fake/infer.sh", "/fake/eval.sh"])
     assert report.summary["status"] == "finished"
     assert report.ok is True
-    assert report.scene_results == [
-        {
-            "method": "VGGT",
-            "task": "MonoDepth",
-            "dataset": "marigold",
-            "scene": "nyuv2",
-            "status": "passed",
-            "report_dir": str(tmp_path / "report"),
-        }
-    ]
-    assert report.dataset_results == [{"task": "MonoDepth", "dataset": "marigold", "passed": 1, "failed": 0,
-                                       "skipped": 0}]
+    assert report.scene_results == [{
+        "method": "VGGT",
+        "task": "MonoDepth",
+        "dataset": "marigold",
+        "scene": "nyuv2",
+        "status": "passed",
+        "report_dir": str(tmp_path / "report"),
+    }]
+    assert report.dataset_results == [{
+        "task": "MonoDepth",
+        "dataset": "marigold",
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0
+    }]
 
 
 def test_native_evaluate_skips_eval_when_infer_fails(tmp_path):
@@ -404,10 +531,21 @@ def test_native_evaluate_skips_eval_when_infer_fails(tmp_path):
 
     evaluator_module = sys.modules["spatialarena.evaluator"]
     bench = _bench(tmp_path, job_system="native")
-    bench.select_runs([{"task": "MonoDepth", "dataset": "marigold", "model": "VGGT", "scenes": ["nyuv2"]}])
+    bench.select_runs([{
+        "task": "MonoDepth",
+        "dataset": "marigold",
+        "model": "VGGT",
+        "scenes": ["nyuv2"]
+    }])
 
     fake_generated = GeneratedRunScripts(
-        work_item={"task": "MonoDepth", "dataset": "marigold", "model": "VGGT", "track": "rgb", "suite": "full-depth"},
+        work_item={
+            "task": "MonoDepth",
+            "dataset": "marigold",
+            "model": "VGGT",
+            "track": "rgb",
+            "suite": "full-depth"
+        },
         case_file=Path("/fake/cases.txt"),
         infer_script=Path("/fake/infer.sh"),
         eval_script=Path("/fake/eval.sh"),
@@ -418,7 +556,11 @@ def test_native_evaluate_skips_eval_when_infer_fails(tmp_path):
     calls = []
 
     # pylint: disable-next=unused-argument
-    def fake_popen(cmd, env=None, **kwargs):  # native mode polls Popen.wait() to update its progress bars
+    def fake_popen(
+            cmd,
+            env=None,
+            **kwargs
+    ):  # native mode polls Popen.wait() to update its progress bars
         calls.append(cmd)
         process = MagicMock(returncode=1)
         process.wait.return_value = 1
@@ -436,14 +578,21 @@ def test_native_evaluate_skips_eval_when_infer_fails(tmp_path):
 
 def test_native_evaluate_rejects_max_in_flight(tmp_path):
     bench = _bench(tmp_path, job_system="native")
-    bench.select_runs([{"task": "MonoDepth", "dataset": "marigold", "model": "VGGT"}])
+    bench.select_runs([{
+        "task": "MonoDepth",
+        "dataset": "marigold",
+        "model": "VGGT"
+    }])
     with pytest.raises(ValueError):
         bench.evaluate(max_in_flight=5)
 
 
 def test_evaluate_refuses_when_validation_fails(tmp_path):
     bench = _bench(tmp_path)
-    bench.select_models([{"name": "VGGT", "track": "rgb_cameras"}])  # VGGT is rgb-only -> validate() error
+    bench.select_models([{
+        "name": "VGGT",
+        "track": "rgb_cameras"
+    }])  # VGGT is rgb-only -> validate() error
     with pytest.raises(ValueError):
         bench.evaluate()
 
@@ -457,9 +606,15 @@ def test_collect_without_a_report_raises():
 def test_collect_with_no_jobs_returns_report_unchanged():
     from spatialarena.evaluator import EvaluationReport
 
-    plan = EvaluationPlan(config={}, selected_datasets=[], selected_models=[], selected_runs=[],
+    plan = EvaluationPlan(config={},
+                          selected_datasets=[],
+                          selected_models=[],
+                          selected_runs=[],
                           output_root=Path("/tmp/x"))
-    report = EvaluationReport(ok=True, config={}, plan=plan, summary={"jobs": []})
+    report = EvaluationReport(ok=True,
+                              config={},
+                              plan=plan,
+                              summary={"jobs": []})
     bench = BenchmarkEvaluator()
     assert bench.collect(report) is report
 
@@ -472,11 +627,14 @@ def test_discover_models_enriches_with_task_tracks():
     assert method["name"] == "PI3_X"
     assert method["task_tracks"]["MonoDepth"] == ["rgb", "rgb_masked_depth"]
     assert set(method["task_tracks"]["MVRecon"]) == {
-        "rgb", "rgb_cameras", "rgb_depth", "rgb_masked_depth", "rgb_masked_depth_cameras",
-        "rgb_sparse_depth", "rgb_sparse_depth_cameras"}
+        "rgb", "rgb_cameras", "rgb_depth", "rgb_masked_depth",
+        "rgb_masked_depth_cameras", "rgb_sparse_depth",
+        "rgb_sparse_depth_cameras"
+    }
     assert set(method["task_tracks"]["SfM"]) == {
         "rgb", "rgb_depth", "rgb_masked_depth", "rgb_masked_depth_cameras",
-        "rgb_sparse_depth", "rgb_sparse_depth_cameras"}
+        "rgb_sparse_depth", "rgb_sparse_depth_cameras"
+    }
 
 
 def test_discover_models_filters_by_model_types():
@@ -488,7 +646,12 @@ def test_discover_models_filters_by_model_types():
 def test_custom_adapter_env_none_for_registered_method():
     from spatialarena.evaluator import _custom_adapter_env
 
-    assert _custom_adapter_env({"task": "MonoDepth", "dataset": "marigold", "model": "VGGT", "track": "rgb"}) is None
+    assert _custom_adapter_env({
+        "task": "MonoDepth",
+        "dataset": "marigold",
+        "model": "VGGT",
+        "track": "rgb"
+    }) is None
 
 
 def test_custom_adapter_env_builds_overrides():
@@ -503,7 +666,9 @@ def test_custom_adapter_env_builds_overrides():
         "resolution": 336,
         "code_path": "/code/mymodel",
         "ckpt_path": "/ckpt/mymodel.pt",
-        "env": {"FOO": "bar"},
+        "env": {
+            "FOO": "bar"
+        },
     }
     env = _custom_adapter_env(work_item)
     assert env["METHOD_COMMAND"] == "python infer.py"
@@ -521,11 +686,14 @@ def test_report_tsv_paths_uses_case_file_stem_suffix():
     job = {
         "report_dir": "/report",
         "case_file": "/scripts/cases/VGGT_full-depth_MonoDepth.txt",
-        "work_item": {"suite": "full-depth"},
+        "work_item": {
+            "suite": "full-depth"
+        },
     }
     summary, failures = _report_tsv_paths(job)
     assert summary == Path("/report/summary_VGGT_full-depth_MonoDepth.tsv")
-    assert failures == Path("/report/case_failures_VGGT_full-depth_MonoDepth.tsv")
+    assert failures == Path(
+        "/report/case_failures_VGGT_full-depth_MonoDepth.tsv")
 
 
 def test_report_tsv_paths_no_suffix_when_case_file_matches_suite_default():
@@ -534,7 +702,9 @@ def test_report_tsv_paths_no_suffix_when_case_file_matches_suite_default():
     job = {
         "report_dir": "/report",
         "case_file": "/scripts/test/full_standard_depth_cases.txt",
-        "work_item": {"suite": "full-depth"},
+        "work_item": {
+            "suite": "full-depth"
+        },
     }
     summary, failures = _report_tsv_paths(job)
     assert summary == Path("/report/summary.tsv")
@@ -547,7 +717,9 @@ def test_report_tsv_paths_pose_suite_default():
     job = {
         "report_dir": "/report",
         "case_file": "/scripts/test/full_standard_sfm_cases.txt",
-        "work_item": {"suite": "full-pose"},
+        "work_item": {
+            "suite": "full-pose"
+        },
     }
     summary, _ = _report_tsv_paths(job)
     assert summary == Path("/report/summary.tsv")
@@ -574,24 +746,45 @@ def test_read_tsv_data_rows_header_only_yields_nothing(tmp_path):
     from spatialarena.evaluator import _read_tsv_data_rows
 
     path = tmp_path / "summary.tsv"
-    path.write_text("method\ttask\tdataset\tscene\tinterval\torder\toutput_path\treport_dir\tprediction_retention\n",
-                    encoding="utf-8")
+    path.write_text(
+        "method\ttask\tdataset\tscene\tinterval\torder\toutput_path\treport_dir\tprediction_retention\n",
+        encoding="utf-8")
     assert _read_tsv_data_rows(path) == []
 
 
 def _fake_report(tmp_path, plan, *, report_dirs=()):
     from spatialarena.evaluator import EvaluationReport
 
-    jobs = [{"report_dir": str(tmp_path / d), "work_item": {"task": "MonoDepth", "dataset": "marigold"}}
-            for d in report_dirs]
+    jobs = [{
+        "report_dir": str(tmp_path / d),
+        "work_item": {
+            "task": "MonoDepth",
+            "dataset": "marigold"
+        }
+    } for d in report_dirs]
     return EvaluationReport(
         ok=True,
         config=plan.config,
         plan=plan,
-        scene_results=[{"method": "VGGT", "task": "MonoDepth", "dataset": "marigold", "scene": "nyuv2",
-                        "status": "passed"}],
-        dataset_results=[{"task": "MonoDepth", "dataset": "marigold", "passed": 1, "failed": 0}],
-        summary={"status": "finished", "jobs": jobs, "passed": 1, "failed": 0},
+        scene_results=[{
+            "method": "VGGT",
+            "task": "MonoDepth",
+            "dataset": "marigold",
+            "scene": "nyuv2",
+            "status": "passed"
+        }],
+        dataset_results=[{
+            "task": "MonoDepth",
+            "dataset": "marigold",
+            "passed": 1,
+            "failed": 0
+        }],
+        summary={
+            "status": "finished",
+            "jobs": jobs,
+            "passed": 1,
+            "failed": 0
+        },
         report_dir=plan.output_root,
     )
 
@@ -603,7 +796,8 @@ def test_export_report_writes_summary_plan_validation_json(tmp_path):
     bench.validate()
     plan = bench.plan()
     # pylint: disable-next=protected-access
-    bench._last_report = _fake_report(tmp_path, plan)  # no report_dirs -> skip the aggregated report step
+    bench._last_report = _fake_report(
+        tmp_path, plan)  # no report_dirs -> skip the aggregated report step
 
     out_dir = tmp_path / "exported"
     result = bench.export_report(out_dir)
@@ -612,7 +806,12 @@ def test_export_report_writes_summary_plan_validation_json(tmp_path):
     summary = json.loads((out_dir / "summary.json").read_text())
     assert summary["ok"] is True
     assert summary["passed"] == 1
-    assert summary["dataset_results"] == [{"task": "MonoDepth", "dataset": "marigold", "passed": 1, "failed": 0}]
+    assert summary["dataset_results"] == [{
+        "task": "MonoDepth",
+        "dataset": "marigold",
+        "passed": 1,
+        "failed": 0
+    }]
 
     plan_json = json.loads((out_dir / "plan.json").read_text())
     assert plan_json["selected_runs"] == plan.selected_runs
@@ -628,12 +827,17 @@ def test_export_report_writes_gather_metrics_script(tmp_path):
     from unittest.mock import patch
 
     bench = _bench(tmp_path)
-    bench.select_runs([{"task": "MonoDepth", "dataset": "marigold", "model": "VGGT"}])
+    bench.select_runs([{
+        "task": "MonoDepth",
+        "dataset": "marigold",
+        "model": "VGGT"
+    }])
     plan = bench.plan()
     report_dirs = ("reports/full-depth/VGGT",)
     bench._last_report = _fake_report(tmp_path, plan, report_dirs=report_dirs)  # pylint: disable=protected-access
 
-    with patch.object(BenchmarkEvaluator, "_write_aggregated_report") as mock_aggregate:
+    with patch.object(BenchmarkEvaluator,
+                      "_write_aggregated_report") as mock_aggregate:
         bench.export_report(tmp_path / "exported")
 
     mock_aggregate.assert_called_once()
@@ -661,7 +865,8 @@ def test_list_supported_datasets_delegates_to_download_module():
     bench = BenchmarkEvaluator()
     result = bench.list_supported_datasets()
     assert isinstance(result, list)
-    assert any(e["task"] == "MonoDepth" and e["dataset"] == "marigold" for e in result)
+    assert any(
+        e["task"] == "MonoDepth" and e["dataset"] == "marigold" for e in result)
 
 
 def test_list_supported_models_delegates_to_download_module():
@@ -675,21 +880,33 @@ def test_download_all_supported_datasets_uses_own_benchmark_root(tmp_path):
     from unittest.mock import patch
 
     bench = BenchmarkEvaluator(benchmark_root=tmp_path)
-    with patch("spatialarena.download.download_all_supported_datasets") as mock_download:
-        mock_download.return_value = [{"task": "VideoDepth", "dataset": "sintel", "status": "ok"}]
-        result = bench.download_all_supported_datasets(datasets=[("VideoDepth", "sintel")])
+    with patch("spatialarena.download.download_all_supported_datasets"
+              ) as mock_download:
+        mock_download.return_value = [{
+            "task": "VideoDepth",
+            "dataset": "sintel",
+            "status": "ok"
+        }]
+        result = bench.download_all_supported_datasets(datasets=[("VideoDepth",
+                                                                  "sintel")])
     mock_download.assert_called_once()
     assert mock_download.call_args.kwargs["benchmark_root"] == tmp_path
-    assert result == [{"task": "VideoDepth", "dataset": "sintel", "status": "ok"}]
+    assert result == [{
+        "task": "VideoDepth",
+        "dataset": "sintel",
+        "status": "ok"
+    }]
 
 
 def test_download_all_supported_models_forwards_methods_filter():
     from unittest.mock import patch
 
     bench = BenchmarkEvaluator()
-    with patch("spatialarena.download.download_all_supported_models") as mock_download:
+    with patch("spatialarena.download.download_all_supported_models"
+              ) as mock_download:
         mock_download.return_value = [{"name": "PI3_X", "status": "ok"}]
-        result = bench.download_all_supported_models(methods=["PI3_X"], progress="none")
+        result = bench.download_all_supported_models(methods=["PI3_X"],
+                                                     progress="none")
     mock_download.assert_called_once()
     kwargs = dict(mock_download.call_args.kwargs)
     assert callable(kwargs.pop("on_event"))  # progress hook (bars/board/none)
@@ -706,14 +923,16 @@ def test_list_supported_method_code_delegates_to_download_module():
     bench = BenchmarkEvaluator()
     result = bench.list_supported_method_code()
     assert isinstance(result, list)
-    assert any(e["name"] == "PI3_X" and e["status"] == "automated" for e in result)
+    assert any(
+        e["name"] == "PI3_X" and e["status"] == "automated" for e in result)
 
 
 def test_download_all_supported_method_code_uses_own_method_code_root(tmp_path):
     from unittest.mock import patch
 
     bench = BenchmarkEvaluator(method_code_root=tmp_path)
-    with patch("spatialarena.download.download_all_supported_method_code") as mock_download:
+    with patch("spatialarena.download.download_all_supported_method_code"
+              ) as mock_download:
         mock_download.return_value = [{"name": "PI3_X", "status": "ok"}]
         result = bench.download_all_supported_method_code(methods=["PI3_X"])
     mock_download.assert_called_once()
@@ -723,7 +942,8 @@ def test_download_all_supported_method_code_uses_own_method_code_root(tmp_path):
 
 
 def test_shipped_example_config_loads_and_plans(tmp_path):
-    config_path = Path(__file__).resolve().parents[1] / "configs" / "benchmark" / "evaluation_example.yaml"
+    config_path = Path(__file__).resolve(
+    ).parents[1] / "configs" / "benchmark" / "evaluation_example.yaml"
     bench = BenchmarkEvaluator()
     bench.configure(config_path, experiment_root=tmp_path)
     assert bench.job_system == "slurm"
@@ -733,12 +953,15 @@ def test_shipped_example_config_loads_and_plans(tmp_path):
         ("MonoDepth", "VGGT", "rgb"),
         ("SfM", "PI3_X", "rgb_depth"),
     }
-    assert all(run["track"] == "rgb" for run in runs if run["task"] == "MonoDepth")
+    assert all(
+        run["track"] == "rgb" for run in runs if run["task"] == "MonoDepth")
 
 
 def test_export_report_defaults_to_config_output_path(tmp_path):
     config_path = tmp_path / "config.yaml"
-    config_path.write_text(f"report:\n  output_path: {tmp_path / 'from_config'}\n", encoding="utf-8")
+    config_path.write_text(
+        f"report:\n  output_path: {tmp_path / 'from_config'}\n",
+        encoding="utf-8")
     bench = BenchmarkEvaluator()
     with pytest.raises(ValueError, match="output_path"):
         bench.export_report()
@@ -753,13 +976,26 @@ def test_mvrecon_cases_skip_scenes_without_gt_geometry():
     import importlib  # pylint: disable=import-outside-toplevel
     from unittest.mock import patch
 
-    scenes = [{"scene": "office", "has_gt_geometry": True}, {"scene": "meadow", "has_gt_geometry": False}]
+    scenes = [{
+        "scene": "office",
+        "has_gt_geometry": True
+    }, {
+        "scene": "meadow",
+        "has_gt_geometry": False
+    }]
     bench = BenchmarkEvaluator()
     # The module, not the package attribute: spatialarena.evaluator is also the package's evaluator instance.
     module = importlib.import_module("spatialarena.evaluator")
-    with patch.object(module, "describe_benchmark_scenes", return_value=[{"scenes": scenes}]):
+    with patch.object(module,
+                      "describe_benchmark_scenes",
+                      return_value=[{
+                          "scenes": scenes
+                      }]):
         # pylint: disable-next=protected-access
-        mvrecon = bench._resolve_case_entries({"task": "MVRecon", "dataset": "eth3d"})
+        mvrecon = bench._resolve_case_entries({
+            "task": "MVRecon",
+            "dataset": "eth3d"
+        })
         sfm = bench._resolve_case_entries({"task": "SfM", "dataset": "eth3d"})  # pylint: disable=protected-access
     assert [entry.scene for entry in mvrecon] == ["office"]
     assert [entry.scene for entry in sfm] == ["office", "meadow"]
@@ -780,16 +1016,28 @@ def test_model_slurm_resources_override_the_config_per_phase(tmp_path):
     )
     bench = BenchmarkEvaluator()
     bench.configure(config)
-    scripts = {(item["task"], item["model"]): generated for item, generated in bench.generate()}
+    scripts = {
+        (item["task"], item["model"]): generated
+        for item, generated in bench.generate()
+    }
     sfm = scripts[("SfM", "VGGT")].eval_script.read_text(encoding="utf-8")
     slam = scripts[("SLAM", "VGGT")].eval_script.read_text(encoding="utf-8")
-    long = scripts[("SLAM", "VGGT_LONG")].eval_script.read_text(encoding="utf-8")
+    long = scripts[("SLAM",
+                    "VGGT_LONG")].eval_script.read_text(encoding="utf-8")
     assert "#SBATCH --mem=64G" in sfm and "#SBATCH --cpus-per-task=8" in sfm  # config level
     assert "#SBATCH --mem=32G" in slam and "#SBATCH --cpus-per-task=8" in slam  # the dataset item on top
     assert "#SBATCH --mem=128G" in long and "#SBATCH --cpus-per-task=8" in long  # the model item on top of both
-    assert "#SBATCH --time=1:00:00" in scripts[("SLAM", "VGGT_LONG")].infer_script.read_text(encoding="utf-8")
+    assert "#SBATCH --time=1:00:00" in scripts[(
+        "SLAM", "VGGT_LONG")].infer_script.read_text(encoding="utf-8")
     with pytest.raises(ValueError, match="takes the phases"):
-        bench.select_models([{"name": "VGGT", "slurm_resources": {"align": {"mem": "1G"}}}])
+        bench.select_models([{
+            "name": "VGGT",
+            "slurm_resources": {
+                "align": {
+                    "mem": "1G"
+                }
+            }
+        }])
 
 
 _SUMMARY_HEADER = "method\ttask\tdataset\tscene\tinterval\torder\toutput_path\treport_dir\tprediction_retention\n"
@@ -803,49 +1051,111 @@ def test_read_job_results_counts_only_scored_cases_as_passed(tmp_path):
     from spatialarena.evaluator import _read_job_results
 
     (tmp_path / "summary_cases.tsv").write_text(
-        _SUMMARY_HEADER + _summary_row("a", "kept") + _summary_row("b", "removed_after_eval")
-        + _summary_row("c", "reused_existing_eval") + _summary_row("d", "missing_prediction_for_eval_phase")
-        + _summary_row("e", "skipped_not_applicable") + _summary_row("f", "inference_ready"),
+        _SUMMARY_HEADER + _summary_row("a", "kept") +
+        _summary_row("b", "removed_after_eval") +
+        _summary_row("c", "reused_existing_eval") +
+        _summary_row("d", "missing_prediction_for_eval_phase") +
+        _summary_row("e", "skipped_not_applicable") +
+        _summary_row("f", "inference_ready"),
         encoding="utf-8",
     )
-    job = {"report_dir": str(tmp_path), "case_file": str(tmp_path / "cases.txt"),
-           "work_item": {"task": "MonoDepth", "dataset": "marigold", "model": "VGGT", "suite": "full-depth"}}
+    job = {
+        "report_dir": str(tmp_path),
+        "case_file": str(tmp_path / "cases.txt"),
+        "work_item": {
+            "task": "MonoDepth",
+            "dataset": "marigold",
+            "model": "VGGT",
+            "suite": "full-depth"
+        }
+    }
     bucket = {"passed": 0, "failed": 0, "skipped": 0}
     rows = _read_job_results(job, True, bucket)
-    assert {row["scene"]: row["status"] for row in rows} == {
-        "a": "passed", "b": "passed", "c": "passed", "d": "failed", "e": "skipped", "f": "failed"}
+    assert {
+        row["scene"]: row["status"] for row in rows
+    } == {
+        "a": "passed",
+        "b": "passed",
+        "c": "passed",
+        "d": "failed",
+        "e": "skipped",
+        "f": "failed"
+    }
     assert bucket == {"passed": 3, "failed": 2, "skipped": 1}
 
 
 def test_read_job_results_reports_a_run_that_was_never_generated():
     from spatialarena.evaluator import _read_job_results
 
-    job = {"report_dir": None, "case_file": None, "dispatch_error": "no scenes found",
-           "work_item": {"task": "SLAM", "dataset": "vbr", "model": "VGGT_LONG"}}
+    job = {
+        "report_dir": None,
+        "case_file": None,
+        "dispatch_error": "no scenes found",
+        "work_item": {
+            "task": "SLAM",
+            "dataset": "vbr",
+            "model": "VGGT_LONG"
+        }
+    }
     bucket = {"passed": 0, "failed": 0, "skipped": 0}
     rows = _read_job_results(job, False, bucket)
-    assert rows == [{"method": "VGGT_LONG", "task": "SLAM", "dataset": "vbr", "scene": None, "status": "failed",
-                     "report_dir": None, "note": "no scenes found"}]
+    assert rows == [{
+        "method": "VGGT_LONG",
+        "task": "SLAM",
+        "dataset": "vbr",
+        "scene": None,
+        "status": "failed",
+        "report_dir": None,
+        "note": "no scenes found"
+    }]
     assert bucket["failed"] == 1
 
 
-def test_collect_passes_an_evaluate_only_run_without_an_inference_job(tmp_path, monkeypatch):
+def test_collect_passes_an_evaluate_only_run_without_an_inference_job(
+        tmp_path, monkeypatch):
     from spatialarena.evaluator import EvaluationReport
 
-    (tmp_path / "summary_cases.tsv").write_text(_SUMMARY_HEADER + _summary_row("a", "kept"), encoding="utf-8")
-    job = {"report_dir": str(tmp_path), "case_file": str(tmp_path / "cases.txt"), "infer_job_id": None,
-           "eval_job_id": "42", "work_item": {"task": "MonoDepth", "dataset": "marigold", "model": "VGGT",
-                                             "suite": "full-depth"}}
-    plan = EvaluationPlan(config={}, selected_datasets=[], selected_models=[], selected_runs=[], output_root=tmp_path)
-    report = EvaluationReport(ok=True, config={}, plan=plan, summary={"status": "submitted", "jobs": [job]})
+    (tmp_path / "summary_cases.tsv").write_text(_SUMMARY_HEADER +
+                                                _summary_row("a", "kept"),
+                                                encoding="utf-8")
+    job = {
+        "report_dir": str(tmp_path),
+        "case_file": str(tmp_path / "cases.txt"),
+        "infer_job_id": None,
+        "eval_job_id": "42",
+        "work_item": {
+            "task": "MonoDepth",
+            "dataset": "marigold",
+            "model": "VGGT",
+            "suite": "full-depth"
+        }
+    }
+    plan = EvaluationPlan(config={},
+                          selected_datasets=[],
+                          selected_models=[],
+                          selected_runs=[],
+                          output_root=tmp_path)
+    report = EvaluationReport(ok=True,
+                              config={},
+                              plan=plan,
+                              summary={
+                                  "status": "submitted",
+                                  "jobs": [job]
+                              })
     import sys
 
     # spatialarena/__init__.py binds the `evaluator` singleton over the submodule name; patch the module itself.
-    monkeypatch.setattr(sys.modules["spatialarena.evaluator"], "sacct_states", lambda ids: {"42": "COMPLETED"})
+    monkeypatch.setattr(sys.modules["spatialarena.evaluator"], "sacct_states",
+                        lambda ids: {"42": "COMPLETED"})
     collected = BenchmarkEvaluator().collect(report)
     assert collected.ok is True
-    assert collected.dataset_results == [{"task": "MonoDepth", "dataset": "marigold", "passed": 1, "failed": 0,
-                                          "skipped": 0}]
+    assert collected.dataset_results == [{
+        "task": "MonoDepth",
+        "dataset": "marigold",
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0
+    }]
 
 
 def test_run_label_and_scripts_default_the_track_to_rgb():

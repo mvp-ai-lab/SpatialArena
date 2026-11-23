@@ -1,37 +1,40 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+"""Fuse predicted DTU depth maps into the point cloud of each scan's model.
 
-# pylint: disable=E1101
+For every scan in `scan_list_test.txt`, the depth maps in
+`<depth_path>/<scan>/depth/` are fused with a multi-view consistency check,
+using the cameras of the COLMAP model in `<depth_path>/<scan>/sparse/`, and the
+fused points replace that model's `points3D.bin` (and are also written as
+`points3D.ply`). If fusion yields no points, it is retried up to three times
+with a doubled distance threshold and a halved consistency count.
 
-# This script is used for converting dtu dataset into COLMAP format.
-# the DTU dataset. Please download it at:
-#  https://drive.google.com/file/d/135oKPefcPTsdtLRzoDAQtPpHuoIrpRI_/view
-# before running this script.
-# DTU dataset downloading follows: https://github.com/YoYo000/MVSNet
-#
+Download the DTU test set before running this script:
+https://drive.google.com/file/d/135oKPefcPTsdtLRzoDAQtPpHuoIrpRI_/view
+(DTU downloading follows https://github.com/YoYo000/MVSNet).
+"""
 
 import argparse
 import os
 
-import torch
+import cv2
 import numpy as np
 import open3d as o3d
-import cv2
 from PIL import Image
-from tqdm import trange
-
 import pycolmap
+import torch
+import tqdm
 
-from spatialarena.geometry.geometry import unproject_depth_map_to_point_map
-from spatialarena.geometry.read_write_model import write_points3D_binary
-from spatialarena.geometry.utils import to_colmap_points, randomly_limit_trues
-from spatialarena.geometry.mvs_depth_fusion import depth_fusion
+from spatialarena.geometry import geometry
+from spatialarena.geometry import mvs_depth_fusion
+from spatialarena.geometry import read_write_model
+from spatialarena.geometry import utils as geometry_utils
 
+_MAX_TRIALS = 3
 
 parser = argparse.ArgumentParser(
     description='Depth fusion with consistency check.')
-parser.add_argument('--root_path', type=str,
-                    default='[/path/to/]dtu-test-1200')
+parser.add_argument('--root_path', type=str, default='[/path/to/]dtu-test-1200')
 parser.add_argument('--depth_path', type=str, default='')
 parser.add_argument('--dist_thresh', type=float, default=0.005)
 parser.add_argument('--num_consist', type=int, default=8)
@@ -43,20 +46,24 @@ parser.add_argument(
 )
 
 
-def resize_to_depth_shape(image, mask, depth_shape, interpolation_method='area'):
-    """
-    Resize image and mask to match depth map shape.
+def resize_to_depth_shape(image,
+                          mask,
+                          depth_shape,
+                          interpolation_method='area'):
+    """Resizes an image and its mask to the depth map's shape.
 
     Args:
-        image: RGB image array (H, W, 3)
-        mask: Binary mask array (H, W) or (H, W, 1)
-        depth_shape: Target shape (height, width) of depth map
-        interpolation_method: 'area', 'linear', 'nearest', 'cubic'
+        image: RGB image array (H, W, 3).
+        mask: Binary mask array (H, W) or (H, W, 1).
+        depth_shape: Target shape (height, width) of the depth map.
+        interpolation_method: 'area', 'linear', 'nearest', 'cubic' or
+            'lanczos' for the image; anything else falls back to 'area'. The
+            mask always uses nearest neighbor.
 
     Returns:
-        resized_image, resized_mask
+        The resized image and the resized mask (uint8, 0 or 255).
     """
-    # Map interpolation methods to OpenCV constants
+    # Map interpolation methods to OpenCV constants.
     interpolation_map = {
         'nearest': cv2.INTER_NEAREST,
         'linear': cv2.INTER_LINEAR,
@@ -67,23 +74,20 @@ def resize_to_depth_shape(image, mask, depth_shape, interpolation_method='area')
 
     interp = interpolation_map.get(interpolation_method, cv2.INTER_AREA)
 
-    # Get target dimensions (reverse order for OpenCV: width, height)
+    # Get the target dimensions (reverse order for OpenCV: width, height).
     target_dims = (depth_shape[1], depth_shape[0])
 
-    # Resize image with appropriate interpolation
-    if len(image.shape) == 3:
-        resized_image = cv2.resize(image, target_dims, interpolation=interp)
-    else:
-        resized_image = cv2.resize(image, target_dims, interpolation=interp)
+    resized_image = cv2.resize(image, target_dims, interpolation=interp)
 
-    # For mask, always use nearest neighbor to preserve binary values
+    # The mask always uses nearest neighbor to preserve binary values.
     if len(mask.shape) == 3:
-        mask = mask[:, :, 0]  # Take first channel if mask is 3D
+        mask = mask[:, :, 0]  # Take the first channel of a 3D mask.
 
-    resized_mask = cv2.resize(
-        mask, target_dims, interpolation=cv2.INTER_NEAREST)
+    resized_mask = cv2.resize(mask,
+                              target_dims,
+                              interpolation=cv2.INTER_NEAREST)
 
-    # Ensure mask remains binary
+    # Ensure the mask remains binary.
     resized_mask = (resized_mask > 0).astype(np.uint8) * 255
 
     return resized_image, resized_mask
@@ -96,6 +100,20 @@ def load_data(
     extrinsic_dict: dict,
     intrinsic_dict: dict,
 ):
+    """Loads the 49 views of one scan at the depth maps' resolution.
+
+    Args:
+        data_path: DTU test set root, with `<scan>/images/` and `<scan>/masks/`.
+        depth_path: Prediction root, with `<scan>/depth/NNNNNN.npy`.
+        scene_name: Scan folder name, for example `scan24`.
+        extrinsic_dict: Image name to 4x4 world-to-camera matrix.
+        intrinsic_dict: Image name to 3x3 intrinsics.
+
+    Returns:
+        A tuple `(image_paths, rgbs, depths, projs, extrinsics, intrinsics,
+        valid_masks)`; the arrays are stacked over views and `depths` is
+        (N, 1, H, W).
+    """
     image_paths = []
     depths, projs, rgbs = [], [], []
     valid_masks = []
@@ -110,9 +128,9 @@ def load_data(
 
         rgb = np.array(Image.open(image_filename))
         mask = np.array(Image.open(mask_filename))
-        depth = np.load(depth_filename)  # .squeeze(-1)
+        depth = np.load(depth_filename)
 
-        # Resize rgb and mask ot align with the resolution of depth map.
+        # Resize rgb and mask to align with the resolution of depth map.
         rgb, mask = resize_to_depth_shape(rgb, mask, depth.shape)
 
         rgbs.append(rgb)
@@ -128,16 +146,14 @@ def load_data(
         proj = np.eye(4)
         proj[:3, :4] = np.dot(intrinsic[:3, :3], pose[:3, :4])
 
-        points = unproject_depth_map_to_point_map(
-            depth[None], pose[None], intrinsic[None]
+        points = geometry.unproject_depth_map_to_point_map(
+            depth[None],
+            pose[None],
+            intrinsic[None],
         )
         points = points.reshape(-1, 3)
         valid_mask = (mask != 0)
         valid_masks.append(valid_mask)
-
-        # valid_mask = valid_mask.reshape(-1)
-        # points = points[valid_mask]
-        # colors = rgb.reshape(-1, 3)[valid_mask]
 
         proj_list.append(proj)
 
@@ -151,19 +167,25 @@ def load_data(
 
 
 def retrieve_projs_from_reconstruction(
-    sparse: pycolmap.Reconstruction
-) -> dict[str, np.ndarray]:
+        sparse: pycolmap.Reconstruction) -> dict[str, np.ndarray]:
+    """Reads each image's world-to-camera matrix and pinhole intrinsics.
+
+    Args:
+        sparse: COLMAP reconstruction.
+
+    Returns:
+        Two dicts keyed by image name: 4x4 world-to-camera matrices and 3x3
+        intrinsics.
+    """
     extrinsic_dict, intrinsic_dict = {}, {}
     cameras = sparse.cameras
 
     for image in sparse.images.values():
         cam_id = image.camera_id
         camera = cameras[cam_id]
-        intrinsics = np.array([
-            [camera.focal_length_x, 0, camera.principal_point_x],
-            [0, camera.focal_length_y, camera.principal_point_y],
-            [0, 0, 1]
-        ])
+        intrinsics = np.array(
+            [[camera.focal_length_x, 0, camera.principal_point_x],
+             [0, camera.focal_length_y, camera.principal_point_y], [0, 0, 1]])
         pose = np.eye(4)
         pose[:3, :4] = image.cam_from_world().matrix()
 
@@ -174,6 +196,7 @@ def retrieve_projs_from_reconstruction(
 
 
 def write_ply(filename, points):
+    """Writes (N, 6) xyz + 0-255 rgb points as a binary PLY file."""
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points[:, :3])
     pcd.colors = o3d.utility.Vector3dVector(points[:, 3:] / 255.)
@@ -181,6 +204,7 @@ def write_ply(filename, points):
 
 
 def main() -> None:
+    """Fuses the depth maps of every scan in `scan_list_test.txt`."""
     args = parser.parse_args()
     data_list = os.path.join(args.root_path, "scan_list_test.txt")
     with open(data_list, 'r', encoding='utf-8') as file:
@@ -188,9 +212,8 @@ def main() -> None:
     all_scenes = list(map(str.strip, all_scenes))
 
     device = 'cuda'
-    MAX_TRIALS = 3
 
-    pbar = trange(len(all_scenes), desc="Fusing depth maps...")
+    pbar = tqdm.trange(len(all_scenes), desc="Fusing depth maps...")
     for scene in all_scenes:
         sparse_path = os.path.join(args.depth_path, scene, "sparse")
         sparse = pycolmap.Reconstruction(sparse_path)
@@ -198,9 +221,14 @@ def main() -> None:
         extrinsic_dict, intrinsic_dict = retrieve_projs_from_reconstruction(
             sparse)
 
-        _image_paths, rgbs, depths, projs, _extrinsics, _intrinsics, valid_masks = load_data(
-            args.root_path, args.depth_path, scene, extrinsic_dict, intrinsic_dict
-        )
+        (_image_paths, rgbs, depths, projs, _extrinsics, _intrinsics,
+         valid_masks) = load_data(
+             args.root_path,
+             args.depth_path,
+             scene,
+             extrinsic_dict,
+             intrinsic_dict,
+         )
         depths = torch.from_numpy(depths).float().to(device)
         projs = torch.from_numpy(projs).float().to(device)
         valid_masks = torch.from_numpy(valid_masks).to(device)
@@ -209,15 +237,18 @@ def main() -> None:
         num_trials = 0
         dist_thresh = args.dist_thresh
         num_consist = args.num_consist
-        while num_fused_points == 0 and num_trials <= MAX_TRIALS:
-            fused_points = depth_fusion(
-                depths, projs, rgbs, valid_masks,
+        while num_fused_points == 0 and num_trials <= _MAX_TRIALS:
+            fused_points = mvs_depth_fusion.depth_fusion(
+                depths,
+                projs,
+                rgbs,
+                valid_masks,
                 dist_thresh=dist_thresh,
                 num_consist=num_consist,
             )
 
             mask = np.ones(fused_points.shape[0], dtype=bool)
-            mask = randomly_limit_trues(mask, args.max_points)
+            mask = geometry_utils.randomly_limit_trues(mask, args.max_points)
             fused_points = fused_points[mask]
             num_fused_points = len(fused_points)
 
@@ -228,12 +259,13 @@ def main() -> None:
             num_trials += 1
 
         # Overwrite the original points with the filtered points.
-        colmap_points3D = to_colmap_points(
+        colmap_points = geometry_utils.to_colmap_points(
             fused_points[:, :3],
             (fused_points[:, 3:] * 255).astype(np.uint8),
         )
         colmap_points_path = os.path.join(sparse_path, "points3D.bin")
-        write_points3D_binary(colmap_points3D, colmap_points_path)
+        read_write_model.write_points3D_binary(colmap_points,
+                                               colmap_points_path)
 
         ply_path = os.path.join(sparse_path, "points3D.ply")
         write_ply(ply_path, fused_points)

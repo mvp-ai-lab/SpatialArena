@@ -1,9 +1,11 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+"""Image Matching Challenge (IMC) dataset in the canonical SfM layout."""
 
-from spatialarena.eval.canonical_dataset import CanonicalDataset
+from spatialarena.eval import canonical_dataset
 
 
-class DatasetIMC(CanonicalDataset):
+class DatasetIMC(canonical_dataset.CanonicalDataset):
+    """IMC scenes for the SfM task."""
     dataset_name = "imc"
     task_name = "SfM"

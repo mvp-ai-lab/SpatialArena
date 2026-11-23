@@ -14,7 +14,8 @@ from spatialarena.download import (
 )
 
 
-def test_list_supported_datasets_covers_the_full_task_track_matrix_dataset_set():
+def test_list_supported_datasets_covers_the_full_task_track_matrix_dataset_set(
+):
     from spatialarena.eval.dataset_registry import DEFAULT_DATASET_SPECS
 
     listed = {(e["task"], e["dataset"]) for e in list_supported_datasets()}
@@ -23,7 +24,8 @@ def test_list_supported_datasets_covers_the_full_task_track_matrix_dataset_set()
     assert not missing, f"registered datasets with no download registry entry: {missing}"
 
 
-def test_list_supported_datasets_never_claims_automated_without_verified_steps():
+def test_list_supported_datasets_never_claims_automated_without_verified_steps(
+):
     for entry in list_supported_datasets():
         if entry["status"] == "automated":
             # Either it has its own steps, or its notes explain which sibling
@@ -39,7 +41,8 @@ def _mock_run(returncode=0):
     return result
 
 
-def test_download_dataset_skips_non_automated_entries_without_running_anything(tmp_path):
+def test_download_dataset_skips_non_automated_entries_without_running_anything(
+        tmp_path):
     entry = next(e for e in DATASET_DOWNLOADS if e.status == "manual")
     with patch("spatialarena.download.subprocess.run") as mock_run:
         result = download_dataset(
@@ -55,7 +58,8 @@ def test_download_dataset_skips_non_automated_entries_without_running_anything(t
 
 
 def test_download_dataset_runs_steps_in_order_and_stops_on_failure(tmp_path):
-    entry = next(e for e in DATASET_DOWNLOADS if e.task == "MonoDepth" and e.dataset == "marigold")
+    entry = next(e for e in DATASET_DOWNLOADS
+                 if e.task == "MonoDepth" and e.dataset == "marigold")
     assert len(entry.steps) == 2  # download, materialize
 
     calls = []
@@ -79,7 +83,8 @@ def test_download_dataset_runs_steps_in_order_and_stops_on_failure(tmp_path):
 
 
 def test_download_dataset_formats_benchmark_root_into_env_and_args(tmp_path):
-    entry = next(e for e in DATASET_DOWNLOADS if e.task == "MonoDepth" and e.dataset == "marigold")
+    entry = next(e for e in DATASET_DOWNLOADS
+                 if e.task == "MonoDepth" and e.dataset == "marigold")
 
     seen_envs = []
     seen_argvs = []
@@ -99,10 +104,12 @@ def test_download_dataset_formats_benchmark_root_into_env_and_args(tmp_path):
         )
 
     assert result["status"] == "ok"
-    assert seen_envs[0]["DATA_ROOT_PATH"] == str(tmp_path / "benchmarks" / "MonoDepth")
+    assert seen_envs[0]["DATA_ROOT_PATH"] == str(tmp_path / "benchmarks" /
+                                                 "MonoDepth")
     assert seen_envs[0]["PATH"] == "/usr/bin"  # base process env preserved
     materialize_argv = seen_argvs[1]
-    assert str(tmp_path / "benchmarks" / "MonoDepth" / "marigold") in materialize_argv
+    assert str(tmp_path / "benchmarks" / "MonoDepth" /
+               "marigold") in materialize_argv
 
 
 def test_download_all_supported_datasets_respects_dataset_filter(tmp_path):
@@ -122,8 +129,13 @@ def test_download_all_supported_datasets_respects_dataset_filter(tmp_path):
 
 
 def test_download_all_supported_datasets_skips_already_present(tmp_path):
+
     def fake_describe(*, benchmark_root, tasks, datasets):  # pylint: disable=unused-argument
-        return [{"exists": True, "metadata_required": True, "metadata_exists": True}]
+        return [{
+            "exists": True,
+            "metadata_required": True,
+            "metadata_exists": True
+        }]
 
     with patch("spatialarena.download.subprocess.run") as mock_run, \
          patch("spatialarena.download.describe_benchmark_scenes", side_effect=fake_describe):
@@ -146,10 +158,9 @@ def test_list_supported_models_matches_registry_size():
     models = list_supported_models()
     assert len(models) == len(METHOD_SPECS)
     assert sum(1 for m in models if m["automatable"]) == sum(
-        1
-        for m in models
-        if m["ckpt_kind"] in ("hf_hub", "url", "gdrive", "hf_file", "shipped_with_code", "hf_local_files")
-    )
+        1 for m in models
+        if m["ckpt_kind"] in ("hf_hub", "url", "gdrive", "hf_file",
+                              "shipped_with_code", "hf_local_files"))
 
 
 def test_download_checkpoint_hf_hub_calls_snapshot_download(tmp_path):
@@ -157,12 +168,19 @@ def test_download_checkpoint_hf_hub_calls_snapshot_download(tmp_path):
     from spatialarena.methods import resolve_method
 
     spec = resolve_method("PI3_X")
-    with patch("huggingface_hub.snapshot_download", return_value="/fake/snapshot/path") as mock_snapshot:
-        result = download_checkpoint(
-            spec, shared_checkpoint_root=tmp_path / "ckpt", shared_hf_home=tmp_path / "hf"
-        )
-    mock_snapshot.assert_called_once_with(repo_id=spec.ckpt_default, cache_dir=str(tmp_path / "hf"))
-    assert result == {"name": "PI3_X", "status": "ok", "kind": "hf_hub", "path": "/fake/snapshot/path"}
+    with patch("huggingface_hub.snapshot_download",
+               return_value="/fake/snapshot/path") as mock_snapshot:
+        result = download_checkpoint(spec,
+                                     shared_checkpoint_root=tmp_path / "ckpt",
+                                     shared_hf_home=tmp_path / "hf")
+    mock_snapshot.assert_called_once_with(repo_id=spec.ckpt_default,
+                                          cache_dir=str(tmp_path / "hf"))
+    assert result == {
+        "name": "PI3_X",
+        "status": "ok",
+        "kind": "hf_hub",
+        "path": "/fake/snapshot/path"
+    }
 
 
 def test_download_checkpoint_hf_hub_not_found_is_skipped_not_a_crash(tmp_path):
@@ -178,10 +196,11 @@ def test_download_checkpoint_hf_hub_not_found_is_skipped_not_a_crash(tmp_path):
     from spatialarena.methods import resolve_method
 
     spec = resolve_method("PI3_X")
-    with patch("huggingface_hub.snapshot_download", side_effect=HfHubHTTPError("not found", response=Mock())):
-        result = download_checkpoint(
-            spec, shared_checkpoint_root=tmp_path / "ckpt", shared_hf_home=tmp_path / "hf"
-        )
+    with patch("huggingface_hub.snapshot_download",
+               side_effect=HfHubHTTPError("not found", response=Mock())):
+        result = download_checkpoint(spec,
+                                     shared_checkpoint_root=tmp_path / "ckpt",
+                                     shared_hf_home=tmp_path / "hf")
     assert result["status"] == "skipped"
     assert result["kind"] == "hf_hub"
     assert spec.ckpt_default in result["reason"]
@@ -199,9 +218,9 @@ def test_download_checkpoint_url_downloads_to_local_checkpoint_store(tmp_path):
     fake_response.__exit__ = lambda self, *a: None
 
     with patch("requests.get", return_value=fake_response) as mock_get:
-        result = download_checkpoint(
-            spec, shared_checkpoint_root=tmp_path / "ckpt", shared_hf_home=tmp_path / "hf"
-        )
+        result = download_checkpoint(spec,
+                                     shared_checkpoint_root=tmp_path / "ckpt",
+                                     shared_hf_home=tmp_path / "hf")
 
     mock_get.assert_called_once()
     assert result["status"] == "ok"
@@ -217,9 +236,9 @@ def test_download_checkpoint_local_file_is_skipped_not_guessed(tmp_path):
 
     spec = resolve_method("VGGT")
     with patch("requests.get") as mock_get:
-        result = download_checkpoint(
-            spec, shared_checkpoint_root=tmp_path / "ckpt", shared_hf_home=tmp_path / "hf"
-        )
+        result = download_checkpoint(spec,
+                                     shared_checkpoint_root=tmp_path / "ckpt",
+                                     shared_hf_home=tmp_path / "hf")
     mock_get.assert_not_called()
     assert result["status"] == "skipped"
     assert result["kind"] == "local_file"
@@ -231,7 +250,8 @@ def test_download_checkpoint_gdrive_variable_dependent_uses_gdown(tmp_path):
 
     spec = resolve_method("CUT3R")
     method_code_root = tmp_path / "code"
-    expected_dest = Path(spec.ckpt_default.replace("$METHOD_CODE_ROOT", str(method_code_root)))
+    expected_dest = Path(
+        spec.ckpt_default.replace("$METHOD_CODE_ROOT", str(method_code_root)))
     with patch("subprocess.run") as mock_run:
         result = download_checkpoint(
             spec,
@@ -240,7 +260,8 @@ def test_download_checkpoint_gdrive_variable_dependent_uses_gdown(tmp_path):
             method_code_root=method_code_root,
         )
     mock_run.assert_called_once_with(
-        ["gdown", GDRIVE_CHECKPOINT_URLS["CUT3R"], "-O", str(expected_dest)],
+        ["gdown", GDRIVE_CHECKPOINT_URLS["CUT3R"], "-O",
+         str(expected_dest)],
         check=True,
     )
     assert result["status"] == "ok"
@@ -249,15 +270,16 @@ def test_download_checkpoint_gdrive_variable_dependent_uses_gdown(tmp_path):
     assert expected_dest.parent.is_dir()
 
 
-def test_download_checkpoint_gdrive_without_method_code_root_is_skipped_not_guessed():
+def test_download_checkpoint_gdrive_without_method_code_root_is_skipped_not_guessed(
+):
     from spatialarena.download import download_checkpoint
     from spatialarena.methods import resolve_method
 
     spec = resolve_method("CUT3R")
     with patch("subprocess.run") as mock_run:
-        result = download_checkpoint(
-            spec, shared_checkpoint_root=Path("/tmp/ckpt"), shared_hf_home=Path("/tmp/hf")
-        )
+        result = download_checkpoint(spec,
+                                     shared_checkpoint_root=Path("/tmp/ckpt"),
+                                     shared_hf_home=Path("/tmp/hf"))
     mock_run.assert_not_called()
     assert result["status"] == "skipped"
 
@@ -290,11 +312,17 @@ def test_download_checkpoint_shipped_with_code_copies_from_the_clone(tmp_path):
         method_code_root=method_code_root,
     )
     expected_dest = shared_checkpoint_root / "local" / "come" / "checkpoint.pth"
-    assert result == {"name": "COME", "status": "ok", "kind": "shipped_with_code", "path": str(expected_dest)}
+    assert result == {
+        "name": "COME",
+        "status": "ok",
+        "kind": "shipped_with_code",
+        "path": str(expected_dest)
+    }
     assert expected_dest.read_bytes() == b"fake-checkpoint-bytes"
 
 
-def test_download_checkpoint_shipped_with_code_skips_when_source_missing(tmp_path):
+def test_download_checkpoint_shipped_with_code_skips_when_source_missing(
+        tmp_path):
     from spatialarena.download import download_checkpoint
     from spatialarena.methods import resolve_method
 
@@ -319,7 +347,8 @@ def test_download_checkpoint_hf_file_reports_gated_access_not_a_crash(tmp_path):
 
     spec = resolve_method("IGGT4D")
     method_code_root = tmp_path / "code"
-    with patch("huggingface_hub.hf_hub_download", side_effect=HfHubHTTPError("gated", response=Mock())):
+    with patch("huggingface_hub.hf_hub_download",
+               side_effect=HfHubHTTPError("gated", response=Mock())):
         result = download_checkpoint(
             spec,
             shared_checkpoint_root=tmp_path / "ckpt",
@@ -347,7 +376,8 @@ def test_download_all_supported_models_filters_by_name(tmp_path):
         )
     assert {r["name"] for r in results} == {"PI3_X", "COME"}
     assert next(r for r in results if r["name"] == "PI3_X")["status"] == "ok"
-    assert next(r for r in results if r["name"] == "COME")["status"] == "skipped"
+    assert next(
+        r for r in results if r["name"] == "COME")["status"] == "skipped"
 
 
 def test_code_leaf_dir_handles_nested_and_shared_paths():
@@ -370,7 +400,8 @@ def test_list_supported_method_code_matches_registry_size():
             assert entry["notes"], entry
 
 
-def test_list_supported_method_code_never_claims_automated_without_a_verified_repo():
+def test_list_supported_method_code_never_claims_automated_without_a_verified_repo(
+):
     from spatialarena.download import METHOD_CODE_REPOS, list_supported_method_code
 
     for entry in list_supported_method_code():
@@ -378,7 +409,8 @@ def test_list_supported_method_code_never_claims_automated_without_a_verified_re
             assert entry["repo_url"] == METHOD_CODE_REPOS[entry["leaf_dir"]]
 
 
-def test_download_method_code_skips_leaves_with_no_verified_repo(tmp_path, monkeypatch):
+def test_download_method_code_skips_leaves_with_no_verified_repo(
+        tmp_path, monkeypatch):
     from spatialarena import download as download_module
     from spatialarena.methods import resolve_method
 
@@ -387,7 +419,8 @@ def test_download_method_code_skips_leaves_with_no_verified_repo(tmp_path, monke
     monkeypatch.setattr(download_module, "METHOD_CODE_REPOS", {})
     spec = resolve_method("PI3_X")
     with patch("spatialarena.download.subprocess.run") as mock_run:
-        result = download_module.download_method_code(spec, method_code_root=tmp_path)
+        result = download_module.download_method_code(spec,
+                                                      method_code_root=tmp_path)
     mock_run.assert_not_called()
     assert result["status"] == "skipped"
 
@@ -399,9 +432,15 @@ def test_download_method_code_skips_existing_directory(tmp_path):
     spec = resolve_method("PI3_X")
     (tmp_path / "Pi3").mkdir()
     with patch("spatialarena.download.subprocess.run") as mock_run:
-        result = download_method_code(spec, method_code_root=tmp_path, skip_existing=True)
+        result = download_method_code(spec,
+                                      method_code_root=tmp_path,
+                                      skip_existing=True)
     mock_run.assert_not_called()
-    assert result == {"name": "PI3_X", "status": "already_present", "path": str(tmp_path / "Pi3")}
+    assert result == {
+        "name": "PI3_X",
+        "status": "already_present",
+        "path": str(tmp_path / "Pi3")
+    }
 
 
 def test_download_method_code_clones_via_git(tmp_path):
@@ -409,7 +448,8 @@ def test_download_method_code_clones_via_git(tmp_path):
     from spatialarena.methods import resolve_method
 
     spec = resolve_method("PI3_X")
-    with patch("spatialarena.download.subprocess.run", return_value=_mock_run()) as mock_run:
+    with patch("spatialarena.download.subprocess.run",
+               return_value=_mock_run()) as mock_run:
         result = download_method_code(spec, method_code_root=tmp_path)
     assert result["status"] == "ok"
     argv = mock_run.call_args.args[0]
@@ -418,14 +458,17 @@ def test_download_method_code_clones_via_git(tmp_path):
     assert argv[3] == str(tmp_path / "Pi3")
 
 
-def test_download_all_supported_method_code_shares_one_clone_across_methods(tmp_path):
+def test_download_all_supported_method_code_shares_one_clone_across_methods(
+        tmp_path):
     from spatialarena.download import download_all_supported_method_code
 
     def fake_run(argv, **kwargs):  # pylint: disable=unused-argument
-        Path(argv[3]).mkdir(parents=True)  # simulate `git clone` creating the dest dir
+        Path(argv[3]).mkdir(
+            parents=True)  # simulate `git clone` creating the dest dir
         return _mock_run()
 
-    with patch("spatialarena.download.subprocess.run", side_effect=fake_run) as mock_run:
+    with patch("spatialarena.download.subprocess.run",
+               side_effect=fake_run) as mock_run:
         results = download_all_supported_method_code(
             methods=["VGGT", "FASTVGGT", "ROBUSTVGGT"],
             method_code_root=tmp_path,

@@ -1,20 +1,32 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+"""Depth alignment and error metrics adapted from AMB3R's depth evaluation.
 
-# This script is adapted
-# from https://github.com/HengyiWang/amb3r/blob/main/benchmark/tools/depth_eval.py
+Adapted from
+https://github.com/HengyiWang/amb3r/blob/main/benchmark/tools/depth_eval.py
+"""
 
 from typing import Union
 
-import torch
 import numpy as np
-from scipy.optimize import minimize
+from scipy import optimize
+import torch
 
 
-def depth2disparity(
-    depth: Union[torch.Tensor, np.ndarray],
-    return_mask: bool = False
-):
+def depth2disparity(depth: Union[torch.Tensor, np.ndarray],
+                    return_mask: bool = False):
+    """Returns 1 / depth where depth > 0 and 0 elsewhere.
+
+    Args:
+        depth: Depth map, as a tensor or array.
+        return_mask: Also return the mask of positive depths.
+
+    Returns:
+        The disparity, or (disparity, positive-depth mask) with `return_mask`.
+
+    Raises:
+        TypeError: If `depth` is neither a tensor nor an array.
+    """
     if isinstance(depth, torch.Tensor):
         disparity = torch.zeros_like(depth)
     elif isinstance(depth, np.ndarray):
@@ -32,6 +44,7 @@ def depth2disparity(
 
 
 def absolute_error_loss(params, predicted_depth, ground_truth_depth):
+    """Sum of |s * predicted_depth + t - ground_truth_depth| for (s, t)."""
     s, t = params
 
     predicted_aligned = s * predicted_depth + t
@@ -40,18 +53,27 @@ def absolute_error_loss(params, predicted_depth, ground_truth_depth):
     return np.sum(abs_error)
 
 
-def absolute_value_scaling(
-    predicted_depth: torch.Tensor,
-    ground_truth_depth: torch.Tensor,
-    s: float = 1,
-    t: float = 0
-):
+def absolute_value_scaling(predicted_depth: torch.Tensor,
+                           ground_truth_depth: torch.Tensor,
+                           s: float = 1,
+                           t: float = 0):
+    """Fits scale s and shift t under an L1 loss with scipy's minimize.
+
+    Args:
+        predicted_depth: Predicted values.
+        ground_truth_depth: GT values, paired with `predicted_depth`.
+        s: Initial scale.
+        t: Initial shift.
+
+    Returns:
+        (s, t).
+    """
     predicted_depth_np = predicted_depth.cpu().numpy().reshape(-1)
     ground_truth_depth_np = ground_truth_depth.cpu().numpy().reshape(-1)
 
     initial_params = [s, t]
 
-    result = minimize(
+    result = optimize.minimize(
         absolute_error_loss,
         initial_params,
         args=(predicted_depth_np, ground_truth_depth_np),
@@ -70,6 +92,20 @@ def absolute_value_scaling2(
     max_iters: int = 1000,
     tol: float = 1e-6,
 ):
+    """Fits scale s and shift t under an L1 loss with Adam.
+
+    Args:
+        predicted_depth: Predicted values.
+        ground_truth_depth: GT values, paired with `predicted_depth`.
+        s_init: Initial scale.
+        t_init: Initial shift.
+        lr: Adam learning rate.
+        max_iters: Maximum number of steps.
+        tol: Stop when the loss changes by less than this.
+
+    Returns:
+        (s, t) as floats.
+    """
     s = torch.tensor(
         [s_init],
         requires_grad=True,
@@ -126,19 +162,33 @@ def depth_evaluation(
     align_with_scale=False,
     disp_input=False,
 ):
-    """
-    Evaluate the depth map using various metrics and return a depth error parity map, with an option for least
-    squares alignment.
+    """Aligns a depth map to the ground truth and computes depth metrics.
+
+    Without an alignment flag the prediction is aligned by median scaling.
 
     Args:
-        predicted_depth (numpy.ndarray or torch.Tensor): The predicted depth map.
-        ground_truth_depth (numpy.ndarray or torch.Tensor): The ground truth depth map.
-        max_depth (float): The maximum depth value to consider. Default is 80 meters.
-        align_with_lstsq (bool): If True, perform least squares alignment of the predicted depth with ground truth.
+        predicted_depth_original: The predicted depth map (array or tensor).
+        ground_truth_depth_original: The ground truth depth map (array or
+            tensor).
+        max_depth: The maximum GT depth to consider, or None for no limit.
+        custom_mask: Optional extra mask of pixels to score.
+        post_clip_min: Clip the aligned prediction from below.
+        post_clip_max: Clip the aligned prediction from above.
+        pre_clip_min: Clip the prediction from below before alignment.
+        pre_clip_max: Clip the prediction from above before alignment.
+        align_with_lstsq: Align scale and shift by least squares.
+        align_with_lad: Align scale and shift by L1 (scipy).
+        align_with_lad2: Align scale and shift by L1 (Adam).
+        metric_scale: Score the prediction as it is.
+        lr: Adam learning rate for `align_with_lad2`.
+        max_iters: Adam steps for `align_with_lad2`.
+        use_gpu: Move the maps to CUDA.
+        align_with_scale: Align the scale alone by IRLS.
+        disp_input: The prediction is a disparity; align in disparity space.
 
     Returns:
-        dict: A dictionary containing the evaluation metrics.
-        torch.Tensor: The depth error parity map.
+        (metrics dict, depth error parity map, predicted depth map, GT depth
+        map), the maps at the full image size.
     """
     if isinstance(predicted_depth_original, np.ndarray):
         predicted_depth_original = torch.from_numpy(predicted_depth_original)
@@ -148,7 +198,7 @@ def depth_evaluation(
     if custom_mask is not None and isinstance(custom_mask, np.ndarray):
         custom_mask = torch.from_numpy(custom_mask)
 
-    # if the dimension is 3, flatten to 2d along the batch dimension
+    # If the dimension is 3, flatten to 2D along the batch dimension.
     if predicted_depth_original.dim() == 3:
         _, _, w = predicted_depth_original.shape
         predicted_depth_original = predicted_depth_original.view(-1, w)
@@ -156,51 +206,54 @@ def depth_evaluation(
         if custom_mask is not None:
             custom_mask = custom_mask.view(-1, w)
 
-    # put to device
+    # Put to device.
     if use_gpu:
         predicted_depth_original = predicted_depth_original.cuda()
         ground_truth_depth_original = ground_truth_depth_original.cuda()
 
-    # Filter out depths greater than max_depth
+    # Filter out depths greater than max_depth.
     if max_depth is not None:
-        mask = (ground_truth_depth_original > 0) & (
-            ground_truth_depth_original < max_depth
-        )
+        mask = (ground_truth_depth_original > 0) & (ground_truth_depth_original
+                                                    < max_depth)
     else:
         mask = ground_truth_depth_original > 0
     predicted_depth = predicted_depth_original[mask]
     ground_truth_depth = ground_truth_depth_original[mask]
 
-    # Clip the depth values
+    # Clip the depth values.
     if pre_clip_min is not None:
         predicted_depth = torch.clamp(predicted_depth, min=pre_clip_min)
     if pre_clip_max is not None:
         predicted_depth = torch.clamp(predicted_depth, max=pre_clip_max)
 
-    if disp_input:  # align the pred to gt in the disparity space
+    if disp_input:  # Align the pred to GT in the disparity space.
         real_gt = ground_truth_depth.clone()
         ground_truth_depth = 1 / (ground_truth_depth + 1e-8)
 
-    # various alignment methods
+    # Alignment methods.
     if metric_scale:
-        pass  # metric-scale predictions are scored as they are
+        pass  # Metric-scale predictions are scored as they are.
     elif align_with_lstsq:
-        # Convert to numpy for lstsq
+        # Convert to numpy for lstsq.
         predicted_depth_np = predicted_depth.cpu().numpy().reshape(-1, 1)
         ground_truth_depth_np = ground_truth_depth.cpu().numpy().reshape(-1, 1)
 
-        # Add a column of ones for the shift term
-        A = np.hstack([predicted_depth_np, np.ones_like(predicted_depth_np)])
+        # Add a column of ones for the shift term.
+        design_matrix = np.hstack(
+            [predicted_depth_np,
+             np.ones_like(predicted_depth_np)])
 
-        # Solve for scale (s) and shift (t) using least squares
-        result = np.linalg.lstsq(A, ground_truth_depth_np, rcond=None)
+        # Solve for scale (s) and shift (t) using least squares.
+        result = np.linalg.lstsq(design_matrix,
+                                 ground_truth_depth_np,
+                                 rcond=None)
         s, t = result[0][0], result[0][1]
 
-        # convert to torch tensor
+        # Convert to torch tensors.
         s = torch.tensor(s, device=predicted_depth_original.device)
         t = torch.tensor(t, device=predicted_depth_original.device)
 
-        # Apply scale and shift
+        # Apply scale and shift.
         predicted_depth = s * predicted_depth + t
     elif align_with_lad:
         s, t = absolute_value_scaling(
@@ -210,9 +263,8 @@ def depth_evaluation(
         )
         predicted_depth = s * predicted_depth + t
     elif align_with_lad2:
-        s_init = (
-            torch.median(ground_truth_depth) / torch.median(predicted_depth)
-        ).item()
+        s_init = (torch.median(ground_truth_depth) /
+                  torch.median(predicted_depth)).item()
         s, t = absolute_value_scaling2(
             predicted_depth,
             ground_truth_depth,
@@ -222,50 +274,49 @@ def depth_evaluation(
         )
         predicted_depth = s * predicted_depth + t
     elif align_with_scale:
-        # Compute initial scale factor 's' using the closed-form solution (L2 norm)
+        # Compute the initial scale factor 's' using the closed-form solution
+        # (L2 norm).
         dot_pred_gt = torch.nanmean(ground_truth_depth)
         dot_pred_pred = torch.nanmean(predicted_depth)
         s = dot_pred_gt / dot_pred_pred
 
-        # Iterative reweighted least squares using the Weiszfeld method
+        # Iterative reweighted least squares using the Weiszfeld method.
         for _ in range(10):
-            # Compute residuals between scaled predictions and ground truth
+            # Compute residuals between scaled predictions and ground truth.
             residuals = s * predicted_depth - ground_truth_depth
-            abs_residuals = (
-                residuals.abs() + 1e-8
-            )  # Add small constant to avoid division by zero
+            # Add a small constant to avoid division by zero.
+            abs_residuals = residuals.abs() + 1e-8
 
-            # Compute weights inversely proportional to the residuals
+            # Compute weights inversely proportional to the residuals.
             weights = 1.0 / abs_residuals
 
-            # Update 's' using weighted sums
-            weighted_dot_pred_gt = torch.sum(
-                weights * predicted_depth * ground_truth_depth
-            )
+            # Update 's' using weighted sums.
+            weighted_dot_pred_gt = torch.sum(weights * predicted_depth *
+                                             ground_truth_depth)
             weighted_dot_pred_pred = torch.sum(weights * predicted_depth**2)
             s = weighted_dot_pred_gt / weighted_dot_pred_pred
 
-        # Optionally clip 's' to prevent extreme scaling
+        # Clip 's' to prevent extreme scaling.
         s = s.clamp(min=1e-3)
 
-        # Detach 's' if you want to stop gradients from flowing through it
+        # Detach 's' to stop gradients from flowing through it.
         s = s.detach()
 
-        # Apply the scale factor to the predicted depth
+        # Apply the scale factor to the predicted depth.
         predicted_depth = s * predicted_depth
 
     else:
-        # Align the predicted depth with the ground truth using median scaling
-        scale_factor = torch.median(
-            ground_truth_depth) / torch.median(predicted_depth)
+        # Align the predicted depth with the ground truth by median scaling.
+        scale_factor = torch.median(ground_truth_depth) / torch.median(
+            predicted_depth)
         predicted_depth *= scale_factor
 
     if disp_input:
-        # convert back to depth
+        # Convert back to depth.
         ground_truth_depth = real_gt
         predicted_depth = depth2disparity(predicted_depth)
 
-    # Clip the predicted depth values
+    # Clip the predicted depth values.
     if post_clip_min is not None:
         predicted_depth = torch.clamp(predicted_depth, min=post_clip_min)
     if post_clip_max is not None:
@@ -277,89 +328,61 @@ def depth_evaluation(
         predicted_depth = predicted_depth[mask_within_mask]
         ground_truth_depth = ground_truth_depth[mask_within_mask]
 
-    # Calculate the metrics
+    # Calculate the metrics.
     abs_rel = torch.mean(
-        torch.abs(predicted_depth - ground_truth_depth) / ground_truth_depth
-    ).item()
-    sq_rel = torch.mean(
-        ((predicted_depth - ground_truth_depth) ** 2) / ground_truth_depth
-    ).item()
+        torch.abs(predicted_depth - ground_truth_depth) /
+        ground_truth_depth).item()
+    sq_rel = torch.mean(((predicted_depth - ground_truth_depth)**2) /
+                        ground_truth_depth).item()
 
-    # Correct RMSE calculation
+    # Correct RMSE calculation.
     rmse = torch.sqrt(torch.mean(
-        (predicted_depth - ground_truth_depth) ** 2)).item()
+        (predicted_depth - ground_truth_depth)**2)).item()
 
-    # Clip the depth values to avoid log(0)
+    # Clip the depth values to avoid log(0).
     predicted_depth = torch.clamp(predicted_depth, min=1e-5)
     log_rmse = torch.sqrt(
         torch.mean((torch.log(predicted_depth) -
-                   torch.log(ground_truth_depth)) ** 2)
-    ).item()
+                    torch.log(ground_truth_depth))**2)).item()
 
-    # Calculate the accuracy thresholds
-    max_ratio = torch.maximum(
-        predicted_depth / ground_truth_depth, ground_truth_depth / predicted_depth
-    )
+    # Calculate the accuracy thresholds.
+    max_ratio = torch.maximum(predicted_depth / ground_truth_depth,
+                              ground_truth_depth / predicted_depth)
     threshold_0 = torch.mean((max_ratio < 1.0).float()).item()
     threshold_103 = torch.mean((max_ratio < 1.03).float()).item()
     threshold_1 = torch.mean((max_ratio < 1.25).float()).item()
     threshold_2 = torch.mean((max_ratio < 1.25**2).float()).item()
     threshold_3 = torch.mean((max_ratio < 1.25**3).float()).item()
 
-    # Compute the depth error parity map
+    # Compute the depth error parity map.
     if metric_scale:
-        if disp_input:
-            predicted_depth_original = depth2disparity(
-                predicted_depth_original)
-        depth_error_parity_map = (
-            torch.abs(predicted_depth_original - ground_truth_depth_original)
-            / ground_truth_depth_original
-        )
+        pass
     elif align_with_lstsq or align_with_lad or align_with_lad2:
         predicted_depth_original = predicted_depth_original * s + t
-        if disp_input:
-            predicted_depth_original = depth2disparity(
-                predicted_depth_original)
-        depth_error_parity_map = (
-            torch.abs(predicted_depth_original - ground_truth_depth_original)
-            / ground_truth_depth_original
-        )
     elif align_with_scale:
         predicted_depth_original = predicted_depth_original * s
-        if disp_input:
-            predicted_depth_original = depth2disparity(
-                predicted_depth_original)
-        depth_error_parity_map = (
-            torch.abs(predicted_depth_original - ground_truth_depth_original)
-            / ground_truth_depth_original
-        )
     else:
         predicted_depth_original = predicted_depth_original * scale_factor
-        if disp_input:
-            predicted_depth_original = depth2disparity(
-                predicted_depth_original)
-        depth_error_parity_map = (
-            torch.abs(predicted_depth_original - ground_truth_depth_original)
-            / ground_truth_depth_original
-        )
+    if disp_input:
+        predicted_depth_original = depth2disparity(predicted_depth_original)
+    depth_error_parity_map = (
+        torch.abs(predicted_depth_original - ground_truth_depth_original) /
+        ground_truth_depth_original)
 
-    # Reshape the depth_error_parity_map back to the original image size
+    # Reshape the depth_error_parity_map back to the original image size.
     depth_error_parity_map_full = torch.zeros_like(ground_truth_depth_original)
-    depth_error_parity_map_full = torch.where(
-        mask, depth_error_parity_map, depth_error_parity_map_full
-    )
+    depth_error_parity_map_full = torch.where(mask, depth_error_parity_map,
+                                              depth_error_parity_map_full)
 
     predict_depth_map_full = predicted_depth_original
     gt_depth_map_full = torch.zeros_like(ground_truth_depth_original)
-    gt_depth_map_full = torch.where(
-        mask, ground_truth_depth_original, gt_depth_map_full
-    )
+    gt_depth_map_full = torch.where(mask, ground_truth_depth_original,
+                                    gt_depth_map_full)
 
-    num_valid_pixels = (
-        torch.sum(mask).item()
-        if custom_mask is None
-        else torch.sum(mask_within_mask).item()
-    )
+    if custom_mask is None:
+        num_valid_pixels = torch.sum(mask).item()
+    else:
+        num_valid_pixels = torch.sum(mask_within_mask).item()
     if num_valid_pixels == 0:
         (
             abs_rel,

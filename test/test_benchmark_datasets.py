@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Benchmark dataset layout: canonical dataset adapters, metadata/layout normalization and verification.
 """
 
@@ -32,21 +31,24 @@ def only(items):
 
 # ---- canonical_dataset_adapters ----------------------------------------------------------------------------
 
-def write_metadata(root: Path, dataset_name: str, scene_roots: list[Path]) -> None:
+
+def write_metadata(root: Path, dataset_name: str,
+                   scene_roots: list[Path]) -> None:
     metadata = {
-        "dataset_name": dataset_name,
-        "root_directory": str(root),
-        "total_images": len(scene_roots),
-        "average_images_per_scene": 1,
-        "scenes": [
-            {
-                "dataset_name": dataset_name,
-                "scene_name": scene_root.name,
-                "root_directory": str(scene_root),
-                "total_images": 1,
-            }
-            for scene_root in scene_roots
-        ],
+        "dataset_name":
+            dataset_name,
+        "root_directory":
+            str(root),
+        "total_images":
+            len(scene_roots),
+        "average_images_per_scene":
+            1,
+        "scenes": [{
+            "dataset_name": dataset_name,
+            "scene_name": scene_root.name,
+            "root_directory": str(scene_root),
+            "total_images": 1,
+        } for scene_root in scene_roots],
     }
     root.mkdir(parents=True, exist_ok=True)
     (root / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
@@ -61,7 +63,8 @@ def test_canonical_dataset_lists_materialized_scene_paths(tmp_path):
     (scene / "sparse" / "0").mkdir(parents=True)
     write_metadata(root, "custom", [scene])
 
-    scene_info = only(CanonicalDataset(root, task_name="VideoDepth").list_scenes())
+    scene_info = only(
+        CanonicalDataset(root, task_name="VideoDepth").list_scenes())
 
     assert scene_info.dataset == "custom"
     assert scene_info.task == "VideoDepth"
@@ -150,6 +153,7 @@ def test_dataset_wrappers_set_dataset_and_task_names(
 
 # ---- benchmark_metadata_layout -----------------------------------------------------------------------------
 
+
 def touch(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"test")
@@ -178,7 +182,8 @@ def test_metadata_prefers_imc_dense_images(tmp_path):
 
     touch(scene / "dense" / "images" / "000.jpg")
     touch(scene / "dense" / "images" / "001.jpg")
-    touch(scene / "dense" / "stereo" / "depth_maps_clean_300_th_0.10" / "000.png")
+    touch(scene / "dense" / "stereo" / "depth_maps_clean_300_th_0.10" /
+          "000.png")
 
     metadata = build_metadata(root)
 
@@ -206,14 +211,16 @@ def test_normalize_imc_links_images_depths_and_sparse(tmp_path):
     scene = root / "scene_a"
     (scene / "dense" / "images").mkdir(parents=True)
     (scene / "dense" / "sparse").mkdir(parents=True)
-    (scene / "dense" / "stereo" / "depth_maps_clean_300_th_0.10").mkdir(parents=True)
+    (scene / "dense" / "stereo" /
+     "depth_maps_clean_300_th_0.10").mkdir(parents=True)
 
     stats = normalize_imc(root)
 
     assert stats["copied"] == 3
     assert (scene / "images").is_dir() and not (scene / "images").is_symlink()
     assert (scene / "depths").is_dir() and not (scene / "depths").is_symlink()
-    assert (scene / "sparse" / "0").is_dir() and not (scene / "sparse" / "0").is_symlink()
+    assert (scene / "sparse" /
+            "0").is_dir() and not (scene / "sparse" / "0").is_symlink()
 
 
 def test_metadata_json_shape_is_serializable(tmp_path):
@@ -248,21 +255,24 @@ def test_metadata_counts_images_inside_tar_archives(tmp_path):
 
 # ---- verify_benchmark_datasets -----------------------------------------------------------------------------
 
-def write_verify_metadata(root: Path, dataset_name: str, scene_roots: list[Path]) -> None:
+
+def write_verify_metadata(root: Path, dataset_name: str,
+                          scene_roots: list[Path]) -> None:
     metadata = {
-        "dataset_name": dataset_name,
-        "root_directory": str(root),
-        "total_images": len(scene_roots),
-        "average_images_per_scene": 1,
-        "scenes": [
-            {
-                "dataset_name": dataset_name,
-                "scene_name": scene_root.name,
-                "root_directory": str(scene_root),
-                "total_images": 1,
-            }
-            for scene_root in scene_roots
-        ],
+        "dataset_name":
+            dataset_name,
+        "root_directory":
+            str(root),
+        "total_images":
+            len(scene_roots),
+        "average_images_per_scene":
+            1,
+        "scenes": [{
+            "dataset_name": dataset_name,
+            "scene_name": scene_root.name,
+            "root_directory": str(scene_root),
+            "total_images": 1,
+        } for scene_root in scene_roots],
     }
     root.mkdir(parents=True, exist_ok=True)
     (root / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
@@ -320,7 +330,8 @@ def test_missing_mvrecon_dataset_root_is_reported(tmp_path):
 
     assert len(issues) == 1
     assert issues[0].level == "error"
-    assert issues[0].message == f"dataset root missing: {tmp_path / 'MVRecon' / 'dtu'}"
+    assert issues[
+        0].message == f"dataset root missing: {tmp_path / 'MVRecon' / 'dtu'}"
 
 
 def test_verify_only_ready_reports_expected_issues(tmp_path):
@@ -329,4 +340,5 @@ def test_verify_only_ready_reports_expected_issues(tmp_path):
     issues = verify_records(records, only_ready=True)
 
     assert issues
-    assert all((issue.task, issue.dataset) in READY_REQUIREMENTS for issue in issues)
+    assert all(
+        (issue.task, issue.dataset) in READY_REQUIREMENTS for issue in issues)

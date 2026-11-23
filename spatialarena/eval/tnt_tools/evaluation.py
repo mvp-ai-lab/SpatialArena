@@ -32,9 +32,15 @@
 # This python script is for downloading dataset from www.tanksandtemples.org
 # The dataset has a different license, please refer to
 # https://tanksandtemples.org/license/
+"""Tanks and Temples precision, recall and F-score evaluation.
 
-import json
+Vendored from the official TanksAndTemples toolbox. Computes the point-to-point
+distances between a reconstruction and the ground truth, writes color-coded
+error clouds and the cumulative precision/recall curves.
+"""
+
 import copy
+import json
 
 import numpy as np
 import open3d as o3d
@@ -42,12 +48,14 @@ import matplotlib.pyplot as plt
 
 
 def read_alignment_transformation(filename):
+    """Reads the 4x4 alignment matrix from a Tanks and Temples JSON file."""
     with open(filename) as data_file:
         data = json.load(data_file)
     return np.asarray(data["transformation"]).reshape((4, 4)).transpose()
 
 
 def write_color_distances(path, pcd, distances, max_distance):
+    """Colors `pcd` by distance (clipped at `max_distance`) and writes it."""
     o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Debug)
     # cmap = plt.get_cmap("afmhot")
     cmap = plt.get_cmap("hot_r")
@@ -70,6 +78,15 @@ def EvaluateHisto(
     view_crop,
     verbose=True,
 ):
+    """Crops, downsamples and compares a reconstruction with the ground truth.
+
+    Writes the color-coded precision/recall clouds and the curve text files
+    under `filename_mvs`.
+
+    Returns:
+        [precision, recall, fscore, edges_source, cum_source, edges_target,
+        cum_target], as returned by `get_f1_score_histo2`.
+    """
     print("[EvaluateHisto]")
     o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Debug)
     s = copy.deepcopy(source)
@@ -77,9 +94,12 @@ def EvaluateHisto(
     if crop_volume is not None:
         s = crop_volume.crop_point_cloud(s)
         if view_crop:
-            o3d.visualization.draw_geometries([s, ])
+            o3d.visualization.draw_geometries([
+                s,
+            ])
     else:
-        print("No bounding box provided to crop estimated point cloud, leaving it as the loaded version!!")
+        print("No bounding box provided to crop estimated point cloud, "
+              "leaving it as the loaded version!!")
     s = s.voxel_down_sample(voxel_size)
     s.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamKNN(knn=20))
     print(filename_mvs + "/" + scene_name + ".precision.ply")
@@ -88,7 +108,8 @@ def EvaluateHisto(
     if crop_volume is not None:
         t = crop_volume.crop_point_cloud(t)
     else:
-        print("No bounding box provided to crop groundtruth point cloud, leaving it as the loaded version!!")
+        print("No bounding box provided to crop groundtruth point cloud, "
+              "leaving it as the loaded version!!")
 
     t = t.voxel_down_sample(voxel_size)
     t.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamKNN(knn=20))
@@ -106,7 +127,7 @@ def EvaluateHisto(
     print("[ViewDistances] Add color coding to visualize error")
     write_color_distances(target_n_fn, t, distance2, 3 * threshold)
 
-    # get histogram and f-score
+    # Get the histogram and F-score.
     [
         precision,
         recall,
@@ -141,6 +162,12 @@ def get_f1_score_histo2(threshold,
                         distance1,
                         distance2,
                         verbose=True):
+    """Computes precision, recall, F-score and the cumulative curves.
+
+    Returns:
+        [precision, recall, fscore, edges_source, cum_source, edges_target,
+        cum_target]; all zero when either distance list is empty.
+    """
     print("[get_f1_score_histo2]")
     dist_threshold = threshold
     if len(distance1) and len(distance2):
@@ -151,14 +178,12 @@ def get_f1_score_histo2(threshold,
             len(distance1))
         fscore = 2 * recall * precision / (recall + precision)
         num = len(distance1)
-        bins = np.arange(0, dist_threshold * plot_stretch,
-                         dist_threshold / 100)
+        bins = np.arange(0, dist_threshold * plot_stretch, dist_threshold / 100)
         hist, edges_source = np.histogram(distance1, bins)
         cum_source = np.cumsum(hist).astype(float) / num
 
         num = len(distance2)
-        bins = np.arange(0, dist_threshold * plot_stretch,
-                         dist_threshold / 100)
+        bins = np.arange(0, dist_threshold * plot_stretch, dist_threshold / 100)
         hist, edges_target = np.histogram(distance2, bins)
         cum_target = np.cumsum(hist).astype(float) / num
 

@@ -1,12 +1,15 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+"""Regenerate GenCeption's pose/raymap prompt embedding locally.
 
-"""Regenerate GenCeption's pose/raymap prompt embedding locally (a cross-check; the official one is released).
-
-Superseded: the GenCeption authors released ``assets/genception_prompt_embeddings/raymap.npy`` with their answer
-to https://github.com/google-deepmind/representations4d/issues/10 (closed 2026-11-10), and
-scripts/download/genception.sh downloads it; the benchmark uses that file. This script remains for checking a
-locally encoded embedding against it. It reconstructs the embedding following the issue reporter's write-up:
+This is a cross-check; the official embedding is released. Superseded: the
+GenCeption authors released `assets/genception_prompt_embeddings/raymap.npy`
+with their answer to
+https://github.com/google-deepmind/representations4d/issues/10 (closed
+2026-11-10), and scripts/download/genception.sh downloads it; the benchmark
+uses that file. This script remains for checking a locally encoded embedding
+against it. It reconstructs the embedding following the issue reporter's
+write-up:
 
   1. Prompt template: "Input: RGB. Output: <task>." -- inferred by matching
      UMT5 token counts against the released embeddings (depth.npy has 11
@@ -35,9 +38,10 @@ having torch present at all in the genception (JAX/Flax) env breaks jax's
 own CUDA 12 plugin, for reasons that held regardless of which torch version
 was installed -- see scripts/slurm/build_genception_env.sh's comments.
 
-Usage::
+Usage:
 
-    /path/to/si_bench/bin/python scripts/preprocess/generate_genception_raymap_prompt.py \\
+    /path/to/si_bench/bin/python \\
+        scripts/preprocess/generate_genception_raymap_prompt.py \\
         --released_depth_embedding /path/to/prompt_embeddings/depth.npy \\
         --output_dir /path/to/prompt_embeddings
 """
@@ -63,20 +67,42 @@ VERIFICATION_RELATIVE_ERROR_TOLERANCE = 1e-4
 
 
 def encode_prompt(tokenizer, model, text: str) -> np.ndarray:
-    import torch
+    """Encodes a prompt with UMT5 and zero-pads it to MAX_SEQ_LEN tokens.
 
-    inputs = tokenizer(text, return_tensors="pt", padding=False, truncation=False)
+    Args:
+        tokenizer: The UMT5 tokenizer.
+        model: The UMT5 encoder model.
+        text: The prompt.
+
+    Returns:
+        A float32 array of shape [1, MAX_SEQ_LEN, TEXT_DIM].
+
+    Raises:
+        ValueError: If the prompt is too long or the hidden size is not
+            TEXT_DIM.
+    """
+    import torch  # pylint: disable=import-outside-toplevel
+
+    inputs = tokenizer(text,
+                       return_tensors="pt",
+                       padding=False,
+                       truncation=False)
     input_ids = inputs["input_ids"].to(model.device)
     attention_mask = inputs["attention_mask"].to(model.device)
     with torch.no_grad():
-        hidden_states = model(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
-    hidden_states = hidden_states[0].float().cpu().numpy()  # [real_len, text_dim]
+        hidden_states = model(input_ids=input_ids,
+                              attention_mask=attention_mask).last_hidden_state
+    # Shape [real_len, text_dim].
+    hidden_states = hidden_states[0].float().cpu().numpy()
 
     real_len = hidden_states.shape[0]
     if real_len > MAX_SEQ_LEN:
-        raise ValueError(f"prompt {text!r} tokenizes to {real_len} tokens, exceeding max_seq_len={MAX_SEQ_LEN}")
+        raise ValueError(f"prompt {text!r} tokenizes to {real_len} tokens, "
+                         f"exceeding max_seq_len={MAX_SEQ_LEN}")
     if hidden_states.shape[1] != TEXT_DIM:
-        raise ValueError(f"unexpected UMT5 hidden size {hidden_states.shape[1]}, expected {TEXT_DIM}")
+        raise ValueError(
+            f"unexpected UMT5 hidden size {hidden_states.shape[1]}, "
+            f"expected {TEXT_DIM}")
 
     padded = np.zeros((1, MAX_SEQ_LEN, TEXT_DIM), dtype=np.float32)
     padded[0, :real_len] = hidden_states
@@ -84,51 +110,77 @@ def encode_prompt(tokenizer, model, text: str) -> np.ndarray:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    """Parses the command line."""
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "--released_depth_embedding",
         type=Path,
         required=True,
-        help="Path to the officially released depth.npy (see scripts/download/genception.sh).",
+        help=("Path to the officially released depth.npy "
+              "(see scripts/download/genception.sh)."),
     )
     parser.add_argument("--output_dir", type=Path, required=True)
     parser.add_argument("--umt5_model_id", type=str, default=UMT5_MODEL_ID)
     return parser.parse_args()
 
 
-def run() -> None:
-    args = parse_args()
-    if not args.released_depth_embedding.is_file():
-        raise FileNotFoundError(
-            f"{args.released_depth_embedding} not found -- run scripts/download/genception.sh first."
-        )
+def _verify_depth_reproduction(tokenizer, model,
+                               released_depth_path: Path) -> None:
+    """Checks that this pipeline reproduces the released depth.npy.
 
-    import torch
-    from transformers import AutoTokenizer, UMT5EncoderModel
+    Args:
+        tokenizer: The UMT5 tokenizer.
+        model: The UMT5 encoder model.
+        released_depth_path: The officially released depth.npy.
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Loading {args.umt5_model_id} in fp32 on {device}...")
-    tokenizer = AutoTokenizer.from_pretrained(args.umt5_model_id)
-    model = UMT5EncoderModel.from_pretrained(args.umt5_model_id, torch_dtype=torch.float32).to(device).eval()
-
-    print(f"Regenerating depth.npy for verification (prompt: {DEPTH_PROMPT!r})...")
+    Raises:
+        ValueError: If the regenerated embedding has a different shape.
+        RuntimeError: If the relative error exceeds the tolerance.
+    """
+    print(f"Regenerating depth.npy for verification "
+          f"(prompt: {DEPTH_PROMPT!r})...")
     regenerated_depth = encode_prompt(tokenizer, model, DEPTH_PROMPT)
-    released_depth = np.load(args.released_depth_embedding)
+    released_depth = np.load(released_depth_path)
     if regenerated_depth.shape != released_depth.shape:
         raise ValueError(
-            f"regenerated depth embedding shape {regenerated_depth.shape} != released "
-            f"{released_depth.shape} -- something about this reconstruction has drifted."
-        )
-    relative_error = np.linalg.norm(regenerated_depth - released_depth) / np.linalg.norm(released_depth)
+            f"regenerated depth embedding shape {regenerated_depth.shape} "
+            f"!= released {released_depth.shape} -- something about this "
+            "reconstruction has drifted.")
+    relative_error = np.linalg.norm(
+        regenerated_depth - released_depth) / np.linalg.norm(released_depth)
     print(f"Relative error vs. released depth.npy: {relative_error:.3e}")
     if relative_error > VERIFICATION_RELATIVE_ERROR_TOLERANCE:
         raise RuntimeError(
-            f"Verification failed: relative error {relative_error:.3e} exceeds tolerance "
-            f"{VERIFICATION_RELATIVE_ERROR_TOLERANCE:.0e}. Refusing to write a pose/raymap "
-            "embedding whose generation pipeline doesn't reproduce a known-good release, since "
-            "there's no other way to check its correctness."
-        )
-    print("Verification passed -- this UMT5 pipeline reproduces the released depth.npy.")
+            f"Verification failed: relative error {relative_error:.3e} "
+            f"exceeds tolerance {VERIFICATION_RELATIVE_ERROR_TOLERANCE:.0e}. "
+            "Refusing to write a pose/raymap embedding whose generation "
+            "pipeline doesn't reproduce a known-good release, since there's "
+            "no other way to check its correctness.")
+    print("Verification passed -- this UMT5 pipeline reproduces the released "
+          "depth.npy.")
+
+
+def main() -> None:
+    """Verifies the pipeline on depth.npy, then writes raymap.npy."""
+    args = parse_args()
+    if not args.released_depth_embedding.is_file():
+        raise FileNotFoundError(f"{args.released_depth_embedding} not found "
+                                "-- run scripts/download/genception.sh first.")
+
+    # pylint: disable=import-outside-toplevel
+    import torch
+    import transformers
+    # pylint: enable=import-outside-toplevel
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Loading {args.umt5_model_id} in fp32 on {device}...")
+    tokenizer = transformers.AutoTokenizer.from_pretrained(args.umt5_model_id)
+    model = transformers.UMT5EncoderModel.from_pretrained(
+        args.umt5_model_id, torch_dtype=torch.float32).to(device).eval()
+
+    _verify_depth_reproduction(tokenizer, model, args.released_depth_embedding)
 
     print(f"Generating raymap.npy (prompt: {RAYMAP_PROMPT!r})...")
     raymap_embedding = encode_prompt(tokenizer, model, RAYMAP_PROMPT)
@@ -136,12 +188,12 @@ def run() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     output_path = args.output_dir / "raymap.npy"
     np.save(output_path, raymap_embedding)
-    print(f"Wrote {output_path} (shape={raymap_embedding.shape}, dtype={raymap_embedding.dtype})")
-    print(
-        "NOTE: a local re-encoding; the benchmark uses the officially released raymap.npy "
-        "(scripts/download/genception.sh). Compare against it rather than replacing it."
-    )
+    print(f"Wrote {output_path} (shape={raymap_embedding.shape}, "
+          f"dtype={raymap_embedding.dtype})")
+    print("NOTE: a local re-encoding; the benchmark uses the officially "
+          "released raymap.npy (scripts/download/genception.sh). Compare "
+          "against it rather than replacing it.")
 
 
 if __name__ == "__main__":
-    run()
+    main()

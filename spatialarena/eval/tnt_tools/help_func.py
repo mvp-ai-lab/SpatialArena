@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+"""Camera-pose orientation helpers of the Tanks and Temples mesh evaluation.
+
+`eval_tnt_mesh` orients and centers the COLMAP poses with
+`auto_orient_and_center_poses` before culling the mesh.
+"""
 
 import torch
 
@@ -9,6 +14,7 @@ def rotation_matrix(a, b):
     Args:
         a: The vector to rotate.
         b: The vector to rotate to.
+
     Returns:
         The rotation matrix.
     """
@@ -16,31 +22,31 @@ def rotation_matrix(a, b):
     b = b / torch.linalg.norm(b)
     v = torch.cross(a, b)
     c = torch.dot(a, b)
-    # If vectors are exactly opposite, we add a little noise to one of them
+    # If the vectors are exactly opposite, add a little noise to one of them.
     if c < -1 + 1e-8:
         eps = (torch.rand(3) - 0.5) * 0.01
         return rotation_matrix(a + eps, b)
     s = torch.linalg.norm(v)
-    skew_sym_mat = torch.Tensor(
-        [
-            [0, -v[2], v[1]],
-            [v[2], 0, -v[0]],
-            [-v[1], v[0], 0],
-        ]
-    )
-    return torch.eye(3) + skew_sym_mat + skew_sym_mat @ skew_sym_mat * ((1 - c) / (s**2 + 1e-8))
+    skew_sym_mat = torch.Tensor([
+        [0, -v[2], v[1]],
+        [v[2], 0, -v[0]],
+        [-v[1], v[0], 0],
+    ])
+    return torch.eye(3) + skew_sym_mat + skew_sym_mat @ skew_sym_mat * (
+        (1 - c) / (s**2 + 1e-8))
 
 
-def auto_orient_and_center_poses(
-    poses, method="up", center_poses=True
-):
-    """Orients and centers the poses. We provide two methods for orientation: pca and up.
+def auto_orient_and_center_poses(poses, method="up", center_poses=True):
+    """Orients and centers the poses.
 
-    pca: Orient the poses so that the principal component of the points is aligned with the axes.
-        This method works well when all of the cameras are in the same plane.
-    up: Orient the poses so that the average up vector is aligned with the z axis.
-        This method works well when images are not at arbitrary angles.
+    There are two methods for orientation, pca and up (and none, which only
+    centers):
 
+    pca: Orient the poses so that the principal component of the points is
+        aligned with the axes. This method works well when all of the cameras
+        are in the same plane.
+    up: Orient the poses so that the average up vector is aligned with the z
+        axis. This method works well when images are not at arbitrary angles.
 
     Args:
         poses: The poses to orient.
@@ -48,7 +54,7 @@ def auto_orient_and_center_poses(
         center_poses: If True, the poses are centered around the origin.
 
     Returns:
-        The oriented poses.
+        The oriented poses and the 3x4 transform applied.
     """
 
     translation = poses[..., :3, 3]
@@ -68,8 +74,8 @@ def auto_orient_and_center_poses(
         if torch.linalg.det(eigvec) < 0:
             eigvec[:, 2] = -eigvec[:, 2]
 
-        transform = torch.cat(
-            [eigvec, eigvec @ -translation[..., None]], dim=-1)
+        transform = torch.cat([eigvec, eigvec @ -translation[..., None]],
+                              dim=-1)
         oriented_poses = transform @ poses
 
         if oriented_poses.mean(axis=0)[2, 1] < 0:
@@ -79,8 +85,8 @@ def auto_orient_and_center_poses(
         up = up / torch.linalg.norm(up)
 
         rotation = rotation_matrix(up, torch.Tensor([0, 0, 1]))
-        transform = torch.cat(
-            [rotation, rotation @ -translation[..., None]], dim=-1)
+        transform = torch.cat([rotation, rotation @ -translation[..., None]],
+                              dim=-1)
         oriented_poses = transform @ poses
     elif method == "none":
         transform = torch.eye(4)

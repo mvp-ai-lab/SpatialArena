@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-23T10:23:34Z",
+  "generated_at": "2026-11-23T10:53:03Z",
   "summary": {
     "rows": 975,
     "raw_rows": 975,
@@ -5958,9 +5958,7 @@
                   "display": "36.79",
                   "rank": 31
                 }
-              },
-              "coverage_label": "0/3 scenes",
-              "incomplete": true
+              }
             },
             {
               "method": "MAST3R",
@@ -8878,9 +8876,7 @@
                   "display": "27.17",
                   "rank": 19
                 }
-              },
-              "coverage_label": "0/1 scenes",
-              "incomplete": true
+              }
             },
             {
               "method": "MAST3R",
@@ -11804,9 +11800,7 @@
                   "display": "25.56",
                   "rank": 25
                 }
-              },
-              "coverage_label": "0/1 scenes",
-              "incomplete": true
+              }
             },
             {
               "method": "MAST3R",
@@ -14730,9 +14724,7 @@
                   "display": "38.01",
                   "rank": 24
                 }
-              },
-              "coverage_label": "0/4 scenes",
-              "incomplete": true
+              }
             },
             {
               "method": "MAST3R",
@@ -17652,7 +17644,7 @@
                   "rank": 28
                 }
               },
-              "coverage_label": "0/19 scenes",
+              "coverage_label": "8/19 scenes",
               "incomplete": true
             },
             {
@@ -20560,9 +20552,7 @@
                   "display": "53.76",
                   "rank": 22
                 }
-              },
-              "coverage_label": "0/1 scenes",
-              "incomplete": true
+              }
             },
             {
               "method": "MAST3R",
@@ -23361,9 +23351,7 @@
                   "display": "21.87",
                   "rank": 10
                 }
-              },
-              "coverage_label": "0/5 scenes",
-              "incomplete": true
+              }
             },
             {
               "method": "MAST3R",

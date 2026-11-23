@@ -16,7 +16,9 @@ from spatialarena.eval.sparse_reconstruction_evaluator import (
 )
 
 
-def write_colmap_text_model(path: Path, translation_scale: float = 1.0, prefix: str = "") -> None:
+def write_colmap_text_model(path: Path,
+                            translation_scale: float = 1.0,
+                            prefix: str = "") -> None:
     """Write a small COLMAP text model with two cameras' poses."""
     path.mkdir(parents=True, exist_ok=True)
     (path / "cameras.txt").write_text(
@@ -24,15 +26,12 @@ def write_colmap_text_model(path: Path, translation_scale: float = 1.0, prefix: 
         encoding="utf-8",
     )
     (path / "images.txt").write_text(
-        "\n".join(
-            [
-                f"1 1 0 0 0 0 0 0 1 {prefix}000.png",
-                "",
-                f"2 1 0 0 0 {translation_scale} 0 0 1 {prefix}001.png",
-                "",
-            ]
-        )
-        + "\n",
+        "\n".join([
+            f"1 1 0 0 0 0 0 0 1 {prefix}000.png",
+            "",
+            f"2 1 0 0 0 {translation_scale} 0 0 1 {prefix}001.png",
+            "",
+        ]) + "\n",
         encoding="utf-8",
     )
     (path / "points3D.txt").write_text("", encoding="utf-8")
@@ -56,8 +55,7 @@ def write_colmap_binary_images(path: Path) -> None:
                 0.0,
                 0.0,
                 1,
-            )
-        )
+            ))
         file.write(b"000.png\x00")
         file.write(struct.pack("<Q", 0))
 
@@ -82,7 +80,8 @@ def test_read_colmap_poses_reads_binary_images(tmp_path):
     np.testing.assert_allclose(poses["000.png"].tvec, [0.0, 0.0, 0.0])
 
 
-def test_compute_relative_pose_metrics_is_zero_for_scaled_identical_layout(tmp_path):
+def test_compute_relative_pose_metrics_is_zero_for_scaled_identical_layout(
+        tmp_path):
     gt_sparse = tmp_path / "gt"
     pred_sparse = tmp_path / "pred"
     write_colmap_text_model(gt_sparse, translation_scale=1.0)
@@ -108,7 +107,8 @@ def test_compute_relative_pose_metrics_is_zero_for_scaled_identical_layout(tmp_p
     assert metrics["auc_30"] == 1.0
 
 
-def test_rta_and_maa_use_translation_axis_error_while_direct_error_is_retained(tmp_path):
+def test_rta_and_maa_use_translation_axis_error_while_direct_error_is_retained(
+        tmp_path):
     gt_sparse = tmp_path / "gt"
     pred_sparse = tmp_path / "pred"
     write_colmap_text_model(gt_sparse, translation_scale=1.0)
@@ -189,13 +189,18 @@ def test_gt_names_with_folders_match_predicted_file_names(tmp_path):
     pred_scene = tmp_path / "exp" / "SfM" / "eth3d" / "M" / "scene"
     write_colmap_text_model(gt_sparse, prefix="dslr_images_undistorted/")
     write_colmap_text_model(pred_scene / "sparse" / "0", translation_scale=2.0)
-    scene_info = BenchmarkSceneInfo(dataset="eth3d", task="SfM", scene="scene", root_path=scene_root,
+    scene_info = BenchmarkSceneInfo(dataset="eth3d",
+                                    task="SfM",
+                                    scene="scene",
+                                    root_path=scene_root,
                                     sparse_gt_path=gt_sparse)
     result = evaluate_sparse_scene(scene_info, pred_scene)
-    assert result["num_matched_images"] == 2 and result["metrics"]["num_pairs"] == 1
+    assert result["num_matched_images"] == 2 and result["metrics"][
+        "num_pairs"] == 1
 
 
-def test_name_matching_keeps_exact_names_and_refuses_ambiguous_basenames(tmp_path):
+def test_name_matching_keeps_exact_names_and_refuses_ambiguous_basenames(
+        tmp_path):
     """Exact names win when they overlap; duplicate file names in different folders are not merged."""
     write_colmap_text_model(tmp_path / "a")
     write_colmap_text_model(tmp_path / "b", prefix="x/")
@@ -203,6 +208,11 @@ def test_name_matching_keeps_exact_names_and_refuses_ambiguous_basenames(tmp_pat
     gt, pred = match_pose_names(exact, exact)
     assert gt is exact and pred is exact
     prefixed = read_colmap_poses(tmp_path / "b")
-    ambiguous = {**prefixed, **{name.replace("x/", "y/"): pose for name, pose in prefixed.items()}}
+    ambiguous = {
+        **prefixed,
+        **{
+            name.replace("x/", "y/"): pose for name, pose in prefixed.items()
+        }
+    }
     gt, pred = match_pose_names(ambiguous, exact)
     assert not set(gt) & set(pred)

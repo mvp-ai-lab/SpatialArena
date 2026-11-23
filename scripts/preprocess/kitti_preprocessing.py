@@ -1,39 +1,49 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+"""Gather the KITTI depth-selection validation frames into one folder layout.
 
-# script borrowed from :
-# https://github.com/HengyiWang/amb3r/blob/main/benchmark/data/kitti_preprocessing.py
+Borrowed from
+https://github.com/HengyiWang/amb3r/blob/main/benchmark/data/kitti_preprocessing.py
 
-import os
-import glob
-import shutil
+Usage: python scripts/preprocess/kitti_preprocessing.py --data_path <kitti_root>
+"""
+
 import argparse
+import glob
+import os
+import shutil
 
 from tqdm import tqdm
 
 
 def process_kitti(data_path):
-    """
-        Process KITTI dataset: gather depth and image files into
-        a unified directory structure.
+    """Gathers the first 110 depth maps per drive and their RGB images.
+
+    Writes them to `depth_selection/val_selection_cropped/
+    {groundtruth_depth_gathered,image_gathered}/<drive>_02/`.
+
+    Args:
+        data_path: KITTI root with `val/` and the raw `<date>/<drive>/` folders.
     """
 
     val_dir = os.path.join(data_path, "val")
     out_base = os.path.join(data_path, "depth_selection",
                             "val_selection_cropped")
 
-    depth_dirs = sorted(glob.glob(os.path.join(
-        val_dir, "*", "proj_depth", "groundtruth", "image_02")))
+    depth_dirs = sorted(
+        glob.glob(
+            os.path.join(val_dir, "*", "proj_depth", "groundtruth",
+                         "image_02")))
 
     for depth_dir in tqdm(depth_dirs, desc="Processing KITTI scenes"):
-        # e.g. 2011_09_26_drive_0002_sync
+        # For example 2011_09_26_drive_0002_sync.
         drive_name = depth_dir.split(os.sep)[-4]
-        date_prefix = "_".join(drive_name.split("_")[:3])  # e.g. 2011_09_26
+        date_prefix = "_".join(
+            drive_name.split("_")[:3])  # For example 2011_09_26.
 
-        gt_depth_out = os.path.join(
-            out_base, "groundtruth_depth_gathered", f"{drive_name}_02")
-        image_out = os.path.join(
-            out_base, "image_gathered", f"{drive_name}_02")
+        gt_depth_out = os.path.join(out_base, "groundtruth_depth_gathered",
+                                    f"{drive_name}_02")
+        image_out = os.path.join(out_base, "image_gathered", f"{drive_name}_02")
         os.makedirs(gt_depth_out, exist_ok=True)
         os.makedirs(image_out, exist_ok=True)
 
@@ -42,22 +52,28 @@ def process_kitti(data_path):
         for depth_file in depth_files:
             filename = os.path.basename(depth_file)
 
-            # Copy depth file
+            # Copy the depth file.
             shutil.copy(depth_file, os.path.join(gt_depth_out, filename))
 
-            # Find and copy corresponding RGB image
-            image_file = os.path.join(
-                data_path, date_prefix, drive_name, "image_02", "data", filename
-            )
+            # Find and copy the corresponding RGB image.
+            image_file = os.path.join(data_path, date_prefix, drive_name,
+                                      "image_02", "data", filename)
             if os.path.exists(image_file):
                 shutil.copy(image_file, os.path.join(image_out, filename))
             else:
                 print(f"Warning: Image file not found: {image_file}")
 
 
-if __name__ == "__main__":
+def main():
+    """Runs the script with the command-line arguments."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_path", type=str, required=True,
+    parser.add_argument("--data_path",
+                        type=str,
+                        required=True,
                         help="Path to the KITTI data folder")
     args = parser.parse_args()
     process_kitti(args.data_path)
+
+
+if __name__ == "__main__":
+    main()

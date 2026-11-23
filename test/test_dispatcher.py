@@ -12,10 +12,13 @@ from spatialarena.script_generator import GeneratedRunScripts
 from unittest.mock import MagicMock
 from spatialarena.slurm_utils import sbatch_submit
 
-
 # ---- dispatcher --------------------------------------------------------------------------------------------
 
-def _fake_generate_for_work_item(self, work_item, run_id, case_parallelism=None):  # pylint: disable=unused-argument
+
+def _fake_generate_for_work_item(self,
+                                 work_item,
+                                 run_id,
+                                 case_parallelism=None):  # pylint: disable=unused-argument
     del case_parallelism
     method_id = work_item["model"]
     item_with_suite = dict(work_item, suite="full-depth")
@@ -58,9 +61,24 @@ class _FakeSlurm:
 
 def test_dispatcher_processes_all_items_respecting_max_in_flight(tmp_path):
     runs = [
-        {"task": "MonoDepth", "dataset": "marigold", "model": "VGGT", "track": "rgb"},
-        {"task": "MonoDepth", "dataset": "marigold", "model": "DA3-L", "track": "rgb"},
-        {"task": "MonoDepth", "dataset": "marigold", "model": "PI3_X", "track": "rgb"},
+        {
+            "task": "MonoDepth",
+            "dataset": "marigold",
+            "model": "VGGT",
+            "track": "rgb"
+        },
+        {
+            "task": "MonoDepth",
+            "dataset": "marigold",
+            "model": "DA3-L",
+            "track": "rgb"
+        },
+        {
+            "task": "MonoDepth",
+            "dataset": "marigold",
+            "model": "PI3_X",
+            "track": "rgb"
+        },
     ]
     bench = BenchmarkEvaluator(experiment_root=tmp_path, experiment_name="demo")
     fake = _FakeSlurm()
@@ -93,10 +111,12 @@ def test_dispatcher_processes_all_items_respecting_max_in_flight(tmp_path):
 
 
 def test_dispatcher_never_exceeds_max_in_flight_concurrent_jobs(tmp_path):
-    runs = [
-        {"task": "MonoDepth", "dataset": "marigold", "model": name, "track": "rgb"}
-        for name in ("VGGT", "DA3-L", "DA3-G", "PI3_X", "FASTVGGT")
-    ]
+    runs = [{
+        "task": "MonoDepth",
+        "dataset": "marigold",
+        "model": name,
+        "track": "rgb"
+    } for name in ("VGGT", "DA3-L", "DA3-G", "PI3_X", "FASTVGGT")]
     bench = BenchmarkEvaluator(experiment_root=tmp_path, experiment_name="demo")
     fake = _FakeSlurm()
     max_seen_active = {"value": 0}
@@ -127,12 +147,23 @@ def test_dispatcher_never_exceeds_max_in_flight_concurrent_jobs(tmp_path):
 
 def test_dispatcher_records_failure_without_stopping_other_items(tmp_path):
     runs = [
-        {"task": "MonoDepth", "dataset": "marigold", "model": "VGGT", "track": "rgb"},
-        {"task": "MonoDepth", "dataset": "marigold", "model": "DA3-L", "track": "rgb"},
+        {
+            "task": "MonoDepth",
+            "dataset": "marigold",
+            "model": "VGGT",
+            "track": "rgb"
+        },
+        {
+            "task": "MonoDepth",
+            "dataset": "marigold",
+            "model": "DA3-L",
+            "track": "rgb"
+        },
     ]
     bench = BenchmarkEvaluator(experiment_root=tmp_path, experiment_name="demo")
 
     class _FailFirstSlurm(_FakeSlurm):
+
         def sacct(self, job_ids):
             states = super().sacct(job_ids)
             if job_ids and job_ids[0] == "1000":
@@ -163,7 +194,12 @@ def test_evaluate_only_dispatch_submits_only_evaluation_jobs(tmp_path):
     """evaluate_only: one evaluation job per run, no inference job; progress counts them as submitted."""
     from spatialarena.progress import dispatcher_progress  # pylint: disable=import-outside-toplevel
 
-    runs = [{"task": "SLAM", "dataset": "7scenes", "model": model, "track": "rgb"} for model in ("VGGT", "PI3_X")]
+    runs = [{
+        "task": "SLAM",
+        "dataset": "7scenes",
+        "model": model,
+        "track": "rgb"
+    } for model in ("VGGT", "PI3_X")]
     bench = BenchmarkEvaluator(experiment_root=tmp_path, experiment_name="demo")
     bench.evaluate_only = True
     fake = _FakeSlurm()
@@ -178,12 +214,22 @@ def test_evaluate_only_dispatch_submits_only_evaluation_jobs(tmp_path):
          patch("spatialarena.dispatcher.sbatch_submit", side_effect=sbatch), \
          patch("spatialarena.dispatcher.sacct_states", side_effect=fake.sacct), \
          patch("spatialarena.dispatcher.time.sleep", return_value=None):
-        result = run_dispatcher(bench, selected_runs=runs, run_id="test-run", max_in_flight=2, infer_parallelism=4,
-                                eval_parallelism=6, poll_interval=0, state_path=state_path)
+        result = run_dispatcher(bench,
+                                selected_runs=runs,
+                                run_id="test-run",
+                                max_in_flight=2,
+                                infer_parallelism=4,
+                                eval_parallelism=6,
+                                poll_interval=0,
+                                state_path=state_path)
 
     assert result == {"total": 2, "passed": 2, "failed": 0}
     assert scripts == ["VGGT_eval.sh", "PI3_X_eval.sh"]
-    with patch("spatialarena.slurm_utils.sacct_states", return_value={"1000": "COMPLETED", "1001": "COMPLETED"}):
+    with patch("spatialarena.slurm_utils.sacct_states",
+               return_value={
+                   "1000": "COMPLETED",
+                   "1001": "COMPLETED"
+               }):
         progress = dispatcher_progress(state_path)
     assert [run.stage for run in progress.runs] != ["queued", "queued"]
 
@@ -194,8 +240,7 @@ def test_detached_dispatcher_keeps_the_evaluation_switches(tmp_path):
     from types import SimpleNamespace  # pylint: disable=import-outside-toplevel
 
     from spatialarena.dispatcher import (  # pylint: disable=import-outside-toplevel
-        _build_evaluator_from_input,
-        launch_detached_dispatcher,
+        _build_evaluator_from_input, launch_detached_dispatcher,
     )
 
     bench = BenchmarkEvaluator(experiment_root=tmp_path, experiment_name="demo")
@@ -205,9 +250,14 @@ def test_detached_dispatcher_keeps_the_evaluation_switches(tmp_path):
     plan = SimpleNamespace(output_root=tmp_path / "demo", selected_runs=[])
     with patch("spatialarena.dispatcher.subprocess.Popen") as popen:
         popen.return_value.pid = 1
-        launch_detached_dispatcher(bench, plan=plan, run_id="r", max_in_flight=1, infer_parallelism=None,
+        launch_detached_dispatcher(bench,
+                                   plan=plan,
+                                   run_id="r",
+                                   max_in_flight=1,
+                                   infer_parallelism=None,
                                    eval_parallelism=None)
-    payload = json.loads((tmp_path / "demo" / "scripts" / "dispatcher_input.json").read_text(encoding="utf-8"))
+    payload = json.loads((tmp_path / "demo" / "scripts" /
+                          "dispatcher_input.json").read_text(encoding="utf-8"))
     rebuilt = _build_evaluator_from_input(payload)
     assert rebuilt.evaluate_only and rebuilt.reevaluate and rebuilt.force_reinfer
 
@@ -215,7 +265,12 @@ def test_detached_dispatcher_keeps_the_evaluation_switches(tmp_path):
 def test_dispatcher_survives_a_transient_sacct_failure(tmp_path):
     import subprocess
 
-    runs = [{"task": "MonoDepth", "dataset": "marigold", "model": "VGGT", "track": "rgb"}]
+    runs = [{
+        "task": "MonoDepth",
+        "dataset": "marigold",
+        "model": "VGGT",
+        "track": "rgb"
+    }]
     bench = BenchmarkEvaluator(experiment_root=tmp_path, experiment_name="demo")
     fake = _FakeSlurm()
     calls = {"n": 0}
@@ -230,14 +285,23 @@ def test_dispatcher_survives_a_transient_sacct_failure(tmp_path):
          patch("spatialarena.dispatcher.sbatch_submit", side_effect=fake.sbatch), \
          patch("spatialarena.dispatcher.sacct_states", side_effect=flaky_sacct), \
          patch("spatialarena.dispatcher.time.sleep", return_value=None):
-        result = run_dispatcher(bench, selected_runs=runs, run_id="test-run", max_in_flight=1, infer_parallelism=None,
-                                eval_parallelism=None, poll_interval=0, state_path=tmp_path / "state.json")
+        result = run_dispatcher(bench,
+                                selected_runs=runs,
+                                run_id="test-run",
+                                max_in_flight=1,
+                                infer_parallelism=None,
+                                eval_parallelism=None,
+                                poll_interval=0,
+                                state_path=tmp_path / "state.json")
 
     assert result == {"total": 1, "passed": 1, "failed": 0}
-    assert json.loads((tmp_path / "state.json").read_text(encoding="utf-8"))["status"] == "finished"
+    assert json.loads(
+        (tmp_path /
+         "state.json").read_text(encoding="utf-8"))["status"] == "finished"
 
 
 # ---- slurm_utils -------------------------------------------------------------------------------------------
+
 
 def _mock_run(stdout="12345"):
     result = MagicMock()
@@ -250,7 +314,8 @@ def test_sbatch_submit_uses_plain_export_nil():
     # intermittently triggered user_env_retrieval_failed_requeued_held
     # (jobs 134724, 148183, 148184), so sbatch never carries variables: a
     # CASE_PARALLELISM override is exported in the generated script instead.
-    with patch("spatialarena.slurm_utils.subprocess.run", return_value=_mock_run()) as run:
+    with patch("spatialarena.slurm_utils.subprocess.run",
+               return_value=_mock_run()) as run:
         sbatch_submit("/fake/script.sh")
     cmd = run.call_args.args[0]
     assert "--export=NIL" in cmd
@@ -258,13 +323,15 @@ def test_sbatch_submit_uses_plain_export_nil():
 
 
 def test_sbatch_submit_appends_dependency_when_given():
-    with patch("spatialarena.slurm_utils.subprocess.run", return_value=_mock_run()) as run:
+    with patch("spatialarena.slurm_utils.subprocess.run",
+               return_value=_mock_run()) as run:
         sbatch_submit("/fake/script.sh", dependency="afterok:999")
     cmd = run.call_args.args[0]
     assert "--dependency=afterok:999" in cmd
 
 
 def test_sbatch_submit_parses_parsable_jobid_with_cluster_suffix():
-    with patch("spatialarena.slurm_utils.subprocess.run", return_value=_mock_run("12345;mycluster\n")):
+    with patch("spatialarena.slurm_utils.subprocess.run",
+               return_value=_mock_run("12345;mycluster\n")):
         job_id = sbatch_submit("/fake/script.sh")
     assert job_id == "12345"

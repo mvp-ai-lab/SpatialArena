@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Validation helpers for model-produced benchmark artifacts.
 
 The benchmark suite evaluates files produced by external methods. This module
@@ -10,16 +9,12 @@ load, or run any external model.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import math
-from dataclasses import dataclass, field
-from pathlib import Path
+import pathlib
 
-from spatialarena.eval.result_layout import (
-    resolve_method_scene_output_path,
-    resolve_sparse_model_path,
-)
-
+from spatialarena.eval import result_layout
 
 DEPTH_DIR_NAMES = ("depths", "depth", "pred_depths", "depth_maps")
 DEPTH_EXTENSIONS = (
@@ -42,33 +37,64 @@ POINT_CLOUD_FILENAMES = (
 )
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class PredictionRequirements:
+    """Which artifacts a task's scene output must contain.
+
+    Attributes:
+        require_sparse: A COLMAP model under sparse/0 or sparse.
+        require_depths: Depth maps in one of DEPTH_DIR_NAMES.
+        require_points: A point cloud (.ply).
+        require_metrics: The adapter's metrics.json.
+    """
+
     require_sparse: bool = False
     require_depths: bool = False
     require_points: bool = False
     require_metrics: bool = False
 
 
-@dataclass(kw_only=True)
+@dataclasses.dataclass(kw_only=True)
 class PredictionArtifactStatus:
+    """The artifacts found in one method scene output.
+
+    Attributes:
+        task: Task name.
+        dataset: Dataset name.
+        method: Method name.
+        scene: Scene name.
+        scene_output_path: The scene output directory.
+        scene_output_exists: Whether the directory exists.
+        sparse_model_path: The COLMAP model found, if any.
+        depth_files: Depth maps found.
+        point_files: Point clouds found.
+        missing: Names of the required artifacts not found.
+        warnings: Layout warnings.
+    """
+
     task: str
     dataset: str
     method: str
     scene: str
-    scene_output_path: Path
+    scene_output_path: pathlib.Path
     scene_output_exists: bool
-    sparse_model_path: Path | None = None
-    depth_files: list[Path] = field(default_factory=list)
-    point_files: list[Path] = field(default_factory=list)
-    missing: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
+    sparse_model_path: pathlib.Path | None = None
+    depth_files: list[pathlib.Path] = dataclasses.field(default_factory=list)
+    point_files: list[pathlib.Path] = dataclasses.field(default_factory=list)
+    missing: list[str] = dataclasses.field(default_factory=list)
+    warnings: list[str] = dataclasses.field(default_factory=list)
 
     @property
     def ok(self) -> bool:
+        """Whether no required artifact is missing."""
         return not self.missing
 
     def to_dict(self) -> dict:
+        """Returns the status as a JSON-ready dict."""
+        if self.sparse_model_path:
+            sparse_model_path = str(self.sparse_model_path)
+        else:
+            sparse_model_path = None
         return {
             "task": self.task,
             "dataset": self.dataset,
@@ -76,9 +102,7 @@ class PredictionArtifactStatus:
             "scene": self.scene,
             "scene_output_path": str(self.scene_output_path),
             "scene_output_exists": self.scene_output_exists,
-            "sparse_model_path": (
-                str(self.sparse_model_path) if self.sparse_model_path else None
-            ),
+            "sparse_model_path": sparse_model_path,
             "num_depth_files": len(self.depth_files),
             "point_files": [str(path) for path in self.point_files],
             "missing": list(self.missing),
@@ -88,6 +112,7 @@ class PredictionArtifactStatus:
 
 
 def requirements_for_task(task_name: str) -> PredictionRequirements:
+    """Returns the artifacts a task needs (none for an unknown task)."""
     task = task_name.lower()
     if task in {"monodepth", "video_depth", "videodepth", "rmvd", "mvdepth"}:
         return PredictionRequirements(require_depths=True)
@@ -98,54 +123,68 @@ def requirements_for_task(task_name: str) -> PredictionRequirements:
     return PredictionRequirements()
 
 
-def find_depth_files(scene_output_path: Path) -> list[Path]:
-    scene_output_path = Path(scene_output_path)
-    depth_files: list[Path] = []
+def find_depth_files(scene_output_path: pathlib.Path) -> list[pathlib.Path]:
+    """Returns every depth file in the scene's depth directories, sorted."""
+    scene_output_path = pathlib.Path(scene_output_path)
+    depth_files: list[pathlib.Path] = []
     for dirname in DEPTH_DIR_NAMES:
         depth_dir = scene_output_path / dirname
         if depth_dir.is_dir():
             depth_files.extend(
-                path
-                for path in depth_dir.rglob("*")
-                if path.is_file() and path.suffix.lower() in DEPTH_EXTENSIONS
-            )
+                path for path in depth_dir.rglob("*")
+                if path.is_file() and path.suffix.lower() in DEPTH_EXTENSIONS)
     return sorted(depth_files)
 
 
-# Per-frame prediction maps are float32 compressed .npz (adapter_utils.save_prediction_map); predictions exported
-# before 2026-11-17 (and imported releases) are .npy, which is still read.
+# Per-frame prediction maps are float32 compressed .npz
+# (adapter_utils.save_prediction_map); predictions exported before 2026-11-17
+# (and imported releases) are .npy, which is still read.
 PREDICTION_MAP_SUFFIXES = (".npz", ".npy")
 
 
-def frame_file(directory: Path, stem: str) -> Path | None:
-    """``<directory>/<stem>.npz`` or, for older predictions, ``<stem>.npy``; None when the frame has neither."""
+def frame_file(directory: pathlib.Path, stem: str) -> pathlib.Path | None:
+    """Returns <directory>/<stem>.npz, or <stem>.npy for older predictions.
+
+    Returns None when the frame has neither.
+    """
     for suffix in PREDICTION_MAP_SUFFIXES:
-        candidate = Path(directory) / f"{stem}{suffix}"
+        candidate = pathlib.Path(directory) / f"{stem}{suffix}"
         if candidate.is_file():
             return candidate
     return None
 
 
-def confidence_file_for(depth_path: Path) -> Path | None:
-    """The predicted confidence map of a depth map: ``<scene>/confidences/<depth stem>.npz`` (``.npy`` for older
-    predictions; pixel-aligned, written by ``adapter_utils.export_confidence_predictions``), or None when the
-    prediction has none."""
-    depth_path = Path(depth_path)
+def confidence_file_for(depth_path: pathlib.Path) -> pathlib.Path | None:
+    """Returns the predicted confidence map of a depth map, or None.
+
+    The map is <scene>/confidences/<depth stem>.npz (.npy for older
+    predictions; pixel-aligned, written by
+    `adapter_utils.export_confidence_predictions`). Returns None when the
+    prediction has none.
+    """
+    depth_path = pathlib.Path(depth_path)
     for parent in depth_path.parents:
         if parent.name in DEPTH_DIR_NAMES:
             return frame_file(parent.parent / "confidences", depth_path.stem)
     return None
 
 
-def load_confidence_map(path: Path):
-    """A confidence map as float32 ``H x W``: the "confidence" array of an .npz (else its first array), or an .npy."""
+def load_confidence_map(path: pathlib.Path):
+    """Loads a confidence map as a float32 H x W array.
+
+    Reads the "confidence" array of an .npz (else its first array), or an
+    .npy.
+    """
     # pylint: disable-next=import-outside-toplevel
     import numpy as np
 
-    path = Path(path)
+    path = pathlib.Path(path)
     if path.suffix.lower() == ".npz":
         with np.load(path) as data:
-            array = data["confidence"] if "confidence" in data.files else data[data.files[0]]
+            if "confidence" in data.files:
+                array = data["confidence"]
+            else:
+                array = data[data.files[0]]
     else:
         array = np.load(path)
     array = np.asarray(array, dtype=np.float32)
@@ -153,6 +192,7 @@ def load_confidence_map(path: Path):
 
 
 def _finite_or_none(value: object) -> float | None:
+    """Returns value as a finite float, or None."""
     try:
         number = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
@@ -160,45 +200,69 @@ def _finite_or_none(value: object) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def read_adapter_runtime(scene_output_path: Path) -> dict | None:
-    """Runtime of the inference run that produced a scene's predictions, from the adapter's ``metrics.json``.
+def read_adapter_runtime(scene_output_path: pathlib.Path) -> dict | None:
+    """Returns the runtime of the inference run of a scene's predictions.
 
-    Adapters instrumented with ``adapter_utils.mark_model_loaded`` write ``inference_seconds``,
-    ``model_load_seconds`` and ``peak_gpu_memory_mib`` (inference only, model loading excluded). Older outputs only
-    carry each adapter's own ``inference time`` / ``Peak GPU Memory``, whose scope differs per adapter; those are
-    returned with ``runtime_scope = "legacy"`` so they are never silently mixed with the standard numbers.
-    Returns None when there is no readable ``metrics.json``.
+    Reads the adapter's metrics.json. Adapters instrumented with
+    `adapter_utils.mark_model_loaded` write inference_seconds,
+    model_load_seconds and peak_gpu_memory_mib (inference only, model loading
+    excluded). Older outputs only carry each adapter's own "inference time" /
+    "Peak GPU Memory", whose scope differs per adapter; those are returned
+    with runtime_scope = "legacy" so they are never silently mixed with the
+    standard numbers.
+
+    Args:
+        scene_output_path: The method's scene output directory.
+
+    Returns:
+        The runtime and num_input_images, or None when there is no readable
+        metrics.json.
     """
-    path = Path(scene_output_path) / "metrics.json"
+    path = pathlib.Path(scene_output_path) / "metrics.json"
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     if isinstance(payload, list):
-        payload = payload[0] if payload and isinstance(payload[0], dict) else {}
+        if payload and isinstance(payload[0], dict):
+            payload = payload[0]
+        else:
+            payload = {}
     if not isinstance(payload, dict):
         return None
     if "inference_seconds" in payload:
         runtime = {
-            "inference_seconds": _finite_or_none(payload.get("inference_seconds")),
-            "model_load_seconds": _finite_or_none(payload.get("model_load_seconds")),
-            "peak_gpu_memory_mib": _finite_or_none(payload.get("peak_gpu_memory_mib")),
-            "runtime_scope": str(payload.get("runtime_scope") or "unknown"),
+            "inference_seconds":
+                _finite_or_none(payload.get("inference_seconds")),
+            "model_load_seconds":
+                _finite_or_none(payload.get("model_load_seconds")),
+            "peak_gpu_memory_mib":
+                _finite_or_none(payload.get("peak_gpu_memory_mib")),
+            "runtime_scope":
+                str(payload.get("runtime_scope") or "unknown"),
         }
     else:
         runtime = {
-            "inference_seconds": _finite_or_none(payload.get("inference time")),
-            "model_load_seconds": None,
-            "peak_gpu_memory_mib": _finite_or_none(payload.get("Peak GPU Memory")),
-            "runtime_scope": "legacy",
+            "inference_seconds":
+                _finite_or_none(payload.get("inference time")),
+            "model_load_seconds":
+                None,
+            "peak_gpu_memory_mib":
+                _finite_or_none(payload.get("Peak GPU Memory")),
+            "runtime_scope":
+                "legacy",
         }
     images = payload.get("Preprocessed Images")
-    runtime["num_input_images"] = int(images) if isinstance(images, (int, float)) else None
+    if isinstance(images, (int, float)):
+        runtime["num_input_images"] = int(images)
+    else:
+        runtime["num_input_images"] = None
     return runtime
 
 
-def find_point_files(scene_output_path: Path) -> list[Path]:
-    scene_output_path = Path(scene_output_path)
+def find_point_files(scene_output_path: pathlib.Path) -> list[pathlib.Path]:
+    """Returns the standard point clouds of a scene, else every .ply in it."""
+    scene_output_path = pathlib.Path(scene_output_path)
     point_files = [
         scene_output_path / filename
         for filename in POINT_CLOUD_FILENAMES
@@ -215,11 +279,24 @@ def validate_prediction_output(
     dataset: str,
     method: str,
     scene: str,
-    scene_output_path: Path,
+    scene_output_path: pathlib.Path,
     requirements: PredictionRequirements | None = None,
 ) -> PredictionArtifactStatus:
+    """Checks a scene output directory for the artifacts its task needs.
+
+    Args:
+        task: Task name.
+        dataset: Dataset name.
+        method: Method name.
+        scene: Scene name.
+        scene_output_path: The method's scene output directory.
+        requirements: Required artifacts; None uses the task's.
+
+    Returns:
+        The artifacts found and the names of those missing.
+    """
     requirements = requirements or requirements_for_task(task)
-    scene_output_path = Path(scene_output_path)
+    scene_output_path = pathlib.Path(scene_output_path)
     status = PredictionArtifactStatus(
         task=task,
         dataset=dataset,
@@ -233,7 +310,8 @@ def validate_prediction_output(
         status.missing.append("scene_output")
         return status
 
-    status.sparse_model_path = resolve_sparse_model_path(scene_output_path)
+    status.sparse_model_path = result_layout.resolve_sparse_model_path(
+        scene_output_path)
     status.depth_files = find_depth_files(scene_output_path)
     status.point_files = find_point_files(scene_output_path)
 
@@ -243,7 +321,8 @@ def validate_prediction_output(
         status.missing.append("depth_predictions")
     if requirements.require_points and not status.point_files:
         status.missing.append("point_cloud")
-    if requirements.require_metrics and not (scene_output_path / "metrics.json").is_file():
+    if requirements.require_metrics and not (scene_output_path /
+                                             "metrics.json").is_file():
         status.missing.append("metrics.json")
 
     if status.sparse_model_path == scene_output_path / "sparse":
@@ -254,7 +333,7 @@ def validate_prediction_output(
 
 def validate_method_scene_output(
     *,
-    experiment_root: Path,
+    experiment_root: pathlib.Path,
     experiment_name: str,
     task: str,
     dataset: str,
@@ -263,7 +342,12 @@ def validate_method_scene_output(
     order_name: str | None = None,
     requirements: PredictionRequirements | None = None,
 ) -> PredictionArtifactStatus:
-    scene_output_path = resolve_method_scene_output_path(
+    """Checks the output of a method on a scene, found by the result layout.
+
+    See `result_layout.method_scene_output_path` for the layout and
+    `validate_prediction_output` for the checks.
+    """
+    scene_output_path = result_layout.resolve_method_scene_output_path(
         experiment_root=experiment_root,
         experiment_name=experiment_name,
         dataset_name=dataset,

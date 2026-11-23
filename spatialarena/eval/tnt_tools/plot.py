@@ -32,9 +32,10 @@
 # This python script is for downloading dataset from www.tanksandtemples.org
 # The dataset has a different license, please refer to
 # https://tanksandtemples.org/license/
+"""Precision/recall curve plot for Tanks and Temples (vendored toolbox)."""
 
+import cycler
 import matplotlib.pyplot as plt
-from cycler import cycler
 
 
 def plot_graph(
@@ -49,6 +50,7 @@ def plot_graph(
     mvs_outpath,
     show_figure=False,
 ):
+    """Plots the cumulative precision and recall curves to PNG and PDF."""
     f = plt.figure()
     plt_size = [14, 7]
     pfontsize = "medium"
@@ -74,7 +76,7 @@ def plot_graph(
 
     ax.grid(True)
     plt.rcParams["figure.figsize"] = plt_size
-    plt.rc("axes", prop_cycle=cycler("color", ["r", "g", "b", "y"]))
+    plt.rc("axes", prop_cycle=cycler.cycler("color", ["r", "g", "b", "y"]))
     plt.title("Precision and Recall: " + scene + ", " + "%02.2f f-score" %
               (fscore * 100))
     plt.axvline(x=dist_threshold, c="black", ls="dashed", linewidth=2.0)
@@ -94,7 +96,7 @@ def plot_graph(
     box = ax.get_position()
     ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 
-    # Put a legend to the right of the current axis
+    # Put a legend to the right of the current axis.
     ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
     plt.setp(ax.get_legend().get_texts(), fontsize=pfontsize)
     png_name = mvs_outpath + "/PR_{0}_@d_th_0_{1}.png".format(
@@ -102,7 +104,7 @@ def plot_graph(
     pdf_name = mvs_outpath + "/PR_{0}_@d_th_0_{1}.pdf".format(
         scene, "%04d" % (dist_threshold * 10000))
 
-    # save figure and display
+    # Save the figure and display it.
     f.savefig(png_name, format="png", bbox_inches="tight")
     f.savefig(pdf_name, format="pdf", bbox_inches="tight")
     if show_figure:

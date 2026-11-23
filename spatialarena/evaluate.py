@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Benchmark entrypoint.
 
 The default mode preserves the existing COLMAP reconstruction evaluation for
@@ -13,21 +12,21 @@ from __future__ import annotations
 
 import argparse
 import json
+import pathlib
 import sys
-from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from spatialarena.eval.dataset_registry import (
-    DEFAULT_BENCHMARK_ROOT,
-    describe_benchmark_scenes,
-)
+# pylint: disable-next=wrong-import-position
+from spatialarena.eval import dataset_registry  # noqa: E402
 
 
 def parse_list_scenes_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="List canonical benchmark scenes.")
+    """Parses the arguments of the scene listing mode."""
+    parser = argparse.ArgumentParser(
+        description="List canonical benchmark scenes.")
     parser.add_argument(
         "--list_scenes",
         "--list-scenes",
@@ -36,15 +35,18 @@ def parse_list_scenes_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--benchmark_root",
-        type=Path,
-        default=DEFAULT_BENCHMARK_ROOT,
-        help="Root containing task folders such as MonoDepth, VideoDepth, SfM, WeakTextureSfM, and MVRecon.",
+        type=pathlib.Path,
+        default=dataset_registry.DEFAULT_BENCHMARK_ROOT,
+        help=(
+            "Root containing task folders such as MonoDepth, VideoDepth, SfM, "
+            "WeakTextureSfM, and MVRecon."),
     )
     parser.add_argument(
         "--tasks",
         nargs="*",
         default=[],
-        help="Optional task filter, e.g. MonoDepth VideoDepth SfM WeakTextureSfM MVRecon.",
+        help=("Optional task filter, e.g. MonoDepth VideoDepth SfM "
+              "WeakTextureSfM MVRecon."),
     )
     parser.add_argument(
         "--datasets",
@@ -72,7 +74,7 @@ def _is_list_scenes_request(argv: list[str]) -> bool:
 
 def _run_list_scenes(argv: list[str]) -> None:
     args = parse_list_scenes_args(argv)
-    records = describe_benchmark_scenes(
+    records = dataset_registry.describe_benchmark_scenes(
         benchmark_root=args.benchmark_root,
         tasks=args.tasks,
         datasets=args.datasets,
@@ -83,19 +85,21 @@ def _run_list_scenes(argv: list[str]) -> None:
 
 
 def _run_reconstruction_eval() -> None:
+    """Runs the COLMAP reconstruction evaluation of ETH3D, DTU and TnT."""
+    # Imported here: the listing mode must not need pycolmap.
     import pycolmap
 
-    from spatialarena.eval.dtu_dataset import DatasetDTU
-    from spatialarena.eval.eth3d_dataset import DatasetETH3D
-    from spatialarena.eval.tnt_dataset import DatasetTanksAndTemples
-    from spatialarena.eval.utils import parse_args, process_scenes
+    from spatialarena.eval import dtu_dataset
+    from spatialarena.eval import eth3d_dataset
+    from spatialarena.eval import tnt_dataset
+    from spatialarena.eval import utils
 
-    args = parse_args()
+    args = utils.parse_args()
 
     datasets = {
-        "eth3d": DatasetETH3D,
-        "dtu": DatasetDTU,
-        "tnt": DatasetTanksAndTemples,
+        "eth3d": eth3d_dataset.DatasetETH3D,
+        "dtu": dtu_dataset.DatasetDTU,
+        "tnt": tnt_dataset.DatasetTanksAndTemples,
     }
 
     for dataset_name in args.datasets:
@@ -123,7 +127,7 @@ def _run_reconstruction_eval() -> None:
                 pycolmap.logging.warning("No scenes found")
                 return
 
-            process_scenes(
+            utils.process_scenes(
                 args=args,
                 scene_infos=scene_infos,
                 prepare_scene=dataset.prepare_scene,
@@ -133,7 +137,9 @@ def _run_reconstruction_eval() -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    argv = sys.argv[1:] if argv is None else argv
+    """Lists scenes with --list_scenes, else runs the COLMAP evaluation."""
+    if argv is None:
+        argv = sys.argv[1:]
     if _is_list_scenes_request(argv):
         _run_list_scenes(argv)
         return

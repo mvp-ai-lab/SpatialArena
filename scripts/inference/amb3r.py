@@ -8,7 +8,7 @@ amb3r/frontend.py's ``decode_heads``, which imports
 ``vggt.utils.pose_enc.pose_encoding_to_extri_intri`` from AMB3R's vendored
 ``thirdparty/vggt`` copy), so its prediction dict has the same
 pose/intrinsic/depth/world_points shape convention VGGT's own adapter
-(spatialarena/models/vggt.py) exports -- this adapter mirrors that.
+(scripts/inference/vggt.py) exports -- this adapter mirrors that.
 
 Preprocessing goes through AMB3R's own ``amb3r.datasets.Demo`` dataset
 (pointed at a scratch directory containing only this run's selected/interval-

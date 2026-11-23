@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Materialize benchmark camera priors as a minimal COLMAP model.
 
 The benchmark adapters consume camera priors through COLMAP's cameras/images/
@@ -10,12 +9,13 @@ native metadata instead of an already-materialized COLMAP folder. This script
 exports those native pose/intrinsic records into a minimal text COLMAP model.
 
 Supported native layouts:
-- RobustMVD sampled RMVD cases with ``sample.json`` containing ``poses`` and
-  ``intrinsics``.
-- Bonn RGB-D scenes with TUM-style ``rgb.txt`` and ``groundtruth.txt``.
-- Sintel scenes with ``training/camdata_left/<scene>/*.cam``.
-- DyCheck scenes (``VideoDepth/dycheck``) whose images link to the MegaSaM archive's camera-0 frames, with
-  Nerfies-style ``dense/dycheck/camera/<frame>.json``.
+- RobustMVD sampled RMVD cases with `sample.json` containing `poses` and
+  `intrinsics`.
+- Bonn RGB-D scenes with TUM-style `rgb.txt` and `groundtruth.txt`.
+- Sintel scenes with `training/camdata_left/<scene>/*.cam`.
+- DyCheck scenes (`VideoDepth/dycheck`) whose images link to the MegaSaM
+  archive's camera-0 frames, with Nerfies-style
+  `dense/dycheck/camera/<frame>.json`.
 - KITTI video-depth gathered scenes with OXTS poses and per-frame intrinsics
   from the depth-selection layout. KITTI calibration-to-camera extrinsics are
   not present in the current benchmark copy, so the OXTS vehicle trajectory is
@@ -25,12 +25,12 @@ Supported native layouts:
 from __future__ import annotations
 
 import argparse
+import bisect
 import json
 import math
+from pathlib import Path
 import shutil
 import sys
-from bisect import bisect_left
-from pathlib import Path
 from typing import Iterable
 
 import numpy as np
@@ -40,14 +40,8 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from spatialarena.geometry.read_write_model import (  # noqa: E402
-    Camera,
-    Image as ColmapImage,
-    rotmat2qvec,
-    write_model,
-)
-from scripts.inference.adapter_utils import find_image_paths  # noqa: E402
-
+from scripts.inference import adapter_utils  # noqa: E402
+from spatialarena.geometry import read_write_model  # noqa: E402
 
 TUM_BONN_INTRINSICS = np.array(
     [542.822841, 0.0, 315.593520, 0.0, 542.576870, 237.756098, 0.0, 0.0, 1.0],
@@ -59,6 +53,7 @@ EARTH_RADIUS_METERS = 6378137.0
 
 
 def _read_tum_trajectory(path: Path) -> dict[float, np.ndarray]:
+    """Reads a TUM trajectory as {timestamp: 4x4 camera-to-world}."""
     poses: dict[float, np.ndarray] = {}
     if not path.is_file():
         return poses
@@ -75,6 +70,7 @@ def _read_tum_trajectory(path: Path) -> dict[float, np.ndarray]:
 
 
 def _read_tum_rgb_index(path: Path) -> dict[str, float]:
+    """Maps rgb.txt image names and stems to their timestamps."""
     mapping: dict[str, float] = {}
     if not path.is_file():
         return mapping
@@ -90,13 +86,14 @@ def _read_tum_rgb_index(path: Path) -> dict[str, float]:
     return mapping
 
 
-def _nearest_pose(
-    timestamp: float, poses: dict[float, np.ndarray], max_delta_seconds: float = 0.12
-) -> np.ndarray | None:
+def _nearest_pose(timestamp: float,
+                  poses: dict[float, np.ndarray],
+                  max_delta_seconds: float = 0.12) -> np.ndarray | None:
+    """Returns the pose nearest `timestamp`, or None if none is close enough."""
     if not poses:
         return None
     keys = sorted(poses)
-    index = bisect_left(keys, timestamp)
+    index = bisect.bisect_left(keys, timestamp)
     candidates = []
     if index < len(keys):
         candidates.append(keys[index])
@@ -110,15 +107,26 @@ def _nearest_pose(
     return poses[nearest]
 
 
-def _quat_xyzw_to_c2w(qx: float, qy: float, qz: float, qw: float, tx: float, ty: float, tz: float) -> np.ndarray:
-    q = np.asarray([qw, qx, qy, qz], dtype=np.float64)
-    q = q / (np.linalg.norm(q) + 1e-12)
-    qw, qx, qy, qz = q.tolist()
+def _quat_xyzw_to_c2w(qx: float, qy: float, qz: float, qw: float, tx: float,
+                      ty: float, tz: float) -> np.ndarray:
+    """Builds a 4x4 pose from an xyzw quaternion and a translation."""
+    quat = np.asarray([qw, qx, qy, qz], dtype=np.float64)
+    quat = quat / (np.linalg.norm(quat) + 1e-12)
+    qw, qx, qy, qz = quat.tolist()
     rotation = np.array(
         [
-            [1 - 2 * qy * qy - 2 * qz * qz, 2 * qx * qy - 2 * qw * qz, 2 * qx * qz + 2 * qw * qy],
-            [2 * qx * qy + 2 * qw * qz, 1 - 2 * qx * qx - 2 * qz * qz, 2 * qy * qz - 2 * qw * qx],
-            [2 * qx * qz - 2 * qw * qy, 2 * qy * qz + 2 * qw * qx, 1 - 2 * qx * qx - 2 * qy * qy],
+            [
+                1 - 2 * qy * qy - 2 * qz * qz, 2 * qx * qy - 2 * qw * qz,
+                2 * qx * qz + 2 * qw * qy
+            ],
+            [
+                2 * qx * qy + 2 * qw * qz, 1 - 2 * qx * qx - 2 * qz * qz,
+                2 * qy * qz - 2 * qw * qx
+            ],
+            [
+                2 * qx * qz - 2 * qw * qy, 2 * qy * qz + 2 * qw * qx,
+                1 - 2 * qx * qx - 2 * qy * qy
+            ],
         ],
         dtype=np.float64,
     )
@@ -129,41 +137,62 @@ def _quat_xyzw_to_c2w(qx: float, qy: float, qz: float, qw: float, tx: float, ty:
 
 
 def _read_sintel_cam(path: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Reads a Sintel .cam file as (camera-to-world, K)."""
     with path.open("rb") as handle:
         tag = np.fromfile(handle, dtype=np.float32, count=1)[0]
         if abs(float(tag) - SINTEL_CAM_TAG_FLOAT) > 1e-4:
             raise ValueError(f"Invalid Sintel camera tag in {path}: {tag}")
         intrinsic = np.fromfile(handle, dtype=np.float64, count=9).reshape(3, 3)
-        extrinsic = np.fromfile(handle, dtype=np.float64, count=12).reshape(3, 4)
+        extrinsic = np.fromfile(handle, dtype=np.float64,
+                                count=12).reshape(3, 4)
     w2c = np.eye(4, dtype=np.float64)
     w2c[:3, :4] = extrinsic
     return np.linalg.inv(w2c), intrinsic
 
 
-def _latlon_to_mercator(lat: float, lon: float, scale: float) -> tuple[float, float]:
+def _latlon_to_mercator(lat: float, lon: float,
+                        scale: float) -> tuple[float, float]:
+    """Projects latitude/longitude to scaled Mercator metres (KITTI devkit)."""
     mx = scale * lon * math.pi * EARTH_RADIUS_METERS / 180.0
-    my = scale * EARTH_RADIUS_METERS * math.log(math.tan((90.0 + lat) * math.pi / 360.0))
+    my = scale * EARTH_RADIUS_METERS * math.log(
+        math.tan((90.0 + lat) * math.pi / 360.0))
     return mx, my
 
 
 def _rotz(t: float) -> np.ndarray:
+    """Rotation by `t` radians about z."""
     c, s = math.cos(t), math.sin(t)
-    return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]], dtype=np.float64)
+    return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]],
+                    dtype=np.float64)
 
 
 def _roty(t: float) -> np.ndarray:
+    """Rotation by `t` radians about y."""
     c, s = math.cos(t), math.sin(t)
-    return np.array([[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]], dtype=np.float64)
+    return np.array([[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]],
+                    dtype=np.float64)
 
 
 def _rotx(t: float) -> np.ndarray:
+    """Rotation by `t` radians about x."""
     c, s = math.cos(t), math.sin(t)
-    return np.array([[1.0, 0.0, 0.0], [0.0, c, -s], [0.0, s, c]], dtype=np.float64)
+    return np.array([[1.0, 0.0, 0.0], [0.0, c, -s], [0.0, s, c]],
+                    dtype=np.float64)
 
 
 def _read_kitti_oxts_scene(
     scene_root: Path, image_paths: list[Path]
 ) -> tuple[list[np.ndarray], list[np.ndarray]] | None:
+    """Reads OXTS poses and per-frame intrinsics of a gathered KITTI scene.
+
+    Args:
+        scene_root: The scene, named `<date>_drive_<id>_sync_..._<cam>`.
+        image_paths: The scene's images, named by frame index.
+
+    Returns:
+        (poses, intrinsics), one per image, or None when the scene is not a
+        KITTI scene or a frame lacks a pose or intrinsics.
+    """
     dataset_root = scene_root.parent
     parts = scene_root.name.split("_")
     if len(parts) < 7 or parts[-1] not in {"02", "03"}:
@@ -172,7 +201,8 @@ def _read_kitti_oxts_scene(
     drive = "_".join(parts[:6])
     cam = parts[-1]
     oxts_dir = dataset_root / date / drive / "oxts" / "data"
-    intrinsics_dir = dataset_root / "depth_selection" / "val_selection_cropped" / "intrinsics"
+    intrinsics_dir = (dataset_root / "depth_selection" /
+                      "val_selection_cropped" / "intrinsics")
     if not oxts_dir.is_dir() or not intrinsics_dir.is_dir():
         return None
 
@@ -180,7 +210,10 @@ def _read_kitti_oxts_scene(
     origin = None
     scale = None
     for oxts_path in sorted(oxts_dir.glob("*.txt")):
-        values = [float(part) for part in oxts_path.read_text(encoding="utf-8").split()]
+        values = [
+            float(part)
+            for part in oxts_path.read_text(encoding="utf-8").split()
+        ]
         if len(values) < 6:
             continue
         lat, lon, alt, roll, pitch, yaw = values[:6]
@@ -196,20 +229,23 @@ def _read_kitti_oxts_scene(
         oxts_by_index[oxts_path.stem] = pose
 
     intrinsic_fallback = None
-    fallback_candidates = sorted(intrinsics_dir.glob(f"{drive}_image_*_image_{cam}.txt"))
+    fallback_candidates = sorted(
+        intrinsics_dir.glob(f"{drive}_image_*_image_{cam}.txt"))
     if fallback_candidates:
         intrinsic_values = [
-            float(part)
-            for part in fallback_candidates[0].read_text(encoding="utf-8").split()
+            float(part) for part in fallback_candidates[0].read_text(
+                encoding="utf-8").split()
         ]
-        intrinsic_fallback = np.asarray(intrinsic_values, dtype=np.float64).reshape(3, 3)
+        intrinsic_fallback = np.asarray(intrinsic_values,
+                                        dtype=np.float64).reshape(3, 3)
 
     poses: list[np.ndarray] = []
     intrinsics: list[np.ndarray] = []
     for image_path in image_paths:
         frame = image_path.stem
         pose = oxts_by_index.get(frame)
-        intrinsic_path = intrinsics_dir / f"{drive}_image_{frame}_image_{cam}.txt"
+        intrinsic_path = (intrinsics_dir /
+                          f"{drive}_image_{frame}_image_{cam}.txt")
         if pose is None:
             return None
         if intrinsic_path.is_file():
@@ -217,7 +253,8 @@ def _read_kitti_oxts_scene(
                 float(part)
                 for part in intrinsic_path.read_text(encoding="utf-8").split()
             ]
-            intrinsic = np.asarray(intrinsic_values, dtype=np.float64).reshape(3, 3)
+            intrinsic = np.asarray(intrinsic_values,
+                                   dtype=np.float64).reshape(3, 3)
         elif intrinsic_fallback is not None:
             intrinsic = intrinsic_fallback
         else:
@@ -228,17 +265,22 @@ def _read_kitti_oxts_scene(
 
 
 def _image_name_for_colmap(image_path: Path, images_dir: Path) -> str:
+    """The image name relative to `images_dir`, else its file name."""
     try:
         return image_path.relative_to(images_dir).as_posix()
     except ValueError:
         return image_path.name
 
 
-def _intrinsics_to_params(intrinsic: np.ndarray, image_path: Path) -> tuple[int, int, np.ndarray]:
+def _intrinsics_to_params(intrinsic: np.ndarray,
+                          image_path: Path) -> tuple[int, int, np.ndarray]:
+    """Returns the image's (width, height, PINHOLE params) from K."""
     with Image.open(image_path) as image:
         width, height = image.size
     intrinsic = np.asarray(intrinsic, dtype=np.float64).reshape(3, 3)
-    params = np.array([intrinsic[0, 0], intrinsic[1, 1], intrinsic[0, 2], intrinsic[1, 2]], dtype=np.float64)
+    params = np.array(
+        [intrinsic[0, 0], intrinsic[1, 1], intrinsic[0, 2], intrinsic[1, 2]],
+        dtype=np.float64)
     return width, height, params
 
 
@@ -250,16 +292,33 @@ def _write_colmap_model(
     c2w_poses: Iterable[np.ndarray],
     intrinsics: Iterable[np.ndarray],
 ) -> int:
+    """Writes a text COLMAP model with one PINHOLE camera per image.
+
+    Args:
+        output_dir: The output model directory.
+        images_dir: The directory image names are made relative to.
+        image_paths: The images.
+        c2w_poses: One 4x4 camera-to-world pose per image.
+        intrinsics: One 3x3 K per image.
+
+    Returns:
+        The number of images written.
+    """
     cameras = {}
     images = {}
-    for index, (image_path, c2w, intrinsic) in enumerate(zip(image_paths, c2w_poses, intrinsics, strict=True), start=1):
+    frames = zip(image_paths, c2w_poses, intrinsics, strict=True)
+    for index, (image_path, c2w, intrinsic) in enumerate(frames, start=1):
         width, height, params = _intrinsics_to_params(intrinsic, image_path)
-        cameras[index] = Camera(id=index, model="PINHOLE", width=width, height=height, params=params)
+        cameras[index] = read_write_model.Camera(id=index,
+                                                 model="PINHOLE",
+                                                 width=width,
+                                                 height=height,
+                                                 params=params)
         c2w = np.asarray(c2w, dtype=np.float64).reshape(4, 4)
         w2c = np.linalg.inv(c2w)
-        images[index] = ColmapImage(
+        images[index] = read_write_model.Image(
             id=index,
-            qvec=rotmat2qvec(w2c[:3, :3]),
+            qvec=read_write_model.rotmat2qvec(w2c[:3, :3]),
             tvec=w2c[:3, 3],
             camera_id=index,
             name=_image_name_for_colmap(image_path, images_dir),
@@ -267,31 +326,47 @@ def _write_colmap_model(
             point3D_ids=np.empty((0,), dtype=np.int64),
         )
     output_dir.mkdir(parents=True, exist_ok=True)
-    write_model(cameras, images, {}, str(output_dir), ext=".txt")
+    read_write_model.write_model(
+        cameras,
+        images,
+        {},
+        str(output_dir),
+        ext=".txt",
+    )
     return len(images)
 
 
 def materialize_sample_json(scene_root: Path, output_dir: Path) -> int | None:
+    """Exports a RobustMVD sample.json; returns the image count or None."""
     sample_path = scene_root / "sample.json"
     images_dir = scene_root / "images"
     if not sample_path.is_file() or not images_dir.is_dir():
         return None
     payload = json.loads(sample_path.read_text(encoding="utf-8"))
-    if "poses" not in payload or "intrinsics" not in payload or "images" not in payload:
+    if ("poses" not in payload or "intrinsics" not in payload or
+            "images" not in payload):
         return None
-    image_paths = [scene_root / record["canonical_path"] for record in payload["images"]]
+    image_paths = [
+        scene_root / record["canonical_path"] for record in payload["images"]
+    ]
     if any(not path.is_file() for path in image_paths):
         return None
     return _write_colmap_model(
         output_dir=output_dir,
         images_dir=images_dir,
         image_paths=image_paths,
-        c2w_poses=[np.asarray(pose, dtype=np.float64) for pose in payload["poses"]],
-        intrinsics=[np.asarray(intrinsic, dtype=np.float64) for intrinsic in payload["intrinsics"]],
+        c2w_poses=[
+            np.asarray(pose, dtype=np.float64) for pose in payload["poses"]
+        ],
+        intrinsics=[
+            np.asarray(intrinsic, dtype=np.float64)
+            for intrinsic in payload["intrinsics"]
+        ],
     )
 
 
 def materialize_bonn(scene_root: Path, output_dir: Path) -> int | None:
+    """Exports a Bonn RGB-D scene; returns the image count or None."""
     images_dir = scene_root / "images"
     if not images_dir.is_dir():
         return None
@@ -300,11 +375,14 @@ def materialize_bonn(scene_root: Path, output_dir: Path) -> int | None:
     poses_by_time = _read_tum_trajectory(raw_scene / "groundtruth.txt")
     if not rgb_index or not poses_by_time:
         return None
-    image_paths = [Path(path) for path in find_image_paths(images_dir)]
+    image_paths = [
+        Path(path) for path in adapter_utils.find_image_paths(images_dir)
+    ]
     poses: list[np.ndarray] = []
     intrinsics: list[np.ndarray] = []
     for image_path in image_paths:
-        timestamp = rgb_index.get(image_path.name) or rgb_index.get(image_path.stem)
+        timestamp = rgb_index.get(image_path.name) or rgb_index.get(
+            image_path.stem)
         if timestamp is None:
             try:
                 timestamp = float(image_path.stem)
@@ -325,6 +403,7 @@ def materialize_bonn(scene_root: Path, output_dir: Path) -> int | None:
 
 
 def materialize_sintel(scene_root: Path, output_dir: Path) -> int | None:
+    """Exports a Sintel scene; returns the image count or None."""
     images_dir = scene_root / "images"
     if not images_dir.is_dir():
         return None
@@ -332,7 +411,9 @@ def materialize_sintel(scene_root: Path, output_dir: Path) -> int | None:
     cam_dir = dataset_root / "training" / "camdata_left" / scene_root.name
     if not cam_dir.is_dir():
         return None
-    image_paths = [Path(path) for path in find_image_paths(images_dir)]
+    image_paths = [
+        Path(path) for path in adapter_utils.find_image_paths(images_dir)
+    ]
     poses: list[np.ndarray] = []
     intrinsics: list[np.ndarray] = []
     for image_path in image_paths:
@@ -352,10 +433,13 @@ def materialize_sintel(scene_root: Path, output_dir: Path) -> int | None:
 
 
 def materialize_kitti(scene_root: Path, output_dir: Path) -> int | None:
+    """Exports a gathered KITTI scene; returns the image count or None."""
     images_dir = scene_root / "images"
     if not images_dir.is_dir():
         return None
-    image_paths = [Path(path) for path in find_image_paths(images_dir)]
+    image_paths = [
+        Path(path) for path in adapter_utils.find_image_paths(images_dir)
+    ]
     loaded = _read_kitti_oxts_scene(scene_root, image_paths)
     if loaded is None:
         return None
@@ -369,40 +453,69 @@ def materialize_kitti(scene_root: Path, output_dir: Path) -> int | None:
     )
 
 
-def _read_dycheck_camera(path: Path, image_size: tuple[int, int]) -> tuple[np.ndarray, np.ndarray]:
-    """DyCheck (Nerfies) camera JSON -> (c2w, K) at ``image_size``.
+def _read_dycheck_camera(
+        path: Path, image_size: tuple[int,
+                                      int]) -> tuple[np.ndarray, np.ndarray]:
+    """Reads a DyCheck (Nerfies) camera JSON as (c2w, K) at `image_size`.
 
-    ``orientation`` is the world-to-camera rotation and ``position`` the camera centre, in OpenCV axes; the
-    intrinsics are given at the JSON's ``image_size`` and rescaled to the image actually linked.
+    `orientation` is the world-to-camera rotation and `position` the camera
+    centre, in OpenCV axes; the intrinsics are given at the JSON's
+    `image_size` and rescaled to the image actually linked.
+
+    Args:
+        path: The camera JSON.
+        image_size: The linked image's (width, height).
+
+    Returns:
+        The 4x4 camera-to-world pose and the 3x3 K.
+
+    Raises:
+        ValueError: If the camera has skew or distortion.
     """
     camera = json.loads(path.read_text(encoding="utf-8"))
-    distortion = [*camera.get("radial_distortion", []), *camera.get("tangential_distortion", [])]
+    distortion = [
+        *camera.get("radial_distortion", []),
+        *camera.get("tangential_distortion", [])
+    ]
     if camera.get("skew", 0) or any(distortion):
-        raise ValueError(f"DyCheck camera has skew or distortion a PINHOLE prior cannot express: {path}")
+        raise ValueError("DyCheck camera has skew or distortion a PINHOLE "
+                         f"prior cannot express: {path}")
     c2w = np.eye(4)
     c2w[:3, :3] = np.asarray(camera["orientation"], dtype=np.float64).T
     c2w[:3, 3] = np.asarray(camera["position"], dtype=np.float64)
-    sx, sy = image_size[0] / camera["image_size"][0], image_size[1] / camera["image_size"][1]
+    sx = image_size[0] / camera["image_size"][0]
+    sy = image_size[1] / camera["image_size"][1]
     focal = float(camera["focal_length"])
     intrinsic = np.array([
         [focal * sx, 0.0, camera["principal_point"][0] * sx],
-        [0.0, focal * camera.get("pixel_aspect_ratio", 1.0) * sy, camera["principal_point"][1] * sy],
+        [
+            0.0, focal * camera.get("pixel_aspect_ratio", 1.0) * sy,
+            camera["principal_point"][1] * sy
+        ],
         [0.0, 0.0, 1.0],
     ])
     return c2w, intrinsic
 
 
 def materialize_dycheck(scene_root: Path, output_dir: Path) -> int | None:
-    """VideoDepth/dycheck: images link to <scene>/dense/rgb/1x/<frame>.png; cameras are dense/dycheck/camera."""
+    """Exports a VideoDepth/dycheck scene; returns the image count or None.
+
+    The images link to <scene>/dense/rgb/1x/<frame>.png; the cameras are in
+    dense/dycheck/camera.
+    """
     images_dir = scene_root / "images"
-    if not images_dir.is_dir() or not (scene_root / "frame_manifest.json").is_file():
+    if (not images_dir.is_dir() or
+            not (scene_root / "frame_manifest.json").is_file()):
         return None
-    image_paths = [Path(path) for path in find_image_paths(images_dir)]
+    image_paths = [
+        Path(path) for path in adapter_utils.find_image_paths(images_dir)
+    ]
     poses: list[np.ndarray] = []
     intrinsics: list[np.ndarray] = []
     for image_path in image_paths:
         source = image_path.resolve()
-        cam_path = source.parents[2] / "dycheck" / "camera" / f"{source.stem}.json"
+        cam_path = (source.parents[2] / "dycheck" / "camera" /
+                    f"{source.stem}.json")
         if not cam_path.is_file():
             return None
         with Image.open(image_path) as image:
@@ -418,13 +531,32 @@ def materialize_dycheck(scene_root: Path, output_dir: Path) -> int | None:
     )
 
 
-def materialize(scene_root: Path, output_dir: Path, overwrite: bool = False) -> int:
-    existing = [output_dir / name for name in ("cameras.txt", "images.txt", "points3D.txt")]
+def materialize(scene_root: Path,
+                output_dir: Path,
+                overwrite: bool = False) -> int:
+    """Exports a scene's camera priors with the first converter that applies.
+
+    Args:
+        scene_root: The benchmark scene root containing images/.
+        output_dir: The output COLMAP model directory.
+        overwrite: Rewrite an existing model.
+
+    Returns:
+        The number of images written, or -1 when the model already exists.
+
+    Raises:
+        ValueError: If no supported camera-prior source is found.
+    """
+    existing = [
+        output_dir / name
+        for name in ("cameras.txt", "images.txt", "points3D.txt")
+    ]
     if all(path.is_file() for path in existing) and not overwrite:
         return -1
     if overwrite and output_dir.exists():
         shutil.rmtree(output_dir)
-    for converter in (materialize_sample_json, materialize_bonn, materialize_sintel, materialize_kitti,
+    for converter in (materialize_sample_json, materialize_bonn,
+                      materialize_sintel, materialize_kitti,
                       materialize_dycheck):
         result = converter(scene_root, output_dir)
         if result is not None:
@@ -433,16 +565,26 @@ def materialize(scene_root: Path, output_dir: Path, overwrite: bool = False) -> 
 
 
 def parse_args() -> argparse.Namespace:
+    """Parses the command line."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data_path", type=Path, required=True, help="Benchmark scene root containing images/.")
-    parser.add_argument("--output_path", type=Path, required=True, help="Output COLMAP model directory.")
+    parser.add_argument("--data_path",
+                        type=Path,
+                        required=True,
+                        help="Benchmark scene root containing images/.")
+    parser.add_argument("--output_path",
+                        type=Path,
+                        required=True,
+                        help="Output COLMAP model directory.")
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
 
 def main() -> None:
+    """Materializes the camera priors of one scene."""
     args = parse_args()
-    count = materialize(args.data_path, args.output_path, overwrite=args.overwrite)
+    count = materialize(args.data_path,
+                        args.output_path,
+                        overwrite=args.overwrite)
     if count == -1:
         print(f"Camera priors already exist: {args.output_path}")
     else:

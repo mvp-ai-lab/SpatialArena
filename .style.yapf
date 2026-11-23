@@ -1,0 +1,4 @@
+# Formatting of the Python code (Google Python Style Guide): python -m yapf -i <files>
+[style]
+based_on_style = google
+column_limit = 80

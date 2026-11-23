@@ -35,7 +35,7 @@ else
   STAGING_ROOT=${STAGING_ROOT:-${SPATIALARENA_ROOT:-$HOME/spatialarena}/_hf_release_staging}
   LAYOUT_ARGS=(--hardlink)
 fi
-REPO_ID=${REPO_ID:-Bluefish2333/benchmark}
+REPO_ID=${REPO_ID:-Bluefish2333/SpatialArena-Dataset}
 UPLOAD=${UPLOAD:-1}  # 0: stage and write the card only, for inspection
 
 # Keep the Xet chunk/shard cache on node-local disk (the home cache is NFS on compute nodes and produced

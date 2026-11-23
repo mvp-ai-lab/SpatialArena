@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Method and dataset registries, method profiles and dataset licenses.
 """
 
@@ -31,20 +30,25 @@ def only(items):
 
 # ---- benchmark_method_registry -----------------------------------------------------------------------------
 
+
 def test_registry_resolves_requested_methods_and_da3_aliases() -> None:
     assert resolve_method("DA3").name == "DA3-G"
     assert resolve_method("DA3-L").ckpt_default
     assert resolve_method("MapAnything").name == "MAPANYTHING"
     assert resolve_method("Omni-VGGT").name == "OMNIVGGT"
-    assert resolve_method("déjà view".replace("é", "e").replace(" ", "-")).name == "DEJAVIEW"
+    assert resolve_method("déjà view".replace("é", "e").replace(
+        " ", "-")).name == "DEJAVIEW"
 
 
 def test_registry_validates_multimodal_tracks() -> None:
-    assert TRACK_RGB_DEPTH in validate_track("MAPANYTHING", TRACK_RGB_DEPTH).tracks
-    assert TRACK_RGB_CAMERAS in validate_track("PI3-X", TRACK_RGB_CAMERAS).tracks
+    assert TRACK_RGB_DEPTH in validate_track("MAPANYTHING",
+                                             TRACK_RGB_DEPTH).tracks
+    assert TRACK_RGB_CAMERAS in validate_track("PI3-X",
+                                               TRACK_RGB_CAMERAS).tracks
 
 
-def test_external_adapter_dry_run_reports_standard_layout(tmp_path: Path) -> None:
+def test_external_adapter_dry_run_reports_standard_layout(
+        tmp_path: Path) -> None:
     scene = tmp_path / "scene"
     images = scene / "images"
     images.mkdir(parents=True)
@@ -84,40 +88,40 @@ def test_pdf_report_generation_from_synthetic_reports(tmp_path: Path) -> None:
     depth_report.parent.mkdir(parents=True)
     sparse_report.parent.mkdir(parents=True)
     depth_report.write_text(
-        json.dumps(
-            {
-                "scene_results": [
-                    {
-                        "method": "DA3-G",
-                        "task": "MonoDepth",
-                        "dataset": "marigold",
-                        "scene": "nyuv2",
-                        "num_evaluated_frames": 2,
-                        "num_metric_units": 2,
-                        "num_valid_pixels": 10,
-                        "metrics": {"abs_relative_difference": 0.1, "rmse_linear": 1.0, "delta125_acc": 0.9},
-                    }
-                ]
-            }
-        ),
+        json.dumps({
+            "scene_results": [{
+                "method": "DA3-G",
+                "task": "MonoDepth",
+                "dataset": "marigold",
+                "scene": "nyuv2",
+                "num_evaluated_frames": 2,
+                "num_metric_units": 2,
+                "num_valid_pixels": 10,
+                "metrics": {
+                    "abs_relative_difference": 0.1,
+                    "rmse_linear": 1.0,
+                    "delta125_acc": 0.9
+                },
+            }]
+        }),
         encoding="utf-8",
     )
     sparse_report.write_text(
-        json.dumps(
-            {
-                "scene_results": [
-                    {
-                        "method": "DA3-G",
-                        "task": "SfM",
-                        "dataset": "imc",
-                        "scene": "scene",
-                        "num_matched_images": 5,
-                        "metrics": {"ate_rmse": 0.2, "relative_rotation_error_deg_mean": 1.0, "mAA_30": 0.8,
-                                    "num_pairs": 4},
-                    }
-                ]
-            }
-        ),
+        json.dumps({
+            "scene_results": [{
+                "method": "DA3-G",
+                "task": "SfM",
+                "dataset": "imc",
+                "scene": "scene",
+                "num_matched_images": 5,
+                "metrics": {
+                    "ate_rmse": 0.2,
+                    "relative_rotation_error_deg_mean": 1.0,
+                    "mAA_30": 0.8,
+                    "num_pairs": 4
+                },
+            }]
+        }),
         encoding="utf-8",
     )
     output = tmp_path / "report.pdf"
@@ -132,19 +136,19 @@ def test_point_query_vlms_query_a_grid_not_just_the_image_centre():
 
     grids = {spec.name: spec.point_grid_size for spec in METHOD_SPECS}
     assert grids["DEPTHLM"] == 16 and grids["QWEN3_VL"] == 16
-    assert all(size == 0 for name, size in grids.items() if name not in {"DEPTHLM", "QWEN3_VL"})
+    assert all(size == 0
+               for name, size in grids.items()
+               if name not in {"DEPTHLM", "QWEN3_VL"})
 
 
 # ---- benchmark_method_profiles -----------------------------------------------------------------------------
 
+
 def load_registry():
-    module_path = (
-        Path(__file__).resolve().parents[1]
-        / "scripts"
-        / "test"
-        / "benchmark_methods.py"
-    )
-    spec = importlib.util.spec_from_file_location("benchmark_methods", module_path)
+    module_path = (Path(__file__).resolve().parents[1] / "scripts" / "test" /
+                   "benchmark_methods.py")
+    spec = importlib.util.spec_from_file_location("benchmark_methods",
+                                                  module_path)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     sys.modules[spec.name] = module
@@ -168,7 +172,8 @@ def test_method_resolution_profiles_match_canonical_defaults():
         "DEJAVIEW": (504, 504, 0),
     }
 
-    for method, (resolution, image_load_resolution, pixel_limit) in expected.items():
+    for method, (resolution, image_load_resolution,
+                 pixel_limit) in expected.items():
         spec = registry.validate_track(method, "rgb")
         assert spec.input_resolution == resolution
         assert spec.image_load_resolution == image_load_resolution
@@ -188,12 +193,8 @@ def test_pi3_alias_uses_pi3_evaluation_profile():
 
 
 def test_pi3_adapter_direct_defaults_match_registry_profile():
-    adapter_path = (
-        Path(__file__).resolve().parents[1]
-        / "scripts"
-        / "inference"
-        / "pi3.py"
-    )
+    adapter_path = (Path(__file__).resolve().parents[1] / "scripts" /
+                    "inference" / "pi3.py")
     source = adapter_path.read_text(encoding="utf-8")
 
     assert 'parser.add_argument("--resolution", type=int, default=512)' in source
@@ -206,21 +207,24 @@ def test_pi3_adapter_direct_defaults_match_registry_profile():
 
 # ---- dataset_registry --------------------------------------------------------------------------------------
 
-def write_metadata(root: Path, dataset_name: str, scene_roots: list[Path]) -> None:
+
+def write_metadata(root: Path, dataset_name: str,
+                   scene_roots: list[Path]) -> None:
     metadata = {
-        "dataset_name": dataset_name,
-        "root_directory": str(root),
-        "total_images": len(scene_roots),
-        "average_images_per_scene": 1,
-        "scenes": [
-            {
-                "dataset_name": dataset_name,
-                "scene_name": scene_root.name,
-                "root_directory": str(scene_root),
-                "total_images": 1,
-            }
-            for scene_root in scene_roots
-        ],
+        "dataset_name":
+            dataset_name,
+        "root_directory":
+            str(root),
+        "total_images":
+            len(scene_roots),
+        "average_images_per_scene":
+            1,
+        "scenes": [{
+            "dataset_name": dataset_name,
+            "scene_name": scene_root.name,
+            "root_directory": str(scene_root),
+            "total_images": 1,
+        } for scene_root in scene_roots],
     }
     root.mkdir(parents=True, exist_ok=True)
     (root / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
@@ -233,11 +237,12 @@ def test_registry_describes_selected_dataset(tmp_path):
     (scene / "depths").mkdir()
     write_metadata(dataset_root, "bonn", [scene])
 
-    record = only(describe_benchmark_scenes(
-        benchmark_root=tmp_path,
-        tasks=["VideoDepth"],
-        datasets=["bonn"],
-    ))
+    record = only(
+        describe_benchmark_scenes(
+            benchmark_root=tmp_path,
+            tasks=["VideoDepth"],
+            datasets=["bonn"],
+        ))
 
     assert record["task"] == "VideoDepth"
     assert record["dataset"] == "bonn"
@@ -254,10 +259,22 @@ def test_registry_counts_slam_input_frames(tmp_path):
     """SLAM/<dataset>/metadata.json (materialize_slam_inputs.py) records a scene's frames as num_images."""
     dataset_root = tmp_path / "SLAM" / "vbr"
     (dataset_root / "seq_a" / "images").mkdir(parents=True)
-    metadata = {"dataset_name": "vbr", "scenes": [{"scene_name": "seq_a", "num_images": 7, "input_size": [504, 252]}]}
-    (dataset_root / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+    metadata = {
+        "dataset_name":
+            "vbr",
+        "scenes": [{
+            "scene_name": "seq_a",
+            "num_images": 7,
+            "input_size": [504, 252]
+        }]
+    }
+    (dataset_root / "metadata.json").write_text(json.dumps(metadata),
+                                                encoding="utf-8")
 
-    record = only(describe_benchmark_scenes(benchmark_root=tmp_path, tasks=["SLAM"], datasets=["vbr"]))
+    record = only(
+        describe_benchmark_scenes(benchmark_root=tmp_path,
+                                  tasks=["SLAM"],
+                                  datasets=["vbr"]))
 
     assert record["total_images"] == 7
     assert record["scenes"][0]["total_images"] == 7
@@ -310,15 +327,20 @@ def test_tanks_and_temples_sfm_resolves_in_the_release_layout(tmp_path):
     both exist, so existing roots keep their resolved path."""
     release = tmp_path / "release"
     (release / "SfM" / "tanks_and_temples").mkdir(parents=True)
-    assert resolve_dataset_root(release, "SfM", "tanks_and_temples") == release / "SfM" / "tanks_and_temples"
+    assert resolve_dataset_root(
+        release, "SfM",
+        "tanks_and_temples") == release / "SfM" / "tanks_and_temples"
 
     internal = tmp_path / "internal"
     for folder in ("3DGS/tanks_and_temples", "SfM/tanks_and_temples"):
         (internal / folder).mkdir(parents=True)
-    assert resolve_dataset_root(internal, "SfM", "tanks_and_temples") == internal / "3DGS" / "tanks_and_temples"
+    assert resolve_dataset_root(
+        internal, "SfM",
+        "tanks_and_temples") == internal / "3DGS" / "tanks_and_temples"
 
 
 # ---- dataset_licenses --------------------------------------------------------------------------------------
+
 
 def test_every_dataset_source_key_resolves_to_a_registered_license():
     referenced = {key for keys in DATASET_SOURCES.values() for key in keys}
@@ -330,7 +352,9 @@ def test_covers_every_default_dataset_registry_entry_for_the_release_tasks():
     from spatialarena.eval.dataset_registry import DEFAULT_DATASET_SPECS
 
     release_tasks = {"MVRecon", "MonoDepth", "SfM", "VideoDepth", "SLAM"}
-    registered = {(s.task, s.dataset) for s in DEFAULT_DATASET_SPECS if s.task in release_tasks}
+    registered = {(s.task, s.dataset)
+                  for s in DEFAULT_DATASET_SPECS
+                  if s.task in release_tasks}
     missing = registered - set(DATASET_SOURCES)
     assert not missing, f"registered datasets with no license-source mapping: {missing}"
 
@@ -345,7 +369,8 @@ def test_texturepoorsfm_is_marked_unconfirmed_not_guessed():
 def test_scannetpp_is_marked_restricted_noncommercial():
     sources = sources_for("MVRecon", "scannetpp")
     assert sources[0].status == "restricted_noncommercial"
-    assert is_safe_for_default_public_release("MVRecon", "scannetpp")  # confirmed license, just restrictive
+    assert is_safe_for_default_public_release(
+        "MVRecon", "scannetpp")  # confirmed license, just restrictive
 
 
 def test_unregistered_pair_is_not_safe_for_default_release():
@@ -358,13 +383,16 @@ def test_marigold_withholds_scannet_and_stays_unconfirmed_for_nyuv2():
     assert SOURCE_LICENSES["scannet"].status == "no_redistribution"
     assert "scannet" in DATASET_SOURCES[("MonoDepth", "marigold")]
     assert set(withheld_scenes("MonoDepth", "marigold")) == {"scannet"}
-    assert is_redistributable("MonoDepth", "marigold")  # ScanNet is withheld, the rest may ship
-    assert not is_safe_for_default_public_release("MonoDepth", "marigold")  # NYUv2 is unconfirmed
+    assert is_redistributable(
+        "MonoDepth", "marigold")  # ScanNet is withheld, the rest may ship
+    assert not is_safe_for_default_public_release(
+        "MonoDepth", "marigold")  # NYUv2 is unconfirmed
 
 
 def test_a_shipped_no_redistribution_source_blocks_the_dataset(monkeypatch):
     from spatialarena import dataset_licenses
 
-    monkeypatch.setitem(dataset_licenses.WITHHELD_SCENES, ("MonoDepth", "marigold"), {})
+    monkeypatch.setitem(dataset_licenses.WITHHELD_SCENES,
+                        ("MonoDepth", "marigold"), {})
     assert not dataset_licenses.is_redistributable("MonoDepth", "marigold")
     assert not is_safe_for_default_public_release("MonoDepth", "marigold")

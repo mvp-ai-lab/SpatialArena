@@ -184,13 +184,13 @@ to specific pairs, or `skip_existing=False` to force a re-download.
 
 Most of the datasets above (everything Section 10 marks `included`) are
 already packaged and hosted at
-[`Bluefish2333/benchmark`](https://huggingface.co/datasets/Bluefish2333/benchmark)
+[`Bluefish2333/SpatialArena-Dataset`](https://huggingface.co/datasets/Bluefish2333/SpatialArena-Dataset)
 -- pulling from there skips re-running any `scripts/download/` +
 `scripts/preprocess/` step yourself:
 
 ```bash
 pip install huggingface_hub
-hf download Bluefish2333/benchmark --repo-type dataset \
+hf download Bluefish2333/SpatialArena-Dataset --repo-type dataset \
     --local-dir /path/to/benchmark_root
 python /path/to/benchmark_root/extract_benchmark_archives.py /path/to/benchmark_root --delete
 ```
@@ -210,7 +210,7 @@ or from Python:
 from huggingface_hub import snapshot_download
 
 snapshot_download(
-    repo_id="Bluefish2333/benchmark",
+    repo_id="Bluefish2333/SpatialArena-Dataset",
     repo_type="dataset",
     local_dir="/path/to/benchmark_root",
     # allow_patterns=["MVRecon/*", "VideoDepth/*", "*.py"],  # to fetch only some tasks
@@ -1009,7 +1009,7 @@ data as another included pair (e.g. `SfM/eth3d` and `MVRecon/eth3d`) are
 staged once and get a `SEE_INSTEAD.md` pointer on the duplicate side, so
 the upload doesn't carry the same bytes twice.
 
-This exact command (default dataset set, `--repo_id Bluefish2333/benchmark`)
+This exact command (default dataset set, `--repo_id Bluefish2333/SpatialArena-Dataset`)
 is what produced the live release referenced in Section 2.0a. The MonoDepth extension datasets were added to it
 on 2026-10-16 with `--datasets MonoDepth/aerialmetric MonoDepth/hammer MonoDepth/ibims1 MonoDepth/spring
 MonoDepth/synth4k --include_unconfirmed` (Synth4K and AerialMetric by the maintainer's decision, with the papers,

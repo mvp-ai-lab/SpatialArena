@@ -1,38 +1,55 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+"""Scene-folder helpers of `eval_scannetpp_depth`.
 
-"""Scene-folder helpers of ``eval_scannetpp_depth``: list scenes, read their COLMAP cameras, find per-image sidecar
+The helpers list scenes, read their COLMAP cameras, find per-image sidecar
 files (depths, masks) and load depth maps.
 
-Moved from the DL3DV preprocessing scripts (``scripts/preprocess/dl3dv/common.py`` and
-``generate_depth_masks.load_depth_map``) on 2026-11-21: the evaluator was their only user here.
+Moved from the DL3DV preprocessing scripts
+(scripts/preprocess/dl3dv/common.py and
+`generate_depth_masks.load_depth_map`) on 2026-11-21: the evaluator was their
+only user here.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import json
-from dataclasses import dataclass
-from pathlib import Path
+import pathlib
 from typing import Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 from PIL import Image
 
-from spatialarena.geometry.read_write_model import qvec2rotmat, read_model
+from spatialarena.geometry import read_write_model
 
 DEPTH_EXTENSIONS = (".npy", ".npz", ".png", ".tiff", ".tif", ".exr")
 MASK_EXTENSIONS = (".png", ".jpg", ".jpeg")
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class SceneCamera:
-    """Camera metadata in COLMAP world-to-camera convention."""
+    """Camera metadata in COLMAP world-to-camera convention.
+
+    Attributes:
+        index: Position of the camera in image-name order.
+        image_id: COLMAP image id.
+        image_name: COLMAP image name.
+        camera_id: COLMAP camera id.
+        image_path: The image file.
+        width: Image width in pixels.
+        height: Image height in pixels.
+        w2c: (4, 4) world-to-camera matrix.
+        intrinsics: (3, 3) intrinsics, scaled to the image size.
+        center: Camera center in world coordinates.
+        center_ray: Unit viewing direction in world coordinates.
+    """
 
     index: int
     image_id: int
     image_name: str
     camera_id: int
-    image_path: Path
+    image_path: pathlib.Path
     width: int
     height: int
     w2c: np.ndarray
@@ -42,6 +59,7 @@ class SceneCamera:
 
 
 def read_scene_ids(path: Optional[str]) -> Optional[List[str]]:
+    """Returns the non-empty lines of a scene-id file, or None without one."""
     if path is None:
         return None
     with open(path, "r", encoding="utf-8") as file:
@@ -49,26 +67,44 @@ def read_scene_ids(path: Optional[str]) -> Optional[List[str]]:
 
 
 def parse_scene_ids(value: Optional[str]) -> Optional[List[str]]:
+    """Returns the ids of a comma-separated list, or None without one."""
     if value is None:
         return None
-    return [scene_id.strip() for scene_id in value.split(",") if scene_id.strip()]
+    return [
+        scene_id.strip() for scene_id in value.split(",") if scene_id.strip()
+    ]
 
 
 def list_scene_dirs(
-    dataset_root: Path,
+    dataset_root: pathlib.Path,
     scene_ids: Optional[Sequence[str]] = None,
     scene_ids_file: Optional[str] = None,
-) -> List[Path]:
+) -> List[pathlib.Path]:
+    """Returns the scene directories to process.
+
+    Args:
+        dataset_root: Directory with one subdirectory per scene.
+        scene_ids: Optional scene ids.
+        scene_ids_file: Optional file with one scene id per line.
+
+    Returns:
+        The sorted, unique given scenes (from both sources); without any,
+        every non-hidden subdirectory of dataset_root.
+    """
     file_scene_ids = read_scene_ids(scene_ids_file)
     merged_scene_ids: Optional[List[str]] = None
     if scene_ids is not None:
         merged_scene_ids = list(scene_ids)
     if file_scene_ids is not None:
-        merged_scene_ids = file_scene_ids if merged_scene_ids is None else (
-            merged_scene_ids + file_scene_ids
-        )
+        if merged_scene_ids is None:
+            merged_scene_ids = file_scene_ids
+        else:
+            merged_scene_ids = merged_scene_ids + file_scene_ids
     if merged_scene_ids is not None:
-        return [dataset_root / scene_id for scene_id in sorted(set(merged_scene_ids))]
+        return [
+            dataset_root / scene_id
+            for scene_id in sorted(set(merged_scene_ids))
+        ]
 
     scenes = []
     for path in sorted(dataset_root.iterdir()):
@@ -82,13 +118,20 @@ def list_scene_dirs(
     return scenes
 
 
-def write_json(path: Path, payload: dict) -> None:
+def write_json(path: pathlib.Path, payload: dict) -> None:
+    """Writes payload as indented JSON, creating the parent directory."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as file:
         json.dump(payload, file, indent=2)
 
 
-def find_existing_colmap_dir(scene_dir: Path, model_folder: str) -> Path:
+def find_existing_colmap_dir(scene_dir: pathlib.Path,
+                             model_folder: str) -> pathlib.Path:
+    """Returns sparse/<model_folder> or colmap/sparse/<model_folder>.
+
+    Raises:
+        FileNotFoundError: Neither exists.
+    """
     candidates = [
         scene_dir / "sparse" / model_folder,
         scene_dir / "colmap" / "sparse" / model_folder,
@@ -101,17 +144,28 @@ def find_existing_colmap_dir(scene_dir: Path, model_folder: str) -> Path:
     )
 
 
-def resolve_image_path(images_dir: Path, image_name: str) -> Path:
+def resolve_image_path(images_dir: pathlib.Path,
+                       image_name: str) -> pathlib.Path:
+    """Returns an image by its relative name, else by basename anywhere below.
+
+    Raises:
+        FileNotFoundError: The image is not found.
+    """
     direct = images_dir / image_name
     if direct.exists():
         return direct
-    matches = list(images_dir.rglob(Path(image_name).name))
+    matches = list(images_dir.rglob(pathlib.Path(image_name).name))
     if matches:
         return matches[0]
     raise FileNotFoundError(f"Missing image for COLMAP entry: {direct}")
 
 
 def camera_params_to_intrinsics(camera) -> np.ndarray:
+    """Returns the 3x3 intrinsics of a COLMAP camera at its own size.
+
+    Raises:
+        ValueError: The camera model is not supported.
+    """
     camera_params = camera.params
     simple_focal_models = {
         "SIMPLE_PINHOLE",
@@ -146,6 +200,7 @@ def camera_params_to_intrinsics(camera) -> np.ndarray:
 
 
 def scale_intrinsics_to_size(camera, width: int, height: int) -> np.ndarray:
+    """Returns a COLMAP camera's intrinsics scaled to width x height."""
     intrinsics = camera_params_to_intrinsics(camera)
     scale_x = width / camera.width
     scale_y = height / camera.height
@@ -159,6 +214,7 @@ def scale_intrinsics_between_sizes(
     source_size: Tuple[int, int],
     target_size: Tuple[int, int],
 ) -> np.ndarray:
+    """Returns intrinsics scaled from a (width, height) to another one."""
     source_width, source_height = source_size
     target_width, target_height = target_size
     scaled = np.asarray(intrinsics, dtype=np.float32).copy()
@@ -168,12 +224,25 @@ def scale_intrinsics_between_sizes(
 
 
 def load_scene_cameras(
-    scene_dir: Path,
+    scene_dir: pathlib.Path,
     image_folder: str,
     model_folder: str,
 ) -> List[SceneCamera]:
+    """Returns the cameras of a scene's COLMAP model, in image-name order.
+
+    Args:
+        scene_dir: Scene directory.
+        image_folder: Image directory under scene_dir.
+        model_folder: COLMAP model name under sparse/ or colmap/sparse/.
+
+    Returns:
+        One `SceneCamera` per image, with intrinsics scaled to the image file.
+
+    Raises:
+        FileNotFoundError: The model, the image folder or an image is missing.
+    """
     model_dir = find_existing_colmap_dir(scene_dir, model_folder)
-    cameras, images, _ = read_model(str(model_dir))
+    cameras, images, _ = read_write_model.read_model(str(model_dir))
     images_dir = scene_dir / image_folder
     if not images_dir.exists():
         raise FileNotFoundError(f"Missing image folder: {images_dir}")
@@ -181,17 +250,19 @@ def load_scene_cameras(
     scene_cameras: List[SceneCamera] = []
     bottom = np.array([0.0, 0.0, 0.0, 1.0], dtype=np.float32).reshape(1, 4)
     for index, (image_id, image) in enumerate(
-        sorted(images.items(), key=lambda item: item[1].name)
-    ):
+            sorted(images.items(), key=lambda item: item[1].name)):
         image_path = resolve_image_path(images_dir, image.name)
         with Image.open(image_path) as pil_image:
             width, height = pil_image.size
         camera = cameras[image.camera_id]
         intrinsics = scale_intrinsics_to_size(camera, width, height)
-        rotation = qvec2rotmat(image.qvec).astype(np.float32)
+        rotation = read_write_model.qvec2rotmat(image.qvec).astype(np.float32)
         translation = image.tvec.astype(np.float32)
         w2c = np.concatenate(
-            [np.concatenate([rotation, translation.reshape(3, 1)], axis=1), bottom],
+            [
+                np.concatenate([rotation, translation.reshape(3, 1)], axis=1),
+                bottom
+            ],
             axis=0,
         ).astype(np.float32)
         center = (-rotation.T @ translation).astype(np.float32)
@@ -212,22 +283,25 @@ def load_scene_cameras(
                 intrinsics=intrinsics,
                 center=center,
                 center_ray=center_ray.astype(np.float32),
-            )
-        )
+            ))
     return scene_cameras
 
 
 def find_sidecar_file(
-    source_dir: Path,
+    source_dir: pathlib.Path,
     image_name: str,
     extensions: Iterable[str],
-) -> Optional[Path]:
-    relative_stem = Path(image_name).with_suffix("")
+) -> Optional[pathlib.Path]:
+    """Returns the file of an image in source_dir with one of the extensions.
+
+    Tries the image's relative path, then its basename, per extension.
+    """
+    relative_stem = pathlib.Path(image_name).with_suffix("")
     flat_stem = relative_stem.name
-    for ext in extensions:
+    for extension in extensions:
         candidates = [
-            source_dir / f"{relative_stem}{ext}",
-            source_dir / f"{flat_stem}{ext}",
+            source_dir / f"{relative_stem}{extension}",
+            source_dir / f"{flat_stem}{extension}",
         ]
         for candidate in candidates:
             if candidate.exists():
@@ -236,26 +310,44 @@ def find_sidecar_file(
 
 
 def load_depth_map(
-    path: Path,
+    path: pathlib.Path,
     npz_key: Optional[str],
     png_depth_scale: float,
     allow_rgb_depth_png: bool,
 ) -> np.ndarray:
+    """Loads a 2D float32 depth map from .npy, .npz or an image file.
+
+    Args:
+        path: Depth file.
+        npz_key: Array of an .npz file; None picks "depth", else the first.
+        png_depth_scale: Factor from image values to depth.
+        allow_rgb_depth_png: Whether to accept a multi-channel image (its
+            first channel is used); for debugging only.
+
+    Returns:
+        The (H, W) depth map.
+
+    Raises:
+        ValueError: The image is multi-channel and not allowed, or the depth
+            map is not 2D.
+    """
     suffix = path.suffix.lower()
     if suffix == ".npy":
         depth = np.load(path)
     elif suffix == ".npz":
         payload = np.load(path)
-        key = npz_key or ("depth" if "depth" in payload else payload.files[0])
+        key = npz_key
+        if not key:
+            key = "depth" if "depth" in payload else payload.files[0]
         depth = payload[key]
     else:
         depth = np.asarray(Image.open(path))
         if depth.ndim == 3:
             if not allow_rgb_depth_png:
                 raise ValueError(
-                    f"{path} is an RGB/RGBA image. Depth masks require raw scalar "
-                    "depths; pass --allow_rgb_depth_png only for debugging."
-                )
+                    f"{path} is an RGB/RGBA image. Depth masks require raw "
+                    "scalar depths; pass --allow_rgb_depth_png only for "
+                    "debugging.")
             depth = depth[..., 0]
         depth = depth.astype(np.float32) * png_depth_scale
 
@@ -263,5 +355,6 @@ def load_depth_map(
     if depth.ndim == 3 and depth.shape[-1] == 1:
         depth = depth[..., 0]
     if depth.ndim != 2:
-        raise ValueError(f"Expected a 2D depth map at {path}, got shape {depth.shape}")
+        raise ValueError(
+            f"Expected a 2D depth map at {path}, got shape {depth.shape}")
     return depth.astype(np.float32, copy=False)

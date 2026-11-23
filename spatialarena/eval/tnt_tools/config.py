@@ -28,8 +28,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 # ----------------------------------------------------------------------------
+"""Per-scene distance thresholds (tau) of the Tanks and Temples benchmark."""
 
-# some global parameters - do not modify
+# Global parameters; do not modify.
 scenes_tau_dict = {
     "Barn": 0.01,
     "Caterpillar": 0.005,

@@ -1,8 +1,12 @@
+"""Reading and writing Tanks and Temples camera trajectory (.log) files."""
+
 import numpy as np
 import open3d as o3d
 
 
 class CameraPose:
+    """One trajectory entry: its metadata integers and 4x4 pose matrix."""
+
     def __init__(self, meta, mat):
         self.metadata = meta
         self.pose = mat
@@ -13,6 +17,7 @@ class CameraPose:
 
 
 def convert_trajectory_to_pointcloud(traj):
+    """Returns a point cloud of the camera centers of `traj`."""
     pcd = o3d.geometry.PointCloud()
     for t in traj:
         pcd.points.append(t.pose[:3, 3])
@@ -20,6 +25,7 @@ def convert_trajectory_to_pointcloud(traj):
 
 
 def read_trajectory(filename):
+    """Reads a .log trajectory into a list of `CameraPose`."""
     traj = []
     with open(filename, "r") as f:
         metastr = f.readline()
@@ -35,6 +41,7 @@ def read_trajectory(filename):
 
 
 def write_trajectory(traj, filename):
+    """Writes a list of `CameraPose` to a .log trajectory file."""
     with open(filename, "w") as f:
         for x in traj:
             p = x.pose.tolist()

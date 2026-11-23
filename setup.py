@@ -20,8 +20,12 @@ setup(
     packages=find_packages(include=["spatialarena", "spatialarena.*"]),
     package_dir={"spatialarena": "spatialarena"},
     python_requires=">=3.10",
-    # `pip install .[board]`: the interactive terminal progress board (progress_mode="board").
-    extras_require={"board": ["textual>=0.80"], "test": ["jinja2", "pytest"]},
+    # `pip install .[board]`: the interactive terminal progress board
+    # (progress_mode="board").
+    extras_require={
+        "board": ["textual>=0.80"],
+        "test": ["jinja2", "pytest"]
+    },
     install_requires=[
         "numpy",
         "easydict",

@@ -11,7 +11,6 @@ import yaml
 from spatialarena.methods import resolve_method, validate_track
 from spatialarena.task_track_matrix import runnable_tracks
 
-
 # ---- video_diffusion_depth ---------------------------------------------------------------------------------
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,7 +44,7 @@ def test_chrono_depth_is_not_inverted():
 
 
 @pytest.mark.parametrize("frames,count", [(np.zeros((2, 1, 3, 4)), 3),
-                                         (np.full((2, 1, 3, 4), np.nan), 2)])
+                                          (np.full((2, 1, 3, 4), np.nan), 2)])
 def test_invalid_predictions_fail(frames, count):
     with pytest.raises(ValueError):
         restore_output(frames, "CHRONODEPTH", count, (9, 7))
@@ -67,10 +66,19 @@ def test_real_cli_dry_run_symlink_and_subset(tmp_path, method):
     for i in range(3):
         (scene / "images" / f"frame{i}.png").symlink_to(source)
     env = dict(os.environ, BENCHMARK_MAX_INPUT_FRAMES="2")
-    result = subprocess.run([sys.executable, str(ROOT / "scripts/inference/video_diffusion_depth.py"),
-                             "--method", method, "--data_path", str(scene), "--output_path", str(tmp_path / "out"),
-                             "--code_path", str(tmp_path), "--spatial_policy", "shared", "--export_depth", "--dry_run"],
-                            env=env, capture_output=True, text=True, check=True)
+    result = subprocess.run([
+        sys.executable,
+        str(ROOT / "scripts/inference/video_diffusion_depth.py"), "--method",
+        method, "--data_path",
+        str(scene), "--output_path",
+        str(tmp_path / "out"), "--code_path",
+        str(tmp_path), "--spatial_policy", "shared", "--export_depth",
+        "--dry_run"
+    ],
+                            env=env,
+                            capture_output=True,
+                            text=True,
+                            check=True)
     payload = json.loads(result.stdout)
     assert payload["method"] == method
     assert payload["num_images"] == 2
@@ -78,22 +86,25 @@ def test_real_cli_dry_run_symlink_and_subset(tmp_path, method):
 
 # ---- videodepth_diffusion_registry -------------------------------------------------------------------------
 
-@pytest.mark.parametrize("name,alias", [("DEPTHCRAFTER", "depthcraft"), ("CHRONODEPTH", "ChronoDepth")])
+
+@pytest.mark.parametrize("name,alias", [("DEPTHCRAFTER", "depthcraft"),
+                                        ("CHRONODEPTH", "ChronoDepth")])
 def test_video_diffusion_registration(name, alias):
     spec = resolve_method(alias)
     assert spec.name == name
     assert spec.native
     assert spec.adapter == "video_diffusion_depth.py"
     assert spec.external_command_env == name + "_COMMAND"
-    assert spec.default_depth_protocol == (
-        "inverse_huber_irls_gt" if name == "DEPTHCRAFTER" else "depth_huber_irls_gt"
-    )
+    assert spec.default_depth_protocol == ("inverse_huber_irls_gt"
+                                           if name == "DEPTHCRAFTER" else
+                                           "depth_huber_irls_gt")
     assert runnable_tracks("VideoDepth", spec) == ("rgb",)
     for task in ("MonoDepth", "SfM", "SLAM", "MVRecon"):
         assert runnable_tracks(task, spec) == ()
     with pytest.raises(ValueError):
         validate_track(name, "rgb_cameras")
-    path = Path(__file__).resolve().parents[1] / "configs/benchmark/full_videodepth.yaml"
+    path = Path(__file__).resolve(
+    ).parents[1] / "configs/benchmark/full_videodepth.yaml"
     models = yaml.safe_load(path.read_text())["models"]
     assert sum(m["name"] == name and m["track"] == "rgb" for m in models) == 1
 
@@ -103,10 +114,14 @@ def test_actual_engine_inference_branch(tmp_path, method):
     import json
 
     root = Path(__file__).resolve().parents[1]
-    engine = (root / "spatialarena/templates/_engine/run_method_case_list.sh").read_text()
-    function = engine.split("run_inference_once() {", 1)[1].split("\nverify_case()", 1)[0]
+    engine = (
+        root /
+        "spatialarena/templates/_engine/run_method_case_list.sh").read_text()
+    function = engine.split("run_inference_once() {",
+                            1)[1].split("\nverify_case()", 1)[0]
     stub = tmp_path / "python-stub"
-    stub.write_text("#!" + sys.executable + "\nimport json,sys\nprint(json.dumps(sys.argv[1:]))\n")
+    stub.write_text("#!" + sys.executable +
+                    "\nimport json,sys\nprint(json.dumps(sys.argv[1:]))\n")
     stub.chmod(0o755)
     (tmp_path / "scene").mkdir()
     script = '''set -eu
@@ -117,11 +132,24 @@ depth_only_exports_poses() { return 1; }
 ''' + "run_inference_once() {" + function + '''
 run_inference_once VideoDepth bonn scene 1 '' "$TEST_ROOT/out"
 '''
-    env = dict(os.environ, TEST_ROOT=str(tmp_path), PYTHON=str(stub), METHOD=method, METHOD_ID=method,
-               METHOD_NATIVE="1", METHOD_ADAPTER="video_diffusion_depth.py", METHOD_CODE_ENV="CODE",
-               METHOD_CKPT_ENV="CKPT", BENCHMARK_TRACK="rgb", MAX_IMAGES_PER_RUN="100",
-               BENCHMARK_TMP_ROOT=str(tmp_path), SPATIAL_POLICY="shared")
-    result = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True, check=True)
+    env = dict(os.environ,
+               TEST_ROOT=str(tmp_path),
+               PYTHON=str(stub),
+               METHOD=method,
+               METHOD_ID=method,
+               METHOD_NATIVE="1",
+               METHOD_ADAPTER="video_diffusion_depth.py",
+               METHOD_CODE_ENV="CODE",
+               METHOD_CKPT_ENV="CKPT",
+               BENCHMARK_TRACK="rgb",
+               MAX_IMAGES_PER_RUN="100",
+               BENCHMARK_TMP_ROOT=str(tmp_path),
+               SPATIAL_POLICY="shared")
+    result = subprocess.run(["bash", "-c", script],
+                            env=env,
+                            capture_output=True,
+                            text=True,
+                            check=True)
     args = json.loads(result.stdout.splitlines()[-1])
     assert args[0] == "scripts/inference/video_diffusion_depth.py"
     assert args[args.index("--method") + 1] == method

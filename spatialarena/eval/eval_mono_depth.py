@@ -1,10 +1,8 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """MonoDepth evaluation over standardized prediction artifacts."""
 
-from spatialarena.eval.depth_prediction_evaluator import main
-
+from spatialarena.eval import depth_prediction_evaluator
 
 if __name__ == "__main__":
-    main(default_tasks=["MonoDepth"])
+    depth_prediction_evaluator.main(default_tasks=["MonoDepth"])

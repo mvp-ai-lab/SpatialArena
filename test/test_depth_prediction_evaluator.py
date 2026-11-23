@@ -33,18 +33,20 @@ def only(items):
 def write_metadata(root: Path, dataset_name: str, scene_root: Path) -> None:
     root.mkdir(parents=True, exist_ok=True)
     metadata = {
-        "dataset_name": dataset_name,
-        "root_directory": str(root),
-        "total_images": 1,
-        "average_images_per_scene": 1,
-        "scenes": [
-            {
-                "dataset_name": dataset_name,
-                "scene_name": scene_root.name,
-                "root_directory": str(scene_root),
-                "total_images": 1,
-            }
-        ],
+        "dataset_name":
+            dataset_name,
+        "root_directory":
+            str(root),
+        "total_images":
+            1,
+        "average_images_per_scene":
+            1,
+        "scenes": [{
+            "dataset_name": dataset_name,
+            "scene_name": scene_root.name,
+            "root_directory": str(scene_root),
+            "total_images": 1,
+        }],
     }
     (root / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
 
@@ -93,7 +95,8 @@ def test_pair_depth_files_prefers_numeric_depth_over_visualization(tmp_path):
     assert not used_fallback
 
 
-def test_pair_depth_files_normalizes_7scenes_color_and_projected_depth_stems(tmp_path):
+def test_pair_depth_files_normalizes_7scenes_color_and_projected_depth_stems(
+        tmp_path):
     gt = tmp_path / "gt"
     pred = tmp_path / "pred"
     gt.mkdir()
@@ -114,7 +117,8 @@ def test_pair_depth_files_normalizes_7scenes_color_and_projected_depth_stems(tmp
     assert not used_fallback
 
 
-def test_pair_depth_files_by_nearest_timestamp_supports_bonn_partial_predictions(tmp_path):
+def test_pair_depth_files_by_nearest_timestamp_supports_bonn_partial_predictions(
+        tmp_path):
     gt = tmp_path / "gt"
     pred = tmp_path / "pred"
     gt.mkdir()
@@ -141,7 +145,8 @@ def test_pair_depth_files_by_nearest_timestamp_supports_bonn_partial_predictions
     assert missing_pred == ["1548263177.88536"]
 
 
-def test_pair_depth_files_by_integer_offset_supports_tnt_zero_indexed_images(tmp_path):
+def test_pair_depth_files_by_integer_offset_supports_tnt_zero_indexed_images(
+        tmp_path):
     gt = tmp_path / "gt"
     pred = tmp_path / "pred"
     gt.mkdir()
@@ -175,10 +180,11 @@ def test_evaluate_depth_scene_reads_standardized_artifacts(tmp_path):
     np.save(pred_root / "000.npy", gt_depth * 2.0)
     write_metadata(dataset_root, "bonn", scene_root)
 
-    scene_info = only(CanonicalDataset(
-        dataset_root,
-        task_name="VideoDepth",
-    ).list_scenes())
+    scene_info = only(
+        CanonicalDataset(
+            dataset_root,
+            task_name="VideoDepth",
+        ).list_scenes())
     result = evaluate_depth_scene(
         scene_info,
         pred_root.parent,
@@ -193,7 +199,8 @@ def test_evaluate_depth_scene_reads_standardized_artifacts(tmp_path):
     assert result["metrics"]["delta125_acc"] == 1.0
 
 
-def test_standard_monodepth_protocol_uses_least_squares_alignment_and_nyu_limits(tmp_path):
+def test_standard_monodepth_protocol_uses_least_squares_alignment_and_nyu_limits(
+        tmp_path):
     dataset_root = tmp_path / "marigold"
     scene_root = dataset_root / "nyuv2"
     depth_root = scene_root / "depths"
@@ -207,10 +214,11 @@ def test_standard_monodepth_protocol_uses_least_squares_alignment_and_nyu_limits
     np.save(pred_root / "000.npy", pred_depth)
     write_metadata(dataset_root, "marigold", scene_root)
 
-    scene_info = only(CanonicalDataset(
-        dataset_root,
-        task_name="MonoDepth",
-    ).list_scenes())
+    scene_info = only(
+        CanonicalDataset(
+            dataset_root,
+            task_name="MonoDepth",
+        ).list_scenes())
     result = evaluate_depth_scene(
         scene_info,
         pred_root.parent,
@@ -225,7 +233,8 @@ def test_standard_monodepth_protocol_uses_least_squares_alignment_and_nyu_limits
     assert result["metrics"]["abs_relative_difference"] < 1e-6
 
 
-def test_standard_monodepth_protocol_recovers_geometry_metrics_without_manifest_intrinsics(tmp_path):
+def test_standard_monodepth_protocol_recovers_geometry_metrics_without_manifest_intrinsics(
+        tmp_path):
     dataset_root = tmp_path / "marigold"
     scene_root = dataset_root / "nyuv2"
     depth_root = scene_root / "depths"
@@ -240,24 +249,31 @@ def test_standard_monodepth_protocol_recovers_geometry_metrics_without_manifest_
     np.save(pred_root / "000.npy", gt_depth.copy())
     from PIL import Image
 
-    Image.new("RGB", (640, 480), color=(20, 40, 60)).save(image_root / "000.png")
+    Image.new("RGB", (640, 480),
+              color=(20, 40, 60)).save(image_root / "000.png")
     (scene_root / "materialized_full.json").write_text(
-        json.dumps(
-            {
-                "dataset": "marigold",
-                "scene": "nyuv2",
-                "num_samples": 1,
-                "records": [{"key": "000", "depth": str(depth_root / "000.npy"), "image": str(image_root / "000.png")}],
-            }
-        ),
+        json.dumps({
+            "dataset":
+                "marigold",
+            "scene":
+                "nyuv2",
+            "num_samples":
+                1,
+            "records": [{
+                "key": "000",
+                "depth": str(depth_root / "000.npy"),
+                "image": str(image_root / "000.png")
+            }],
+        }),
         encoding="utf-8",
     )
     write_metadata(dataset_root, "marigold", scene_root)
 
-    scene_info = only(CanonicalDataset(
-        dataset_root,
-        task_name="MonoDepth",
-    ).list_scenes())
+    scene_info = only(
+        CanonicalDataset(
+            dataset_root,
+            task_name="MonoDepth",
+        ).list_scenes())
     result = evaluate_depth_scene(
         scene_info,
         pred_root.parent,
@@ -283,10 +299,11 @@ def test_standard_eth3d_monodepth_protocol_uses_alignment_downsample(tmp_path):
     np.save(pred_root / "000.npy", pred_depth)
     write_metadata(dataset_root, "marigold", scene_root)
 
-    scene_info = only(CanonicalDataset(
-        dataset_root,
-        task_name="MonoDepth",
-    ).list_scenes())
+    scene_info = only(
+        CanonicalDataset(
+            dataset_root,
+            task_name="MonoDepth",
+        ).list_scenes())
     result = evaluate_depth_scene(
         scene_info,
         pred_root.parent,
@@ -302,10 +319,11 @@ def test_pi3_video_protocol_uses_lad_scale_shift_and_cubic_resize(tmp_path):
     dataset_root = tmp_path / "bonn"
     scene_root = dataset_root / "scene_a"
     write_metadata(dataset_root, "bonn", scene_root)
-    scene_info = only(CanonicalDataset(
-        dataset_root,
-        task_name="VideoDepth",
-    ).list_scenes())
+    scene_info = only(
+        CanonicalDataset(
+            dataset_root,
+            task_name="VideoDepth",
+        ).list_scenes())
 
     resolved = resolve_depth_config(
         scene_info,
@@ -323,10 +341,11 @@ def test_default_video_depth_protocol_uses_pi3_sequence_alignment(tmp_path):
     dataset_root = tmp_path / "sintel"
     scene_root = dataset_root / "alley_1"
     write_metadata(dataset_root, "sintel", scene_root)
-    scene_info = only(CanonicalDataset(
-        dataset_root,
-        task_name="VideoDepth",
-    ).list_scenes())
+    scene_info = only(
+        CanonicalDataset(
+            dataset_root,
+            task_name="VideoDepth",
+        ).list_scenes())
 
     resolved = resolve_depth_config(
         scene_info,
@@ -343,10 +362,11 @@ def test_pi3_mono_protocol_uses_scale_alignment_and_cubic_resize(tmp_path):
     dataset_root = tmp_path / "marigold"
     scene_root = dataset_root / "kitti"
     write_metadata(dataset_root, "marigold", scene_root)
-    scene_info = only(CanonicalDataset(
-        dataset_root,
-        task_name="MonoDepth",
-    ).list_scenes())
+    scene_info = only(
+        CanonicalDataset(
+            dataset_root,
+            task_name="MonoDepth",
+        ).list_scenes())
 
     resolved = resolve_depth_config(
         scene_info,
@@ -392,22 +412,24 @@ def test_monodepth_manifest_filters_stale_depth_files(tmp_path):
     np.save(pred_root / "000.npy", gt_depth)
     np.save(pred_root / "stale.npy", gt_depth * 10.0)
     (scene_root / "materialized_full.json").write_text(
-        json.dumps(
-            {
-                "dataset": "marigold",
-                "scene": "nyuv2",
-                "num_samples": 1,
-                "records": [{"key": "000", "depth": str(depth_root / "000.npy")}],
-            }
-        ),
+        json.dumps({
+            "dataset": "marigold",
+            "scene": "nyuv2",
+            "num_samples": 1,
+            "records": [{
+                "key": "000",
+                "depth": str(depth_root / "000.npy")
+            }],
+        }),
         encoding="utf-8",
     )
     write_metadata(dataset_root, "marigold", scene_root)
 
-    scene_info = only(CanonicalDataset(
-        dataset_root,
-        task_name="MonoDepth",
-    ).list_scenes())
+    scene_info = only(
+        CanonicalDataset(
+            dataset_root,
+            task_name="MonoDepth",
+        ).list_scenes())
     result = evaluate_depth_scene(
         scene_info,
         pred_root.parent,
@@ -436,28 +458,28 @@ def test_monodepth_manifest_record_mask_is_applied(tmp_path):
     np.save(protocol_mask_root / "000_valid.npy", mask)
     np.save(pred_root / "000.npy", pred_depth)
     (scene_root / "materialized_full.json").write_text(
-        json.dumps(
-            {
-                "dataset": "marigold",
-                "scene": "nyuv2",
-                "num_samples": 1,
-                "records": [
-                    {
-                        "key": "000",
-                        "depth": str(depth_root / "000.npy"),
-                        "mask": str(protocol_mask_root / "000_valid.npy"),
-                    }
-                ],
-            }
-        ),
+        json.dumps({
+            "dataset":
+                "marigold",
+            "scene":
+                "nyuv2",
+            "num_samples":
+                1,
+            "records": [{
+                "key": "000",
+                "depth": str(depth_root / "000.npy"),
+                "mask": str(protocol_mask_root / "000_valid.npy"),
+            }],
+        }),
         encoding="utf-8",
     )
     write_metadata(dataset_root, "marigold", scene_root)
 
-    scene_info = only(CanonicalDataset(
-        dataset_root,
-        task_name="MonoDepth",
-    ).list_scenes())
+    scene_info = only(
+        CanonicalDataset(
+            dataset_root,
+            task_name="MonoDepth",
+        ).list_scenes())
     result = evaluate_depth_scene(
         scene_info,
         pred_root.parent,
@@ -467,7 +489,8 @@ def test_monodepth_manifest_record_mask_is_applied(tmp_path):
     assert result["num_valid_pixels"] == 1
 
 
-def test_standard_diode_protocol_uses_provided_mask_without_gt_range_filter(tmp_path):
+def test_standard_diode_protocol_uses_provided_mask_without_gt_range_filter(
+        tmp_path):
     dataset_root = tmp_path / "marigold"
     scene_root = dataset_root / "diode"
     depth_root = scene_root / "depths"
@@ -485,10 +508,11 @@ def test_standard_diode_protocol_uses_provided_mask_without_gt_range_filter(tmp_
     np.save(pred_root / "000.npy", pred_depth)
     write_metadata(dataset_root, "marigold", scene_root)
 
-    scene_info = only(CanonicalDataset(
-        dataset_root,
-        task_name="MonoDepth",
-    ).list_scenes())
+    scene_info = only(
+        CanonicalDataset(
+            dataset_root,
+            task_name="MonoDepth",
+        ).list_scenes())
     result = evaluate_depth_scene(
         scene_info,
         pred_root.parent,
@@ -500,20 +524,13 @@ def test_standard_diode_protocol_uses_provided_mask_without_gt_range_filter(tmp_
     assert result["num_valid_pixels"] == 4
 
 
-def test_mvrecon_compatibility_protocol_uses_median_alignment_and_clipping(tmp_path):
+def test_mvrecon_compatibility_protocol_uses_median_alignment_and_clipping(
+        tmp_path):
     dataset_root = tmp_path / "eth3d"
     scene_root = dataset_root / "courtyard" / "key000001"
     depth_root = scene_root / "depths"
-    pred_root = (
-        tmp_path
-        / "exp"
-        / "MVRecon"
-        / "eth3d"
-        / "DA3"
-        / "courtyard"
-        / "key000001"
-        / "depths"
-    )
+    pred_root = (tmp_path / "exp" / "MVRecon" / "eth3d" / "DA3" / "courtyard" /
+                 "key000001" / "depths")
     depth_root.mkdir(parents=True)
     pred_root.mkdir(parents=True)
 
@@ -522,10 +539,11 @@ def test_mvrecon_compatibility_protocol_uses_median_alignment_and_clipping(tmp_p
     np.save(pred_root / "000.npy", gt_depth * 2.0)
     write_metadata(dataset_root, "eth3d", scene_root)
 
-    scene_info = only(CanonicalDataset(
-        dataset_root,
-        task_name="MVRecon",
-    ).list_scenes())
+    scene_info = only(
+        CanonicalDataset(
+            dataset_root,
+            task_name="MVRecon",
+        ).list_scenes())
     result = evaluate_depth_scene(
         scene_info,
         pred_root.parent,
@@ -580,10 +598,13 @@ def test_surge_style_normals_use_local_neighborhoods_at_borders():
         dtype=np.float64,
     )
     points = depth_eval.depth_to_camera_points(depth, intrinsics)
-    normals, mask = point_map_to_normals(points, np.ones_like(depth, dtype=bool))
+    normals, mask = point_map_to_normals(points, np.ones_like(depth,
+                                                              dtype=bool))
 
     assert mask.all()
-    np.testing.assert_allclose(normals[mask], np.array([[0.0, 0.0, 1.0]] * 4), atol=1e-12)
+    np.testing.assert_allclose(normals[mask],
+                               np.array([[0.0, 0.0, 1.0]] * 4),
+                               atol=1e-12)
 
 
 def test_rmvd_sample_json_intrinsics_enable_depth_geometry_metrics(tmp_path):
@@ -598,29 +619,31 @@ def test_rmvd_sample_json_intrinsics_enable_depth_geometry_metrics(tmp_path):
     np.save(depth_root / "000000_key.npy", gt_depth)
     np.save(pred_root / "000000_key.npy", gt_depth)
     (scene_root / "sample.json").write_text(
-        json.dumps(
-            {
-                "dataset_name": "dtu",
-                "task": "RMVD",
-                "keyview_idx": 0,
-                "depth": {"canonical_path": "depths/000000_key.npy"},
-                "intrinsics": [
-                    [
-                        [1.0, 0.0, 1.0],
-                        [0.0, 1.0, 1.0],
-                        [0.0, 0.0, 1.0],
-                    ]
-                ],
-            }
-        ),
+        json.dumps({
+            "dataset_name":
+                "dtu",
+            "task":
+                "RMVD",
+            "keyview_idx":
+                0,
+            "depth": {
+                "canonical_path": "depths/000000_key.npy"
+            },
+            "intrinsics": [[
+                [1.0, 0.0, 1.0],
+                [0.0, 1.0, 1.0],
+                [0.0, 0.0, 1.0],
+            ]],
+        }),
         encoding="utf-8",
     )
     write_metadata(dataset_root, "dtu", scene_root)
 
-    scene_info = only(CanonicalDataset(
-        dataset_root,
-        task_name="RMVD",
-    ).list_scenes())
+    scene_info = only(
+        CanonicalDataset(
+            dataset_root,
+            task_name="RMVD",
+        ).list_scenes())
     result = evaluate_depth_scene(
         scene_info,
         pred_root.parent,
@@ -644,7 +667,8 @@ def test_load_depth_map_reads_sintel_dpt(tmp_path):
     loaded = load_depth_map(path)
 
     assert np.isnan(loaded[1, 1])
-    np.testing.assert_array_equal(loaded[np.isfinite(loaded)], [1.0, 2.0, 3.0, 4.0, 6.0])
+    np.testing.assert_array_equal(loaded[np.isfinite(loaded)],
+                                  [1.0, 2.0, 3.0, 4.0, 6.0])
 
 
 def test_load_depth_map_reads_eth3d_raw_float_jpg(tmp_path, monkeypatch):
@@ -666,16 +690,22 @@ def test_error_artifacts_record_alignment_and_absrel_maps(tmp_path):
     prediction = gt / 4.0 + 0.5  # recovered exactly by a scale/shift fit
     prediction[10, 20] = 1.5  # one wrong pixel: aligned depth 4 vs GT 2
     valid = gt > 0
-    pair = depth_eval.DepthPairData(gt_path=tmp_path / "frame_0007.png", pred_path=tmp_path / "frame_0007.npy",
-                                    ground_truth=gt, prediction=prediction, valid_mask=valid)
-    writer = depth_eval.DepthErrorArtifactWriter(root=tmp_path / "out", max_side=40)
-    config = depth_eval.DepthEvaluationConfig(alignment="least_squares", compute_geometry_metrics=False)
+    pair = depth_eval.DepthPairData(gt_path=tmp_path / "frame_0007.png",
+                                    pred_path=tmp_path / "frame_0007.npy",
+                                    ground_truth=gt,
+                                    prediction=prediction,
+                                    valid_mask=valid)
+    writer = depth_eval.DepthErrorArtifactWriter(root=tmp_path / "out",
+                                                 max_side=40)
+    config = depth_eval.DepthEvaluationConfig(alignment="least_squares",
+                                              compute_geometry_metrics=False)
     metrics = depth_eval.evaluate_single_depth_pair(pair, config, writer)
 
     error = np.load(tmp_path / "out" / "error_maps" / "frame_0007.npy")
     assert error.dtype == np.float16 and error.shape == (20, 40)
     assert np.isnan(error[:, :4]).all() and np.nanmin(error) == 0.0
-    assert (tmp_path / "out" / "error_visualizations" / "frame_0007.png").is_file()
+    assert (tmp_path / "out" / "error_visualizations" /
+            "frame_0007.png").is_file()
     record = writer.records[0]
     assert record["gt"] == "frame_0007.png" and record["metrics"] == metrics
     assert record["num_valid_pixels"] == int(valid.sum())
@@ -688,7 +718,8 @@ def test_bonn_video_depth_reads_tum_format_depth(tmp_path):
     scene_root = dataset_root / "scene_a"
     (scene_root / "depths").mkdir(parents=True)
     write_metadata(dataset_root, "bonn", scene_root)
-    scene_info = only(CanonicalDataset(dataset_root, task_name="VideoDepth").list_scenes())
+    scene_info = only(
+        CanonicalDataset(dataset_root, task_name="VideoDepth").list_scenes())
     config = resolve_depth_config(scene_info, DepthEvaluationConfig())
     assert config.gt_depth_scale == depth_eval.BONN_DEPTH_SCALE == 1.0 / 5000.0
     assert 15000 * config.gt_depth_scale == 3.0 < config.max_depth

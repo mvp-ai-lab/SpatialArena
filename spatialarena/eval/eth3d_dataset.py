@@ -29,20 +29,32 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
+"""Dataset adapter for the raw ETH3D layout (<data_path>/eth3d/<category>)."""
 
-from pathlib import Path
+import pathlib
 
-from spatialarena.eval.utils import Dataset, SceneInfo
+from spatialarena.eval import utils
 
 
-class DatasetETH3D(Dataset):
+class DatasetETH3D(utils.Dataset):
+    """Lists the ETH3D scenes of each category (e.g. dslr, rig).
+
+    Attributes:
+        data_path: Dataset root; scenes are under data_path/eth3d.
+        categories: Categories to keep; empty keeps every category.
+        scenes: Scene names to keep; empty keeps every scene.
+        method: Method name used in the workspace path.
+        run_path: Root of the method runs.
+        run_name: Run directory name under run_path.
+    """
+
     def __init__(
         self,
-        data_path: Path,
+        data_path: pathlib.Path,
         categories: list[str],
-        scenes: list[Path],
+        scenes: list[pathlib.Path],
         method: str,
-        run_path: Path,
+        run_path: pathlib.Path,
         run_name: str,
     ):
         super().__init__()
@@ -65,9 +77,9 @@ class DatasetETH3D(Dataset):
     def list_scenes(self):
         scene_infos = []
         for category_path in (self.data_path / "eth3d").iterdir():
-            if not category_path.is_dir() or (
-                self.categories and category_path.name not in self.categories
-            ):
+            if not category_path.is_dir() or (self.categories and
+                                              category_path.name
+                                              not in self.categories):
                 continue
 
             category = category_path.name
@@ -80,21 +92,19 @@ class DatasetETH3D(Dataset):
                 if self.scenes and scene not in self.scenes:
                     continue
 
-                workspace_path = (
-                    self.run_path / self.run_name / "eth3d" / category / self.method / scene
-                )
+                workspace_path = (self.run_path / self.run_name / "eth3d" /
+                                  category / self.method / scene)
                 # ETH3D stores both original DSLR images and the images used
-                # by the undistorted COLMAP calibration.  The latter are the
+                # by the undistorted COLMAP calibration. The latter are the
                 # canonical benchmark inputs.
                 image_path = scene_path / "images" / "dslr_images_undistorted"
                 sparse_gt_path = list(
-                    scene_path.glob("*_calibration_undistorted")
-                )[0]
+                    scene_path.glob("*_calibration_undistorted"))[0]
 
                 dense_gt_path = scene_path / f"{category}_scan_eval"
                 if dense_gt_path.exists() is False:
                     dense_gt_path = None
-                
+
                 depth_path = scene_path / "ground_truth_depth" / "dslr_images"
                 if not depth_path.exists():
                     depth_path = None
@@ -105,7 +115,7 @@ class DatasetETH3D(Dataset):
                 elif category == "rig":
                     colmap_extra_args.extend(["--data_type", "video"])
 
-                scene_info = SceneInfo(
+                scene_info = utils.SceneInfo(
                     dataset="eth3d",
                     category=category,
                     scene=scene,

@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Generated or registry-derived parts of the docs stay in sync with the code.
 
 evaluation_doc_methods: docs/evaluation.md's protocol matrix lists the evaluated methods per track; keep it in sync
@@ -17,12 +16,12 @@ from scripts.preprocess.export_benchmark_data_doc import (
     update_marked_section,
 )
 
-
 # ---- evaluation_doc_methods --------------------------------------------------------------------------------
 
 DOC = Path(__file__).resolve().parents[1] / "docs" / "evaluation.md"
-HEADER = ("| Task | Dataset | Images Used | Ground Truth Used | Metrics Used | Protocol "
-          "| Evaluated Methods (per track) |")
+HEADER = (
+    "| Task | Dataset | Images Used | Ground Truth Used | Metrics Used | Protocol "
+    "| Evaluated Methods (per track) |")
 
 
 def expected_cell(task: str) -> str:
@@ -31,7 +30,9 @@ def expected_cell(task: str) -> str:
         for slam_range in (("short", "long") if task == "SLAM" else (None,)):
             names = evaluated_methods(task, track, slam_range)
             label = f"`{track}`" + (f" {slam_range}" if slam_range else "")
-            parts.append(f"{label} ({len(names)}): {', '.join(names) if names else '--'}")
+            parts.append(
+                f"{label} ({len(names)}): {', '.join(names) if names else '--'}"
+            )
     return "<br>".join(parts)
 
 
@@ -46,7 +47,8 @@ def test_protocol_matrix_lists_the_planned_methods_per_track():
         first_cell.setdefault(cells[0], cells[-1])
     assert set(first_cell) == set(TASK_TRACK_MATRIX)
     for task, cell in first_cell.items():
-        assert cell == expected_cell(task), f"{task}: regenerate the protocol matrix column"
+        assert cell == expected_cell(
+            task), f"{task}: regenerate the protocol matrix column"
 
 
 def test_task_restricted_methods_are_planned_only_for_their_tasks():
@@ -61,19 +63,19 @@ def test_task_restricted_methods_are_planned_only_for_their_tasks():
 
 # ---- benchmark_data_doc_export -----------------------------------------------------------------------------
 
+
 def test_update_marked_section_replaces_existing_block():
-    existing = "\n".join(
-        [
-            "# Datasets",
-            "",
-            BEGIN_MARKER,
-            "old generated content",
-            END_MARKER,
-            "",
-            "tail",
-        ]
-    )
-    generated = "\n".join([BEGIN_MARKER, "new generated content", END_MARKER, ""])
+    existing = "\n".join([
+        "# Datasets",
+        "",
+        BEGIN_MARKER,
+        "old generated content",
+        END_MARKER,
+        "",
+        "tail",
+    ])
+    generated = "\n".join(
+        [BEGIN_MARKER, "new generated content", END_MARKER, ""])
 
     updated = update_marked_section(existing, generated)
 

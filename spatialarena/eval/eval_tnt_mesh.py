@@ -35,38 +35,53 @@
 # This python script is for downloading dataset from www.tanksandtemples.org
 # The dataset has a different license, please refer to
 # https://tanksandtemples.org/license/
+"""Tanks and Temples mesh evaluation (precision, recall and F-score).
 
-# this script requires Open3D python binding
-# please follow the instructions in setup.py before running this script.
+Adapted from the TanksAndTemples toolbox: aligns a reconstructed mesh to the GT
+point cloud through the COLMAP trajectory, refines the alignment by ICP and
+writes the metrics and precision/recall plots next to the mesh. Requires the
+Open3D Python binding. Run `main` for the standalone CLI.
+"""
 
-import os
 import argparse
 import json
-from pathlib import Path
+import os
+import pathlib
 
-import torch
-import trimesh
 import numpy as np
 import open3d as o3d
+import torch
+import trimesh
 
-from spatialarena.eval.tnt_dataset import DatasetTanksAndTemples  # type: ignore
-from spatialarena.eval.tnt_tools.cull_mesh import get_traj, Mesher
-from spatialarena.eval.tnt_tools.config import scenes_tau_dict
-from spatialarena.eval.tnt_tools.registration import (
-    trajectory_alignment,
-    registration_vol_ds,
-    registration_unif,
-)
-from spatialarena.eval.tnt_tools.help_func import auto_orient_and_center_poses
-from spatialarena.eval.tnt_tools.trajectory_io import CameraPose, read_trajectory
-from spatialarena.eval.tnt_tools.evaluation import EvaluateHisto
-from spatialarena.eval.tnt_tools.plot import plot_graph
+from spatialarena.eval import tnt_dataset  # type: ignore
+from spatialarena.eval.tnt_tools import config
+# Aliased: this module defines its own cull_mesh function.
+from spatialarena.eval.tnt_tools import cull_mesh as tnt_cull_mesh
+from spatialarena.eval.tnt_tools import evaluation
+from spatialarena.eval.tnt_tools import help_func
+from spatialarena.eval.tnt_tools import plot
+from spatialarena.eval.tnt_tools import registration
+from spatialarena.eval.tnt_tools import trajectory_io
 
 
 def run_evaluation(dataset_dir, traj_path, ply_path, out_dir, view_crop):
+    """Evaluates one Tanks and Temples mesh against the scene's GT.
+
+    Args:
+        dataset_dir: Scene folder with the GT cloud, crop file, alignment and
+            COLMAP SfM log, named after the scene.
+        traj_path: Camera trajectory of the reconstruction (.log, .npy or a
+            transforms .json).
+        ply_path: Reconstructed mesh.
+        out_dir: Output folder for metrics.json, error clouds and plots.
+        view_crop: Show the cropped reconstruction in an Open3D window.
+
+    Raises:
+        ValueError: If the scene has no threshold in `scenes_tau_dict`.
+    """
     scene = os.path.basename(os.path.normpath(dataset_dir))
 
-    if scene not in scenes_tau_dict:
+    if scene not in config.scenes_tau_dict:
         print(dataset_dir, scene)
         raise ValueError("invalid dataset-dir, not in scenes_tau_dict")
 
@@ -75,23 +90,23 @@ def run_evaluation(dataset_dir, traj_path, ply_path, out_dir, view_crop):
     print(f"Evaluating {scene}")
     print("===========================")
 
-    dTau = scenes_tau_dict[scene]
+    tau = config.scenes_tau_dict[scene]
 
-    # Put the crop-file, the GT file, the COLMAP SfM log file and
-    # the alignment of the according scene in a folder of
-    # the same scene name in the dataset_dir
+    # Put the crop file, the GT file, the COLMAP SfM log file and the
+    # alignment of the scene in a folder of the same scene name in the
+    # dataset_dir.
     colmap_ref_logfile = os.path.join(dataset_dir, scene + "_COLMAP_SfM.log")
 
-    # This is for ground-truth pointcloud, we can use it
+    # The alignment of the ground-truth point cloud.
     alignment = os.path.join(dataset_dir, scene + "_trans.txt")
     gt_filen = os.path.join(dataset_dir, scene + ".ply")
     print(f'alignment: {alignment}')
 
-    # This crop file is also w.r.t the ground-truth pointcloud, we can use it.
-    # Otherwise we have to crop the estimated pointcloud by ourself
+    # This crop file is also w.r.t. the ground-truth point cloud, so we can use
+    # it; otherwise we would have to crop the estimated point cloud ourselves.
     cropfile = os.path.join(dataset_dir, scene + ".json")
 
-    # This is not so necessary
+    # The mapping reference is not needed; it is always disabled below.
     map_file = os.path.join(dataset_dir, scene + "_mapping_reference.txt")
     if not os.path.isfile(map_file):
         map_file = None
@@ -100,19 +115,17 @@ def run_evaluation(dataset_dir, traj_path, ply_path, out_dir, view_crop):
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
-    # Load reconstruction and according GT
+    # Load the reconstruction and its GT.
     print(ply_path)
     pcd = o3d.io.read_point_cloud(ply_path)
-    # add center points
-    
+
     mesh = trimesh.load_mesh(ply_path)
-    # add center points
+    # Add the face center points.
     sampled_vertices = mesh.vertices[mesh.faces].mean(axis=1)
 
     vertices = np.concatenate([mesh.vertices, sampled_vertices], axis=0)
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(vertices)
-    # end add center points
 
     print(gt_filen)
     gt_pcd = o3d.io.read_point_cloud(gt_filen)
@@ -121,10 +134,11 @@ def run_evaluation(dataset_dir, traj_path, ply_path, out_dir, view_crop):
     print(traj_path)
     traj_to_register = []
     if traj_path.endswith('.npy'):
-        ld = np.load(traj_path)
-        for i in range(len(ld)):
-            traj_to_register.append(CameraPose(meta=None, mat=ld[i]))
-    elif traj_path.endswith('.json'):  # instant-npg or sdfstudio format
+        loaded_poses = np.load(traj_path)
+        for i in range(len(loaded_poses)):
+            traj_to_register.append(
+                trajectory_io.CameraPose(meta=None, mat=loaded_poses[i]))
+    elif traj_path.endswith('.json'):  # Instant-NGP or sdfstudio format.
         with open(traj_path, encoding='UTF-8') as f:
             meta = json.load(f)
         poses_dict = {}
@@ -136,37 +150,42 @@ def run_evaluation(dataset_dir, traj_path, ply_path, out_dir, view_crop):
         for i in range(len(poses_dict)):
             poses.append(poses_dict[i])
         poses = torch.from_numpy(np.array(poses).astype(np.float32))
-        poses, _ = auto_orient_and_center_poses(
-            poses, method='up', center_poses=True)
+        poses, _ = help_func.auto_orient_and_center_poses(poses,
+                                                          method='up',
+                                                          center_poses=True)
         scale_factor = 1.0 / float(torch.max(torch.abs(poses[:, :3, 3])))
         poses[:, :3, 3] *= scale_factor
         poses = poses.numpy()
         for i in range(len(poses)):
-            traj_to_register.append(CameraPose(meta=None, mat=poses[i]))
+            traj_to_register.append(
+                trajectory_io.CameraPose(meta=None, mat=poses[i]))
 
     else:
-        traj_to_register = read_trajectory(traj_path)
+        traj_to_register = trajectory_io.read_trajectory(traj_path)
 
-    gt_traj_col = read_trajectory(colmap_ref_logfile)
+    gt_traj_col = trajectory_io.read_trajectory(colmap_ref_logfile)
 
-    trajectory_transform = trajectory_alignment(
+    trajectory_transform = registration.trajectory_alignment(
         map_file, traj_to_register, gt_traj_col, gt_trans)
 
-    # big point clouds will be downsampled to this number to speed up alignment
-    dist_threshold = dTau
-    # Refine alignment by using the actual GT and MVS point clouds
+    # Big point clouds will be downsampled to this number to speed up
+    # alignment.
+    dist_threshold = tau
+    # Refine the alignment by using the actual GT and MVS point clouds.
     vol = o3d.visualization.read_selection_polygon_volume(cropfile)
 
-    # Registration refinement in 3 iterations
-    r2 = registration_vol_ds(pcd, gt_pcd, trajectory_transform, vol, dTau,
-                             dTau * 80, 20)
-    r3 = registration_vol_ds(pcd, gt_pcd, r2.transformation, vol, dTau / 2.0,
-                             dTau * 20, 20)
-    r = registration_unif(pcd, gt_pcd, r3.transformation, vol, 2 * dTau, 20)
+    # Registration refinement in 3 iterations.
+    coarse_registration = registration.registration_vol_ds(
+        pcd, gt_pcd, trajectory_transform, vol, tau, tau * 80, 20)
+    fine_registration = registration.registration_vol_ds(
+        pcd, gt_pcd, coarse_registration.transformation, vol, tau / 2.0,
+        tau * 20, 20)
+    final_registration = registration.registration_unif(
+        pcd, gt_pcd, fine_registration.transformation, vol, 2 * tau, 20)
 
-    trajectory_transform = r.transformation
+    trajectory_transform = final_registration.transformation
 
-    # Histograms and P/R/F1
+    # Histograms and P/R/F1.
     plot_stretch = 5
     [
         precision,
@@ -176,40 +195,40 @@ def run_evaluation(dataset_dir, traj_path, ply_path, out_dir, view_crop):
         cum_source,
         edges_target,
         cum_target,
-    ] = EvaluateHisto(
+    ] = evaluation.EvaluateHisto(
         pcd,
         gt_pcd,
         trajectory_transform,  # r.transformation,
         vol,
-        dTau / 2.0,
-        dTau,
+        tau / 2.0,
+        tau,
         out_dir,
         plot_stretch,
         scene,
-        view_crop
-    )
+        view_crop)
     eva = [precision, recall, fscore]
     print("==============================")
-    print("evaluation result : %s" % scene)
+    print(f"evaluation result : {scene}")
     print("==============================")
-    print("distance tau : %.3f" % dTau)
-    print("precision : %.4f" % eva[0])
-    print("recall : %.4f" % eva[1])
-    print("f-score : %.4f" % eva[2])
+    print(f"distance tau : {tau:.3f}")
+    print(f"precision : {eva[0]:.4f}")
+    print(f"recall : {eva[1]:.4f}")
+    print(f"f-score : {eva[2]:.4f}")
     print("==============================")
 
     data = {
-        "dTau": dTau,
+        "dTau": tau,
         "precision": precision,
         "recall": recall,
         "fscore": fscore
     }
 
-    with open(os.path.join(out_dir, "metrics.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(out_dir, "metrics.json"), "w",
+              encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
-    # Plotting
-    plot_graph(
+    # Plotting.
+    plot.plot_graph(
         scene,
         fscore,
         dist_threshold,
@@ -223,23 +242,33 @@ def run_evaluation(dataset_dir, traj_path, ply_path, out_dir, view_crop):
 
 
 def cull_mesh(ply_path: str, traj_path: str):
-    estimate_c2w_list = get_traj(traj_path)
+    """Culls the mesh at `ply_path` to the views of the trajectory."""
+    estimate_c2w_list = tnt_cull_mesh.get_traj(traj_path)
 
-    # for Tanks-and-Temples dataset
-    H, W = 1080, 1920
+    # Tanks and Temples camera intrinsics.
+    height, width = 1080, 1920
     fx = 1163.8678928442187
     fy = 1172.793101201448
     cx = 962.3120628412543
     cy = 542.0667209577691
     far = 20.0
 
-    mesher = Mesher(H, W, fx, fy, cx, cy, far, points_batch_size=5e5)
+    mesher = tnt_cull_mesh.Mesher(height,
+                                  width,
+                                  fx,
+                                  fy,
+                                  cx,
+                                  cy,
+                                  far,
+                                  points_batch_size=5e5)
 
     mesher(ply_path, estimate_c2w_list)
 
 
 def main() -> None:
-    r"""Evaluate every Tanks and Temples mesh of an experiment folder (the standalone CLI):
+    r"""Evaluates every Tanks and Temples mesh of an experiment folder.
+
+    This is the standalone CLI:
 
     python -m spatialarena.eval.eval_tnt_mesh \
         --dataset_path ~/datasets \
@@ -247,42 +276,36 @@ def main() -> None:
         --suffix 2dgs
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--dataset_path',
-        type=str,
-        help='Parent directory of the DTU dataset path'
-    )
-    parser.add_argument(
-        '--input_dir',
-        type=str,
-        help='Parent directory of the reconstructed mesh path'
-    )
-    parser.add_argument(
-        '--suffix',
-        type=str,
-        help='Suffix for the experiment output folder'
-    )
+    parser.add_argument('--dataset_path',
+                        type=str,
+                        help='Parent directory of the DTU dataset path')
+    parser.add_argument('--input_dir',
+                        type=str,
+                        help='Parent directory of the reconstructed mesh path')
+    parser.add_argument('--suffix',
+                        type=str,
+                        help='Suffix for the experiment output folder')
     args = parser.parse_args()
 
-    tnt_dataset = DatasetTanksAndTemples(
-        data_path=Path(args.dataset_path),
+    dataset = tnt_dataset.DatasetTanksAndTemples(
+        data_path=pathlib.Path(args.dataset_path),
         categories=[],
         scenes=[],
         method="ours",
-        run_path=Path("./"),
+        run_path=pathlib.Path("./"),
         run_name="eval_mesh",
     )
     dataset_name = "tanks_and_temples_gof"
-    scene_infos = tnt_dataset.list_scenes(dataset_folder=dataset_name)
+    scene_infos = dataset.list_scenes(dataset_folder=dataset_name)
 
     for scene_info in scene_infos:
         scene_name = scene_info.scene
-        scene_path = tnt_dataset.data_path / dataset_name / scene_name
+        scene_path = dataset.data_path / dataset_name / scene_name
         traj_path = scene_path / f"{scene_name}_COLMAP_SfM.log"
         traj_path = str(traj_path)
 
-        scene_input_dir = os.path.join(
-            args.input_dir,  f"{scene_name}_{args.suffix}")
+        scene_input_dir = os.path.join(args.input_dir,
+                                       f"{scene_name}_{args.suffix}")
         mesh_dir = os.path.join(scene_input_dir, "evaluation/meshes")
         input_mesh_path = os.path.join(mesh_dir, "mesh_final.ply")
 

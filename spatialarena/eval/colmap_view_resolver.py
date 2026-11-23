@@ -1,23 +1,28 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+"""Shared COLMAP-to-real-image resolution for camera-conditioned workflows.
 
-"""Shared COLMAP-to-real-image resolution for camera-conditioned workflows."""
+`resolve_colmap_image_mappings` maps each record of a COLMAP model to one real
+image file of a scene (exact path, nested suffix, then basename or stem), and
+reports the records that are missing or ambiguous instead of guessing.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
+import dataclasses
+import pathlib
 from typing import Any
 
 import numpy as np
 
 from spatialarena.geometry import read_write_model
 
-
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
-# Glob patterns of the adapters' frame list (scripts/inference/adapter_utils.find_image_paths); the SLAM evaluator
-# lists a scene's frames with the same patterns.
-IMAGE_PATTERNS = tuple(f"*{ext}" for ext in (".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp")
+# Glob patterns of the adapters' frame list
+# (scripts/inference/adapter_utils.find_image_paths); the SLAM evaluator lists a
+# scene's frames with the same patterns.
+IMAGE_PATTERNS = tuple(f"*{ext}" for ext in (".jpg", ".jpeg", ".png", ".bmp",
+                                             ".tif", ".tiff", ".webp")
                        for ext in (ext, ext.upper()))
 
 
@@ -25,8 +30,21 @@ class ColmapImageResolutionError(FileNotFoundError):
     """Raised when a COLMAP image record cannot be resolved unambiguously."""
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class ColmapImageRecord:
+    """One COLMAP image with its camera.
+
+    Attributes:
+        image_id: COLMAP image id.
+        name: Image name as stored in the model.
+        camera_id: COLMAP camera id.
+        model: COLMAP camera model name.
+        width: Image width in pixels.
+        height: Image height in pixels.
+        params: COLMAP camera parameters.
+        intrinsic: 3x3 pinhole intrinsic matrix.
+        w2c: 4x4 world-to-camera matrix.
+    """
     image_id: int
     name: str
     camera_id: int
@@ -39,23 +57,39 @@ class ColmapImageRecord:
 
     @property
     def c2w(self) -> np.ndarray:
+        """The 4x4 camera-to-world matrix (float32)."""
         return np.linalg.inv(self.w2c).astype(np.float32)
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class ColmapImageMapping:
+    """A COLMAP record matched to a real image file.
+
+    Attributes:
+        record: The COLMAP record.
+        image_path: The matched real image file.
+        match_kind: How it was matched, e.g. "exact_relative".
+    """
     record: ColmapImageRecord
-    image_path: Path
+    image_path: pathlib.Path
     match_kind: str
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class ColmapMappingDiagnostics:
+    """What a mapping run matched, missed and could not decide.
+
+    Attributes:
+        mapped: One {colmap_name, image_path, match_kind} dict per match.
+        missing: Record names without any candidate file.
+        ambiguous: Records with several candidates, or a file already used.
+    """
     mapped: tuple[dict[str, str], ...]
     missing: tuple[str, ...]
     ambiguous: tuple[dict[str, Any], ...]
 
     def to_dict(self) -> dict[str, Any]:
+        """Returns the diagnostics as a JSON-ready dict with counts."""
         return {
             "mapped": [dict(item) for item in self.mapped],
             "missing": list(self.missing),
@@ -66,38 +100,35 @@ class ColmapMappingDiagnostics:
         }
 
 
-def canonical_image_root(data_path: Path) -> Path:
-    """Return the canonical RGB root, including ETH3D undistorted DSLR RGB."""
-
-    data_path = Path(data_path)
+def canonical_image_root(data_path: pathlib.Path) -> pathlib.Path:
+    """Returns the canonical RGB root, including ETH3D undistorted DSLR RGB."""
+    data_path = pathlib.Path(data_path)
     undistorted = data_path / "images" / "dslr_images_undistorted"
     if undistorted.is_dir():
         return undistorted
     return data_path / "images"
 
 
-def list_real_image_paths(data_path: Path) -> list[Path]:
+def list_real_image_paths(data_path: pathlib.Path) -> list[pathlib.Path]:
+    """Lists the image files under the canonical image root, sorted."""
     root = canonical_image_root(data_path)
-    return sorted(
-        path
-        for path in root.rglob("*")
-        if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
-    )
+    return sorted(path for path in root.rglob("*")
+                  if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS)
 
 
-def _normalize(value: str | Path) -> str:
+def _normalize(value: str | pathlib.Path) -> str:
     return str(value).replace("\\", "/").lstrip("./")
 
 
-def _parts(value: str | Path) -> tuple[str, ...]:
+def _parts(value: str | pathlib.Path) -> tuple[str, ...]:
     return tuple(part for part in _normalize(value).split("/") if part)
 
 
-def _stem_key(value: str | Path) -> str:
-    stem = Path(_normalize(value)).stem.casefold()
+def _stem_key(value: str | pathlib.Path) -> str:
+    stem = pathlib.Path(_normalize(value)).stem.casefold()
     for suffix in (".color", ".depth.proj", ".depth", "_depth"):
         if stem.endswith(suffix):
-            stem = stem[: -len(suffix)]
+            stem = stem[:-len(suffix)]
     for prefix in ("depth_map_", "depth_", "disp_", "frame_"):
         if stem.startswith(prefix):
             stem = stem[len(prefix):]
@@ -120,15 +151,23 @@ def _camera_matrix(camera: Any) -> np.ndarray:
     )
 
 
-def load_colmap_image_records(colmap_path: Path) -> list[ColmapImageRecord]:
+def load_colmap_image_records(
+        colmap_path: pathlib.Path) -> list[ColmapImageRecord]:
+    """Reads a COLMAP model into records sorted by image name.
+
+    Raises:
+        ColmapImageResolutionError: If the model cannot be read.
+    """
     model = read_write_model.read_model(str(colmap_path))
     if model is None:
-        raise ColmapImageResolutionError(f"Unable to read COLMAP model: {colmap_path}")
+        raise ColmapImageResolutionError(
+            f"Unable to read COLMAP model: {colmap_path}")
     cameras, images, _points = model
     records = []
     for image in sorted(images.values(), key=lambda item: item.name):
         w2c = np.eye(4, dtype=np.float32)
-        w2c[:3, :3] = read_write_model.qvec2rotmat(image.qvec).astype(np.float32)
+        w2c[:3, :3] = read_write_model.qvec2rotmat(image.qvec).astype(
+            np.float32)
         w2c[:3, 3] = np.asarray(image.tvec, dtype=np.float32)
         records.append(
             ColmapImageRecord(
@@ -138,15 +177,16 @@ def load_colmap_image_records(colmap_path: Path) -> list[ColmapImageRecord]:
                 model=str(cameras[image.camera_id].model),
                 width=int(cameras[image.camera_id].width),
                 height=int(cameras[image.camera_id].height),
-                params=np.asarray(cameras[image.camera_id].params, dtype=np.float32),
+                params=np.asarray(cameras[image.camera_id].params,
+                                  dtype=np.float32),
                 intrinsic=_camera_matrix(cameras[image.camera_id]),
                 w2c=w2c,
-            )
-        )
+            ))
     return records
 
 
-def _real_path_keys(path: Path, image_root: Path) -> tuple[str, ...]:
+def _real_path_keys(path: pathlib.Path,
+                    image_root: pathlib.Path) -> tuple[str, ...]:
     relative = path.relative_to(image_root).as_posix()
     return tuple(dict.fromkeys((_normalize(relative), relative.casefold())))
 
@@ -156,21 +196,25 @@ def _record_exact_keys(name: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys((normalized, normalized.casefold())))
 
 
-def _suffix_candidates(record_name: str, image_paths: list[Path], image_root: Path) -> list[Path]:
+def _suffix_candidates(record_name: str, image_paths: list[pathlib.Path],
+                       image_root: pathlib.Path) -> list[pathlib.Path]:
     record_parts = tuple(part.casefold() for part in _parts(record_name))
     if not record_parts:
         return []
     candidates = []
     for path in image_paths:
-        real_parts = tuple(part.casefold() for part in _parts(path.relative_to(image_root)))
-        if len(real_parts) >= len(record_parts) and real_parts[-len(record_parts):] == record_parts:
+        real_parts = tuple(
+            part.casefold() for part in _parts(path.relative_to(image_root)))
+        if len(real_parts) >= len(record_parts) and real_parts[
+                -len(record_parts):] == record_parts:
             candidates.append(path)
     return candidates
 
 
 # pylint: disable-next=unused-argument
-def _basename_candidates(record_name: str, image_paths: list[Path], image_root: Path) -> list[Path]:
-    record_path = Path(_normalize(record_name))
+def _basename_candidates(record_name: str, image_paths: list[pathlib.Path],
+                         image_root: pathlib.Path) -> list[pathlib.Path]:
+    record_path = pathlib.Path(_normalize(record_name))
     basename = record_path.name.casefold()
     stem = _stem_key(record_name)
     candidates = []
@@ -181,22 +225,38 @@ def _basename_candidates(record_name: str, image_paths: list[Path], image_root: 
 
 
 def resolve_colmap_image_mappings(
-    data_path: Path,
-    image_paths: list[str | Path] | None,
+    data_path: pathlib.Path,
+    image_paths: list[str | pathlib.Path] | None,
     *,
-    colmap_path: Path,
+    colmap_path: pathlib.Path,
     strict: bool = True,
 ) -> tuple[list[ColmapImageMapping], ColmapMappingDiagnostics]:
-    """Map COLMAP records to real files in authoritative COLMAP order.
+    """Maps COLMAP records to real files in authoritative COLMAP order.
 
     Matching priority is exact relative path, nested suffix, basename, then
     stem. Ambiguous candidates are never guessed.
-    """
 
+    Args:
+        data_path: Scene root.
+        image_paths: Candidate image files; defaults to all images under the
+            canonical image root.
+        colmap_path: COLMAP model folder.
+        strict: Raise if any record is missing or ambiguous.
+
+    Returns:
+        (mappings, diagnostics).
+
+    Raises:
+        ColmapImageResolutionError: If no record maps, or in strict mode if
+            any record is missing or ambiguous.
+    """
     image_root = canonical_image_root(data_path)
-    real_paths = [Path(path) for path in (image_paths or list_real_image_paths(data_path))]
+    real_paths = [
+        pathlib.Path(path)
+        for path in (image_paths or list_real_image_paths(data_path))
+    ]
     real_paths = list(dict.fromkeys(real_paths))
-    exact_index: dict[str, list[Path]] = {}
+    exact_index: dict[str, list[pathlib.Path]] = {}
     for path in real_paths:
         for key in _real_path_keys(path, image_root):
             exact_index.setdefault(key, []).append(path)
@@ -205,7 +265,7 @@ def resolve_colmap_image_mappings(
     mapped_records: list[dict[str, str]] = []
     missing: list[str] = []
     ambiguous: list[dict[str, Any]] = []
-    used_paths: set[Path] = set()
+    used_paths: set[pathlib.Path] = set()
 
     for record in load_colmap_image_records(colmap_path):
         exact = []
@@ -222,41 +282,36 @@ def resolve_colmap_image_mappings(
             candidates = _suffix_candidates(record.name, real_paths, image_root)
             match_kind = "nested_prefix"
             if len(candidates) == 0:
-                candidates = _basename_candidates(record.name, real_paths, image_root)
+                candidates = _basename_candidates(record.name, real_paths,
+                                                  image_root)
                 match_kind = "basename_or_stem"
 
         if len(candidates) != 1:
             if len(candidates) == 0:
                 missing.append(record.name)
             else:
-                ambiguous.append(
-                    {
-                        "colmap_name": record.name,
-                        "candidates": [str(path) for path in candidates],
-                        "match_kind": match_kind,
-                    }
-                )
+                ambiguous.append({
+                    "colmap_name": record.name,
+                    "candidates": [str(path) for path in candidates],
+                    "match_kind": match_kind,
+                })
             continue
 
         image_path = candidates[0]
         if image_path in used_paths:
-            ambiguous.append(
-                {
-                    "colmap_name": record.name,
-                    "candidates": [str(image_path)],
-                    "match_kind": "duplicate_real_path",
-                }
-            )
+            ambiguous.append({
+                "colmap_name": record.name,
+                "candidates": [str(image_path)],
+                "match_kind": "duplicate_real_path",
+            })
             continue
         used_paths.add(image_path)
         mappings.append(ColmapImageMapping(record, image_path, match_kind))
-        mapped_records.append(
-            {
-                "colmap_name": record.name,
-                "image_path": str(image_path),
-                "match_kind": match_kind,
-            }
-        )
+        mapped_records.append({
+            "colmap_name": record.name,
+            "image_path": str(image_path),
+            "match_kind": match_kind,
+        })
 
     diagnostics = ColmapMappingDiagnostics(
         mapped=tuple(mapped_records),
@@ -269,10 +324,9 @@ def resolve_colmap_image_mappings(
             "No COLMAP camera-prior image mapping: "
             f"mapped={details['num_mapped']} missing={details['num_missing']} "
             f"ambiguous={details['num_ambiguous']}; "
-            f"missing={list(missing[:5])}; ambiguous={list(ambiguous[:3])}"
-        )
+            f"missing={list(missing[:5])}; ambiguous={list(ambiguous[:3])}")
     if not mappings:
         raise ColmapImageResolutionError(
-            f"No COLMAP camera-prior records map to real images under {image_root}"
-        )
+            "No COLMAP camera-prior records map to real images under "
+            f"{image_root}")
     return mappings, diagnostics

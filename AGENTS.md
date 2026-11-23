@@ -30,8 +30,30 @@ This file applies to the full repository unless a more specific `AGENTS.md` is a
 
 ## Coding style
 
+Python code follows the [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html).
+`spatialarena/geometry/utils.py` is a good example. In particular:
+
+- Formatting: run `python -m yapf -i <files>` (the repo's `.style.yapf`: Google style, 80 columns). It only changes
+  whitespace and line breaks; long strings and comments still need wrapping by hand.
+- Line length: at most 80 characters in new or rewritten code (URLs and pylint directives may be longer). The
+  pre-commit hook enforces a hard limit of 120 characters, so code not yet rewritten keeps passing.
+- Imports: import packages and modules, not functions or classes (`from spatialarena.geometry import utils`, then
+  `utils.write_colmap_formats(...)`); `typing` names are the exception. Use full package paths, no relative imports,
+  one import per line, grouped as `__future__`, standard library, third party, then this repository, each group
+  sorted. Use `from x import y as z` only to resolve a name clash or shorten a long name.
+- Docstrings: a one-line summary ending in a period, a blank line, then the details. Functions use `Args:`,
+  `Returns:` and `Raises:` sections; classes document their public attributes in an `Attributes:` section.
+  Explain what and why in full sentences; do not narrate the code.
+- Naming: `lower_with_under` for modules, functions and variables, `CapWords` for classes, `CAPS_WITH_UNDER` for
+  constants, a leading underscore for module-internal names. Avoid single-letter and abbreviated names except
+  loop counters and well-known math (`x`, `y`, `fx`, `cx`).
+- Readability over density: prefer plain `if` statements to nested conditional expressions, one argument per
+  line for long calls, and small focused functions (about 40 lines is a signal to split). Do not merge dicts
+  with `{**a, ...}` or chain comprehensions where a loop reads more clearly.
+- No mutable default arguments, no bare `except:`, keep `try` bodies small, avoid `@staticmethod` (use a
+  module-level function), and put a script's work in `main()` under `if __name__ == "__main__":`.
+- Comments are complete sentences, two spaces before an inline `#`.
 - Use Python 3.10+ compatible code.
-- Keep line length at or below 120 characters, matching `.pylintrc`.
 - Prefer explicit, typed function signatures for public APIs and dataset/conversion helpers.
 - Use `pathlib.Path` for filesystem paths in new Python code unless an existing local API expects strings.
 - Avoid broad rewrites. Keep changes scoped to the requested dataset, loader, evaluator, or script.

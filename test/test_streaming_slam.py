@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """scripts/inference/streaming_slam.py: pose readers, conventions and wiring of the streaming SLAM methods."""
 
 import json
@@ -24,13 +23,15 @@ from scripts.inference.streaming_slam import (
     weight_paths,
 )
 
-ENGINE = Path(__file__).resolve().parents[1] / "spatialarena" / "templates" / "_engine" / "run_method_case_list.sh"
+ENGINE = Path(__file__).resolve().parents[
+    1] / "spatialarena" / "templates" / "_engine" / "run_method_case_list.sh"
 
 
 def _c2w(index: int) -> np.ndarray:
     pose = np.eye(4)
     angle = 0.1 * index
-    pose[:3, :3] = [[np.cos(angle), -np.sin(angle), 0], [np.sin(angle), np.cos(angle), 0], [0, 0, 1]]
+    pose[:3, :3] = [[np.cos(angle), -np.sin(angle), 0],
+                    [np.sin(angle), np.cos(angle), 0], [0, 0, 1]]
     pose[:3, 3] = [index, 2.0 * index, -0.5 * index]
     return pose
 
@@ -45,7 +46,8 @@ def test_poses_by_index_pads_3x4_to_homogeneous():
 
 def test_read_scal3r_poses_reads_raveled_c2w_rows(tmp_path):
     """Scal3R mat.txt rows are raveled 4x4 camera-to-world poses."""
-    np.savetxt(tmp_path / "mat.txt", np.stack([_c2w(i).ravel() for i in range(4)]))
+    np.savetxt(tmp_path / "mat.txt",
+               np.stack([_c2w(i).ravel() for i in range(4)]))
     poses = read_scal3r_poses(tmp_path)
     assert sorted(poses) == [0, 1, 2, 3]
     np.testing.assert_allclose(poses[3], _c2w(3))
@@ -56,8 +58,12 @@ def test_read_r3_poses_maps_returned_frames_to_input_indices(tmp_path):
     frame_ids = [0, 2, 5]
     (tmp_path / "camera").mkdir()
     for k, frame_id in enumerate(frame_ids):
-        np.savez(tmp_path / "camera" / f"{k:06d}.npz", pose=_c2w(frame_id), intrinsics=np.eye(3))
-    (tmp_path / "run_params.json").write_text(json.dumps({"output_frame_ids": frame_ids}), encoding="utf-8")
+        np.savez(tmp_path / "camera" / f"{k:06d}.npz",
+                 pose=_c2w(frame_id),
+                 intrinsics=np.eye(3))
+    (tmp_path / "run_params.json").write_text(json.dumps(
+        {"output_frame_ids": frame_ids}),
+                                              encoding="utf-8")
     poses = read_r3_poses(tmp_path)
     assert sorted(poses) == frame_ids
     np.testing.assert_allclose(poses[5], _c2w(5))
@@ -65,10 +71,12 @@ def test_read_r3_poses_maps_returned_frames_to_input_indices(tmp_path):
 
 def test_lingbot_resize_matches_its_benchmark_area_budget():
     """lingbot-map benchmark (area budget 255,000, align 14): 640x480 -> 574x434."""
-    assert _lingbot_resize(np.zeros((480, 640, 3), dtype=np.uint8)).shape == (434, 574, 3)
+    assert _lingbot_resize(np.zeros((480, 640, 3),
+                                    dtype=np.uint8)).shape == (434, 574, 3)
 
 
-def test_streaming_methods_are_registered_slam_only_with_downloadable_weights(tmp_path):
+def test_streaming_methods_are_registered_slam_only_with_downloadable_weights(
+        tmp_path):
     """Registry, engine dispatch, code pins and weight paths agree for all six methods."""
     weights = weight_paths(tmp_path)
     engine = ENGINE.read_text(encoding="utf-8")
@@ -84,7 +92,8 @@ def test_streaming_methods_are_registered_slam_only_with_downloadable_weights(tm
         # The adapter reads the weights where the download table puts them, and ckpt_default is the main file.
         _repo, subdir, files = HF_LOCAL_FILE_CHECKPOINTS[method]
         assert weights[method] == tmp_path / "local" / subdir / files[0]
-        assert spec.ckpt_default.endswith(f"/_checkpoints/local/{subdir}/{files[0]}")
+        assert spec.ckpt_default.endswith(
+            f"/_checkpoints/local/{subdir}/{files[0]}")
 
 
 def test_gpu_memory_sampler_starts_and_stops():
@@ -101,11 +110,17 @@ def test_gpu_memory_sampler_starts_and_stops():
 def test_gpu_phase_keeps_depth_arrays_when_exporting_depth(tmp_path):
     """Regression: a split VGGT-Long / Pi-Long run slimmed its chunks to the alignment's arrays, so the depth export
     after the align phase failed with KeyError: 'depth'."""
-    system = ["python", str(FIXED_INPUT_LAUNCHER), "--patch", "loader", "--", "/code/vggt_long.py", "--image_dir", "x"]
+    system = [
+        "python",
+        str(FIXED_INPUT_LAUNCHER), "--patch", "loader", "--",
+        "/code/vggt_long.py", "--image_dir", "x"
+    ]
     command = phase_command(system, "gpu", tmp_path, export_depth=True)
     assert command[:2] == ["python", str(PHASE_LAUNCHER)]
     separator = command.index("--")
-    assert "--export_depth" in command[:separator] and "--patch" in command[:separator]
+    assert "--export_depth" in command[:
+                                       separator] and "--patch" in command[:
+                                                                           separator]
     assert command[separator + 1:] == ["/code/vggt_long.py", "--image_dir", "x"]
     assert "--export_depth" not in phase_command(system, "gpu", tmp_path)
 
@@ -117,12 +132,20 @@ def test_load_weights_refuses_a_checkpoint_that_does_not_match_the_model():
     from scripts.inference.streaming_slam import load_weights
 
     model = torch.nn.Linear(2, 2)
-    load_weights(model, {"weight": torch.ones(2, 2), "bias": torch.zeros(2)}, "Toy")
+    load_weights(model, {
+        "weight": torch.ones(2, 2),
+        "bias": torch.zeros(2)
+    }, "Toy")
     assert torch.equal(model.weight, torch.ones(2, 2))
     with pytest.raises(RuntimeError, match="1 missing keys"):
         load_weights(model, {"weight": torch.ones(2, 2)}, "Toy")
     with pytest.raises(RuntimeError, match="1 unexpected keys"):
-        load_weights(model, {"weight": torch.ones(2, 2), "bias": torch.zeros(2), "extra": torch.zeros(1)}, "Toy")
+        load_weights(
+            model, {
+                "weight": torch.ones(2, 2),
+                "bias": torch.zeros(2),
+                "extra": torch.zeros(1)
+            }, "Toy")
 
 
 _FAKE_ABOT = """
@@ -188,7 +211,8 @@ def test_abot_recon_runs_with_loop_closure(tmp_path, monkeypatch):
     assert calls["from_pretrained"]["loop_salad_checkpoint"] == weights["SALAD"]
     assert calls["from_pretrained"]["loop_dino_checkpoint"] == weights["DINO"]
     assert weights["DINO"].name == "dinov2_vitb14_pretrain.pth"
-    assert Path(calls["from_pretrained"]["loop_output_dir"]).parent == tmp_path / "work"
+    assert Path(
+        calls["from_pretrained"]["loop_output_dir"]).parent == tmp_path / "work"
     assert sorted(poses) == [0, 1, 2]
     assert LOOP_INFO == {"num_loop_edges": 2, "num_candidates": 5}
     LOOP_INFO.clear()

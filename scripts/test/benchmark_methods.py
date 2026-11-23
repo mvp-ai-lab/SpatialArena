@@ -1,13 +1,12 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """CLI wrapper around the benchmark method registry.
 
-The registry itself (``MethodSpec``, ``METHOD_SPECS``, ``resolve_method``,
-``valid_tracks``, ``validate_track``, ``specs_as_dicts``, ...) now lives at
-``spatialarena.methods`` so it's importable by ``BenchmarkEvaluator``.
-This file re-exports it unchanged and keeps only the ``--field ...`` CLI
-that ``run_method_case_list.sh`` already depends on.
+The registry itself (`MethodSpec`, `METHOD_SPECS`, `resolve_method`,
+`valid_tracks`, `validate_track`, `specs_as_dicts`, ...) lives in
+`spatialarena.methods` so that `BenchmarkEvaluator` can import it. This file
+re-exports it unchanged and keeps only the `--field ...` CLI that
+`run_method_case_list.sh` depends on; that script parses the printed output.
 """
 
 from __future__ import annotations
@@ -19,33 +18,35 @@ from pathlib import Path
 
 # This script is invoked directly (`python .../benchmark_methods.py`, not
 # `-m`) by run_method_case_list.sh, so sys.path[0] is this file's own
-# directory, not the project root -- a bare `import spatialarena` would
-# rely on it being installed, which is unreliable here (a stale editable
-# install on this env points at a checkout that no longer exists). Insert
-# the project root explicitly, same fix as vggt.py's import earlier.
+# directory, not the project root. A bare `import spatialarena` would rely on
+# the package being installed, which is unreliable here (a stale editable
+# install on this env points at a checkout that no longer exists), so insert
+# the project root explicitly.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+# The names are imported directly because this module re-exports them; tests
+# import them from here.
+# pylint: disable-next=unused-import
 from spatialarena.methods import (  # noqa: F401,E402
-    TRACK_RGB,
-    TRACK_RGB_CAMERAS,
-    TRACK_RGB_DEPTH,
-    MethodSpec,
-    METHOD_SPECS,
-    method_names,
-    normalize_key,
-    resolve_method,
-    specs_as_dicts,
-    valid_tracks,
+    TRACK_RGB, TRACK_RGB_CAMERAS, TRACK_RGB_DEPTH, MethodSpec, METHOD_SPECS,
+    method_names, normalize_key, resolve_method, specs_as_dicts, valid_tracks,
     validate_track,
 )
 
 
 def parse_args() -> argparse.Namespace:
+    """Parses the command line arguments."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--list", action="store_true", help="Print supported canonical method names")
-    parser.add_argument("--json", action="store_true", help="Print registry as JSON")
+    parser.add_argument("--list",
+                        action="store_true",
+                        help="Print supported canonical method names")
+    parser.add_argument("--json",
+                        action="store_true",
+                        help="Print registry as JSON")
     parser.add_argument("--method", help="Resolve one method or alias")
-    parser.add_argument("--track", default=TRACK_RGB, help="Validate modality track for --method")
+    parser.add_argument("--track",
+                        default=TRACK_RGB,
+                        help="Validate modality track for --method")
     parser.add_argument(
         "--field",
         choices=(
@@ -75,6 +76,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Prints the requested registry view to stdout."""
     args = parse_args()
     if args.json:
         print(json.dumps(specs_as_dicts(), indent=2))

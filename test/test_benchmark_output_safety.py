@@ -32,15 +32,18 @@ from scripts.preprocess.materialize_benchmark_camera_priors import materialize
 from scripts.preprocess.materialize_depth_visualizations import materialize_visualizations
 
 
-def test_path_is_relative_to_accepts_equal_or_nested_paths(tmp_path: Path) -> None:
+def test_path_is_relative_to_accepts_equal_or_nested_paths(
+        tmp_path: Path) -> None:
     benchmark_root = tmp_path / "benchmarks"
 
     assert path_is_relative_to(benchmark_root, benchmark_root)
     assert path_is_relative_to(benchmark_root / "3DGS" / "test", benchmark_root)
-    assert not path_is_relative_to(tmp_path / "benchmark_reports", benchmark_root)
+    assert not path_is_relative_to(tmp_path / "benchmark_reports",
+                                   benchmark_root)
 
 
-def test_validate_output_path_rejects_benchmark_root_outputs(tmp_path: Path) -> None:
+def test_validate_output_path_rejects_benchmark_root_outputs(
+        tmp_path: Path) -> None:
     benchmark_root = tmp_path / "benchmarks"
     output_path = benchmark_root / "3DGS" / "test" / "metrics.json"
 
@@ -55,7 +58,8 @@ def test_validate_output_path_allows_external_reports(tmp_path: Path) -> None:
     )
 
 
-def test_materialize_depth_visualizations_removes_numeric_depth(tmp_path: Path) -> None:
+def test_materialize_depth_visualizations_removes_numeric_depth(
+        tmp_path: Path) -> None:
     prediction_root = tmp_path / "predictions"
     depth_dir = prediction_root / "depths"
     depth_dir.mkdir(parents=True)
@@ -71,10 +75,12 @@ def test_materialize_depth_visualizations_removes_numeric_depth(tmp_path: Path) 
     assert result["num_png_written"] == 1
     assert result["num_numeric_removed"] == 1
     assert not depth_path.exists()
-    assert (tmp_path / "reports" / "depth_visualizations" / "000000.png").is_file()
+    assert (tmp_path / "reports" / "depth_visualizations" /
+            "000000.png").is_file()
 
 
-def test_cleanup_intermediate_paths_removes_scratch_dirs(tmp_path: Path) -> None:
+def test_cleanup_intermediate_paths_removes_scratch_dirs(
+        tmp_path: Path) -> None:
     scratch = tmp_path / "_resized_input_images"
     scratch.mkdir()
     (scratch / "000000.png").write_bytes(b"not a real png")
@@ -84,7 +90,8 @@ def test_cleanup_intermediate_paths_removes_scratch_dirs(tmp_path: Path) -> None
     assert not scratch.exists()
 
 
-def test_cleanup_intermediate_paths_can_keep_scratch_dirs(tmp_path: Path) -> None:
+def test_cleanup_intermediate_paths_can_keep_scratch_dirs(
+        tmp_path: Path) -> None:
     scratch = tmp_path / "_cut3r_raw"
     scratch.mkdir()
 
@@ -136,7 +143,8 @@ def test_load_depth_priors_reads_pfm_depth_prior(tmp_path: Path) -> None:
     np.testing.assert_allclose(loaded[0], depth)
 
 
-def test_load_optional_depth_priors_preserves_missing_positions(tmp_path: Path) -> None:
+def test_load_optional_depth_priors_preserves_missing_positions(
+        tmp_path: Path) -> None:
     image_dir = tmp_path / "images"
     depth_dir = tmp_path / "depths"
     image_dir.mkdir()
@@ -164,15 +172,19 @@ def test_load_optional_depth_priors_preserves_missing_positions(tmp_path: Path) 
     np.testing.assert_allclose(loaded[0], depth)
 
 
-def test_load_depth_prior_file_reads_near_maximum_16_bit_values_as_missing(tmp_path: Path) -> None:
+def test_load_depth_prior_file_reads_near_maximum_16_bit_values_as_missing(
+        tmp_path: Path) -> None:
     from PIL import Image
 
     # 7-Scenes millimetre PNGs mark missing depth with 65535 (raw) or 65000-65534 (colour-registered); neither may
     # load as a ~65 m point.
     path = tmp_path / "frame.depth.proj.png"
-    Image.fromarray(np.array([[1500, 65535, 65061], [0, 2000, 64999]], dtype=np.uint16)).save(path)
+    Image.fromarray(
+        np.array([[1500, 65535, 65061], [0, 2000, 64999]],
+                 dtype=np.uint16)).save(path)
     for png_scale in (None, 1000.0):
-        np.testing.assert_allclose(load_depth_prior_file(path, path, png_scale), [[1.5, 0.0, 0.0], [0.0, 2.0, 64.999]])
+        np.testing.assert_allclose(load_depth_prior_file(path, path, png_scale),
+                                   [[1.5, 0.0, 0.0], [0.0, 2.0, 64.999]])
 
 
 def test_materialize_sample_json_camera_priors(tmp_path: Path) -> None:
@@ -185,8 +197,12 @@ def test_materialize_sample_json_camera_priors(tmp_path: Path) -> None:
         Image.new("RGB", (8, 6), (0, 0, 0)).save(image_dir / name)
     sample = {
         "images": [
-            {"canonical_path": "images/000000_key.png"},
-            {"canonical_path": "images/000001_src001.png"},
+            {
+                "canonical_path": "images/000000_key.png"
+            },
+            {
+                "canonical_path": "images/000001_src001.png"
+            },
         ],
         "poses": [
             np.eye(4, dtype=np.float32).tolist(),
@@ -207,13 +223,17 @@ def test_materialize_sample_json_camera_priors(tmp_path: Path) -> None:
     }
     import json
 
-    (scene_root / "sample.json").write_text(json.dumps(sample), encoding="utf-8")
+    (scene_root / "sample.json").write_text(json.dumps(sample),
+                                            encoding="utf-8")
     output_dir = tmp_path / "priors" / "sparse" / "0"
 
     assert materialize(scene_root, output_dir) == 2
     poses, intrinsics = load_colmap_camera_priors(
         scene_root,
-        [str(image_dir / "000000_key.png"), str(image_dir / "000001_src001.png")],
+        [
+            str(image_dir / "000000_key.png"),
+            str(image_dir / "000001_src001.png")
+        ],
         colmap_path=output_dir,
     )
 
@@ -236,24 +256,43 @@ def test_materialize_dycheck_camera_priors(tmp_path: Path) -> None:
     orientation = [[0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
     for stem in ("0_00000", "0_00001"):
         Image.new("RGB", (8, 6)).save(source / "dense/rgb/1x" / f"{stem}.png")
-        np.save(source / "depth/2x" / f"{stem}.npy", np.ones((3, 4), dtype=np.float32))
-        camera = {"orientation": orientation, "position": [1.0, 2.0, 3.0], "focal_length": 10.0,
-                  "principal_point": [8.0, 6.0], "image_size": [16, 12], "pixel_aspect_ratio": 1.0, "skew": 0.0,
-                  "radial_distortion": [0.0, 0.0, 0.0], "tangential_distortion": [0.0, 0.0]}
-        (source / "dense/dycheck/camera" / f"{stem}.json").write_text(json.dumps(camera), encoding="utf-8")
-    scene_root = materialize_dataset(tmp_path / "source", tmp_path / "benchmarks", scenes=["apple"]) / "apple"
+        np.save(source / "depth/2x" / f"{stem}.npy",
+                np.ones((3, 4), dtype=np.float32))
+        camera = {
+            "orientation": orientation,
+            "position": [1.0, 2.0, 3.0],
+            "focal_length": 10.0,
+            "principal_point": [8.0, 6.0],
+            "image_size": [16, 12],
+            "pixel_aspect_ratio": 1.0,
+            "skew": 0.0,
+            "radial_distortion": [0.0, 0.0, 0.0],
+            "tangential_distortion": [0.0, 0.0]
+        }
+        (source / "dense/dycheck/camera" / f"{stem}.json").write_text(
+            json.dumps(camera), encoding="utf-8")
+    scene_root = materialize_dataset(tmp_path / "source",
+                                     tmp_path / "benchmarks",
+                                     scenes=["apple"]) / "apple"
     output_dir = tmp_path / "priors" / "sparse" / "0"
 
     assert materialize(scene_root, output_dir) == 2
     images = sorted(str(path) for path in (scene_root / "images").iterdir())
-    poses, intrinsics = load_colmap_camera_priors(scene_root, images, colmap_path=output_dir)
+    poses, intrinsics = load_colmap_camera_priors(scene_root,
+                                                  images,
+                                                  colmap_path=output_dir)
 
-    np.testing.assert_allclose(poses[0, :3, :3], np.array(orientation).T, atol=1e-6)
+    np.testing.assert_allclose(poses[0, :3, :3],
+                               np.array(orientation).T,
+                               atol=1e-6)
     np.testing.assert_allclose(poses[0, :3, 3], [1.0, 2.0, 3.0], atol=1e-6)
-    np.testing.assert_allclose(intrinsics[0], [[5.0, 0.0, 4.0], [0.0, 5.0, 3.0], [0.0, 0.0, 1.0]], atol=1e-6)
+    np.testing.assert_allclose(
+        intrinsics[0], [[5.0, 0.0, 4.0], [0.0, 5.0, 3.0], [0.0, 0.0, 1.0]],
+        atol=1e-6)
 
 
-def test_load_colmap_camera_priors_accepts_batch_subset_of_larger_model(tmp_path: Path) -> None:
+def test_load_colmap_camera_priors_accepts_batch_subset_of_larger_model(
+        tmp_path: Path) -> None:
     scene_root = tmp_path / "scene"
     image_dir = scene_root / "images"
     image_dir.mkdir(parents=True)
@@ -263,7 +302,9 @@ def test_load_colmap_camera_priors_accepts_batch_subset_of_larger_model(tmp_path
     for name in names:
         Image.new("RGB", (8, 6), (0, 0, 0)).save(image_dir / name)
     sample = {
-        "images": [{"canonical_path": f"images/{name}"} for name in names],
+        "images": [{
+            "canonical_path": f"images/{name}"
+        } for name in names],
         "poses": [np.eye(4, dtype=np.float32).tolist() for _ in names],
         "intrinsics": [
             [[4.0, 0.0, 3.5], [0.0, 4.0, 2.5], [0.0, 0.0, 1.0]] for _ in names
@@ -271,7 +312,8 @@ def test_load_colmap_camera_priors_accepts_batch_subset_of_larger_model(tmp_path
     }
     import json
 
-    (scene_root / "sample.json").write_text(json.dumps(sample), encoding="utf-8")
+    (scene_root / "sample.json").write_text(json.dumps(sample),
+                                            encoding="utf-8")
     output_dir = tmp_path / "priors" / "sparse" / "0"
 
     assert materialize(scene_root, output_dir) == 3
@@ -290,8 +332,7 @@ def test_load_colmap_camera_priors_accepts_batch_subset_of_larger_model(tmp_path
 
 
 def test_load_colmap_camera_priors_still_rejects_unresolved_requested_image(
-    tmp_path: Path,
-) -> None:
+    tmp_path: Path,) -> None:
     scene_root = tmp_path / "scene"
     image_dir = scene_root / "images"
     image_dir.mkdir(parents=True)
@@ -301,27 +342,30 @@ def test_load_colmap_camera_priors_still_rejects_unresolved_requested_image(
     unregistered = image_dir / "not_in_colmap.png"
     Image.new("RGB", (8, 6), (0, 0, 0)).save(unregistered)
     sample = {
-        "images": [{"canonical_path": "images/000000_key.png"}],
+        "images": [{
+            "canonical_path": "images/000000_key.png"
+        }],
         "poses": [np.eye(4, dtype=np.float32).tolist()],
         "intrinsics": [[[4.0, 0.0, 3.5], [0.0, 4.0, 2.5], [0.0, 0.0, 1.0]]],
     }
     import json
 
-    (scene_root / "sample.json").write_text(json.dumps(sample), encoding="utf-8")
+    (scene_root / "sample.json").write_text(json.dumps(sample),
+                                            encoding="utf-8")
     output_dir = tmp_path / "priors" / "sparse" / "0"
     assert materialize(scene_root, output_dir) == 1
 
     with pytest.raises(FileNotFoundError, match="Missing COLMAP camera priors"):
         load_colmap_camera_priors(
             scene_root,
-            [str(image_dir / "000000_key.png"), str(unregistered)],
+            [str(image_dir / "000000_key.png"),
+             str(unregistered)],
             colmap_path=output_dir,
         )
 
 
 def test_export_camera_pose_priors_satisfies_mvrecon_sparse_requirement(
-    tmp_path: Path,
-) -> None:
+    tmp_path: Path,) -> None:
     scene_root = tmp_path / "scene"
     image_dir = scene_root / "images"
     image_dir.mkdir(parents=True)
@@ -336,14 +380,16 @@ def test_export_camera_pose_priors_satisfies_mvrecon_sparse_requirement(
 
     output_path = tmp_path / "prediction"
     extrinsics_w2c = np.stack([np.eye(4, dtype=np.float32) for _ in names])
-    intrinsics = np.stack(
-        [np.array([[4.0, 0.0, 3.5], [0.0, 4.0, 2.5], [0.0, 0.0, 1.0]], dtype=np.float32) for _ in names]
-    )
+    intrinsics = np.stack([
+        np.array([[4.0, 0.0, 3.5], [0.0, 4.0, 2.5], [0.0, 0.0, 1.0]],
+                 dtype=np.float32) for _ in names
+    ])
 
     # This is what a depth-only MVRecon batch loop now does: export depths
     # incrementally per batch (unchanged), then export the accumulated,
     # points-free camera poses once at the end.
-    export_depth_predictions(output_path, image_paths, np.zeros((2, 6, 8), dtype=np.float32))
+    export_depth_predictions(output_path, image_paths,
+                             np.zeros((2, 6, 8), dtype=np.float32))
     export_camera_pose_priors(
         output_path,
         image_dir,
@@ -372,7 +418,8 @@ def test_export_camera_pose_priors_satisfies_mvrecon_sparse_requirement(
     assert status.missing == []
 
 
-def test_load_depth_priors_uses_nearest_numeric_timestamp(tmp_path: Path) -> None:
+def test_load_depth_priors_uses_nearest_numeric_timestamp(
+        tmp_path: Path) -> None:
     image_dir = tmp_path / "images"
     depth_dir = tmp_path / "depths"
     image_dir.mkdir()
@@ -391,7 +438,8 @@ def test_load_depth_priors_uses_nearest_numeric_timestamp(tmp_path: Path) -> Non
     np.testing.assert_allclose(loaded[0], depth.astype(np.float32) / 1000.0)
 
 
-def test_load_depth_priors_accepts_bonn_sampled_timestamp_jitter(tmp_path: Path) -> None:
+def test_load_depth_priors_accepts_bonn_sampled_timestamp_jitter(
+        tmp_path: Path) -> None:
     image_dir = tmp_path / "images"
     depth_dir = tmp_path / "depths"
     image_dir.mkdir()
@@ -410,7 +458,8 @@ def test_load_depth_priors_accepts_bonn_sampled_timestamp_jitter(tmp_path: Path)
     np.testing.assert_allclose(loaded[0], depth.astype(np.float32) / 1000.0)
 
 
-def test_camera_conditioned_resolver_uses_eth3d_undistorted(tmp_path: Path, monkeypatch) -> None:
+def test_camera_conditioned_resolver_uses_eth3d_undistorted(
+        tmp_path: Path, monkeypatch) -> None:
     scene = tmp_path / "scene"
     distorted = scene / "images" / "dslr_images"
     undistorted = scene / "images" / "dslr_images_undistorted"
@@ -424,25 +473,34 @@ def test_camera_conditioned_resolver_uses_eth3d_undistorted(tmp_path: Path, monk
     for name in ("cameras.txt", "images.txt", "points3D.txt"):
         (calibration / name).touch()
 
-    camera = read_write_model.Camera(1, "PINHOLE", 10, 10, np.array([5, 5, 5, 5]))
+    camera = read_write_model.Camera(1, "PINHOLE", 10, 10,
+                                     np.array([5, 5, 5, 5]))
     records = {
-        index: read_write_model.Image(
-            index, np.array([1, 0, 0, 0]), np.zeros(3), 1,
-            f"dslr_images_undistorted/DSC_000{index}.JPG",
-            np.empty((0, 2)), np.empty(0, dtype=int),
-        )
-        for index in (1, 2)
+        index:
+            read_write_model.Image(
+                index,
+                np.array([1, 0, 0, 0]),
+                np.zeros(3),
+                1,
+                f"dslr_images_undistorted/DSC_000{index}.JPG",
+                np.empty((0, 2)),
+                np.empty(0, dtype=int),
+            ) for index in (1, 2)
     }
-    monkeypatch.setattr(read_write_model, "read_model", lambda _path: ({1: camera}, records, {}))
+    monkeypatch.setattr(read_write_model, "read_model", lambda _path: ({
+        1: camera
+    }, records, {}))
 
     resolved = resolve_camera_conditioned_inputs(scene, colmap_path=calibration)
     assert canonical_image_root(scene) == undistorted
-    assert all(Path(path).parent == undistorted for path in resolved.image_paths)
+    assert all(
+        Path(path).parent == undistorted for path in resolved.image_paths)
     assert resolved.poses.shape == (2, 4, 4)
     assert resolved.intrinsics.shape == (2, 3, 3)
 
 
-def test_camera_conditioned_resolver_rejects_ambiguous_basename(tmp_path: Path, monkeypatch) -> None:
+def test_camera_conditioned_resolver_rejects_ambiguous_basename(
+        tmp_path: Path, monkeypatch) -> None:
     scene = tmp_path / "scene"
     first = scene / "images" / "a"
     second = scene / "images" / "b"
@@ -454,13 +512,24 @@ def test_camera_conditioned_resolver_rejects_ambiguous_basename(tmp_path: Path, 
     calibration.mkdir(parents=True)
     for name in ("cameras.txt", "images.txt", "points3D.txt"):
         (calibration / name).touch()
-    camera = read_write_model.Camera(1, "PINHOLE", 10, 10, np.array([5, 5, 5, 5]))
+    camera = read_write_model.Camera(1, "PINHOLE", 10, 10,
+                                     np.array([5, 5, 5, 5]))
     record = read_write_model.Image(
-        1, np.array([1, 0, 0, 0]), np.zeros(3), 1, "frame.jpg",
-        np.empty((0, 2)), np.empty(0, dtype=int),
+        1,
+        np.array([1, 0, 0, 0]),
+        np.zeros(3),
+        1,
+        "frame.jpg",
+        np.empty((0, 2)),
+        np.empty(0, dtype=int),
     )
-    monkeypatch.setattr(read_write_model, "read_model", lambda _path: ({1: camera}, {1: record}, {}))
+    monkeypatch.setattr(read_write_model, "read_model", lambda _path: ({
+        1: camera
+    }, {
+        1: record
+    }, {}))
     with pytest.raises(FileNotFoundError, match="No COLMAP camera-prior"):
         resolve_camera_conditioned_image_paths(
-            scene, [str(first / "frame.jpg"), str(second / "frame.jpg")], colmap_path=calibration
-        )
+            scene, [str(first / "frame.jpg"),
+                    str(second / "frame.jpg")],
+            colmap_path=calibration)

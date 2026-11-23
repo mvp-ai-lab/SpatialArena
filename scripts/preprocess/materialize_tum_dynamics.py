@@ -1,8 +1,9 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+"""Materialize the TUM RGB-D "Dynamic Objects" sequences as SLAM cases.
 
-"""Materialize the TUM RGB-D "Dynamic Objects" sequences (Sturm et al.,
-IROS 2012 -- https://cvg.cit.tum.de/data/datasets/rgbd-dataset) into the
+The sequences (Sturm et al., IROS 2012 --
+https://cvg.cit.tum.de/data/datasets/rgbd-dataset) are written to the
 benchmark_root/SLAM_source/tum_dynamics canonical layout.
 
 Source layout (one directory per sequence, see scripts/download/
@@ -31,9 +32,9 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 import shutil
 import sys
-from pathlib import Path
 
 import numpy as np
 
@@ -41,7 +42,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from spatialarena.geometry.read_write_model import BaseImage, Camera, rotmat2qvec, write_model  # noqa: E402
+from spatialarena.geometry import read_write_model  # noqa: E402
 
 # https://cvg.cit.tum.de/data/datasets/rgbd-dataset/file_formats
 # ("Intrinsic Camera Calibration of the Kinect").
@@ -84,13 +85,26 @@ SEQUENCES = (
 
 
 def freiburg_model(sequence_name: str) -> str:
+    """Returns the sequence's camera, "freiburg2" or "freiburg3".
+
+    Args:
+        sequence_name: The TUM sequence directory name.
+
+    Returns:
+        The key of FREIBURG_INTRINSICS in the name.
+
+    Raises:
+        ValueError: If the name contains no known camera.
+    """
     for model in FREIBURG_INTRINSICS:
         if model in sequence_name:
             return model
-    raise ValueError(f"Cannot determine freiburg camera model for {sequence_name!r}")
+    raise ValueError(
+        f"Cannot determine freiburg camera model for {sequence_name!r}")
 
 
 def read_file_list(path: Path) -> dict[float, str]:
+    """Reads a TUM "timestamp path" list as {timestamp: path}."""
     result: dict[float, str] = {}
     for line in path.read_text().splitlines():
         line = line.strip()
@@ -102,40 +116,74 @@ def read_file_list(path: Path) -> dict[float, str]:
 
 
 def read_groundtruth(path: Path) -> dict[float, np.ndarray]:
-    """timestamp -> 4x4 camera-to-world matrix (TUM pose convention: tx ty
-    tz qx qy qz qw, scalar-last quaternion, already in OpenCV/COLMAP camera
-    axis convention -- no axis flip needed, unlike NRGBD's OpenGL poses)."""
+    """Reads groundtruth.txt as {timestamp: 4x4 camera-to-world matrix}.
+
+    TUM pose convention: tx ty tz qx qy qz qw, scalar-last quaternion, already
+    in OpenCV/COLMAP camera axis convention -- no axis flip needed, unlike
+    NRGBD's OpenGL poses.
+
+    Args:
+        path: The sequence's groundtruth.txt.
+
+    Returns:
+        The poses keyed by timestamp.
+    """
     result: dict[float, np.ndarray] = {}
     for line in path.read_text().splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        ts, tx, ty, tz, qx, qy, qz, qw = (float(x) for x in line.split())
-        q = np.array([qx, qy, qz, qw], dtype=np.float64)
-        q = q / np.linalg.norm(q)
-        x, y, z, w = q
-        R = np.array(
+        timestamp, tx, ty, tz, qx, qy, qz, qw = (
+            float(value) for value in line.split())
+        quat = np.array([qx, qy, qz, qw], dtype=np.float64)
+        quat = quat / np.linalg.norm(quat)
+        x, y, z, w = quat
+        rotation = np.array(
             [
-                [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
-                [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
-                [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+                [
+                    1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 *
+                    (x * z + y * w)
+                ],
+                [
+                    2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 *
+                    (y * z - x * w)
+                ],
+                [
+                    2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 *
+                    (x * x + y * y)
+                ],
             ],
             dtype=np.float64,
         )
         c2w = np.eye(4, dtype=np.float64)
-        c2w[:3, :3] = R
+        c2w[:3, :3] = rotation
         c2w[:3, 3] = [tx, ty, tz]
-        result[ts] = c2w
+        result[timestamp] = c2w
     return result
 
 
-def associate(first: dict, second: dict, max_difference: float = 0.02) -> list[tuple[float, float]]:
-    """Standard TUM associate.py greedy nearest-neighbor timestamp match."""
+def associate(first: dict,
+              second: dict,
+              max_difference: float = 0.02) -> list[tuple[float, float]]:
+    """Matches timestamps as the standard TUM associate.py does.
+
+    Greedy nearest-neighbor matching: the closest remaining pair within
+    `max_difference` is matched first.
+
+    Args:
+        first: A dict keyed by timestamp.
+        second: A dict keyed by timestamp.
+        max_difference: The largest accepted timestamp difference (seconds).
+
+    Returns:
+        The matched (first, second) timestamps, sorted.
+    """
     first_keys = list(first.keys())
     second_keys = list(second.keys())
-    potential = sorted(
-        (abs(a - b), a, b) for a in first_keys for b in second_keys if abs(a - b) < max_difference
-    )
+    potential = sorted((abs(a - b), a, b)
+                       for a in first_keys
+                       for b in second_keys
+                       if abs(a - b) < max_difference)
     matches = []
     used_first: set[float] = set()
     used_second: set[float] = set()
@@ -150,40 +198,73 @@ def associate(first: dict, second: dict, max_difference: float = 0.02) -> list[t
 
 
 def image_size(path: Path) -> tuple[int, int]:
-    from PIL import Image
+    """Returns an image's (width, height)."""
+    from PIL import Image  # pylint: disable=import-outside-toplevel
 
     with Image.open(path) as image:
         return image.size
 
 
-def camera_for_model(model: str, width: int, height: int, camera_id: int) -> Camera:
+def camera_for_model(model: str, width: int, height: int,
+                     camera_id: int) -> read_write_model.Camera:
+    """Builds the COLMAP camera of a freiburg calibration.
+
+    Args:
+        model: "freiburg2" or "freiburg3".
+        width: The image width.
+        height: The image height.
+        camera_id: The COLMAP camera id.
+
+    Returns:
+        A FULL_OPENCV camera when the calibration has distortion, else a
+        PINHOLE camera.
+    """
     intr = FREIBURG_INTRINSICS[model]
-    has_distortion = any(intr[k] != 0.0 for k in ("k1", "k2", "p1", "p2", "k3"))
+    has_distortion = any(
+        intr[key] != 0.0 for key in ("k1", "k2", "p1", "p2", "k3"))
     if has_distortion:
-        return Camera(
+        return read_write_model.Camera(
             id=camera_id,
             model="FULL_OPENCV",
             width=width,
             height=height,
             params=np.array(
                 [
-                    intr["fx"], intr["fy"], intr["cx"], intr["cy"],
-                    intr["k1"], intr["k2"], intr["p1"], intr["p2"],
-                    intr["k3"], 0.0, 0.0, 0.0,
+                    intr["fx"],
+                    intr["fy"],
+                    intr["cx"],
+                    intr["cy"],
+                    intr["k1"],
+                    intr["k2"],
+                    intr["p1"],
+                    intr["p2"],
+                    intr["k3"],
+                    0.0,
+                    0.0,
+                    0.0,
                 ],
                 dtype=np.float64,
             ),
         )
-    return Camera(
+    return read_write_model.Camera(
         id=camera_id,
         model="PINHOLE",
         width=width,
         height=height,
-        params=np.array([intr["fx"], intr["fy"], intr["cx"], intr["cy"]], dtype=np.float64),
+        params=np.array([intr["fx"], intr["fy"], intr["cx"], intr["cy"]],
+                        dtype=np.float64),
     )
 
 
 def link_path(src: Path, dst: Path, overwrite: bool, copy: bool) -> None:
+    """Copies or symlinks `src` to `dst`.
+
+    Args:
+        src: The source file.
+        dst: The destination path.
+        overwrite: Replace an existing `dst`; otherwise it is kept.
+        copy: Copy `src`; when False, symlink to it.
+    """
     if dst.exists() or dst.is_symlink():
         if not overwrite:
             return
@@ -203,6 +284,19 @@ def materialize_sequence(
     copy: bool,
     max_difference: float,
 ) -> dict | None:
+    """Writes one sequence's associated frames and GT COLMAP model.
+
+    Args:
+        source_root: The directory of extracted sequence folders.
+        sequence_name: The sequence folder name.
+        output_root: benchmark_root/SLAM_source/tum_dynamics.
+        overwrite: Replace existing outputs.
+        copy: Copy frames; when False, symlink to them.
+        max_difference: The timestamp association tolerance (seconds).
+
+    Returns:
+        The scene record, or None when the sequence's lists are missing.
+    """
     seq_root = source_root / sequence_name
     rgb_file = seq_root / "rgb.txt"
     depth_file = seq_root / "depth.txt"
@@ -215,32 +309,40 @@ def materialize_sequence(
     groundtruth = read_groundtruth(gt_file)
 
     rgb_depth_matches = associate(rgb, depth, max_difference=max_difference)
-    rgb_depth = {a: b for a, b in rgb_depth_matches}
-    triple_matches = associate({a: None for a in rgb_depth}, groundtruth, max_difference=max_difference)
+    rgb_depth = dict(rgb_depth_matches)
+    triple_matches = associate({rgb_ts: None for rgb_ts in rgb_depth},
+                               groundtruth,
+                               max_difference=max_difference)
 
     out_scene = output_root / sequence_name
     (out_scene / "images").mkdir(parents=True, exist_ok=True)
     (out_scene / "depths").mkdir(parents=True, exist_ok=True)
 
     model = freiburg_model(sequence_name)
-    cameras: dict[int, Camera] = {}
-    images: dict[int, BaseImage] = {}
+    cameras: dict[int, read_write_model.Camera] = {}
+    images: dict[int, read_write_model.BaseImage] = {}
 
     for image_id, (rgb_ts, gt_ts) in enumerate(triple_matches, start=1):
         depth_ts = rgb_depth[rgb_ts]
         rgb_path = seq_root / rgb[rgb_ts]
         depth_path = seq_root / depth[depth_ts]
         image_name = f"{image_id:06d}.png"
-        link_path(rgb_path, out_scene / "images" / image_name, overwrite=overwrite, copy=copy)
-        link_path(depth_path, out_scene / "depths" / image_name, overwrite=overwrite, copy=copy)
+        link_path(rgb_path,
+                  out_scene / "images" / image_name,
+                  overwrite=overwrite,
+                  copy=copy)
+        link_path(depth_path,
+                  out_scene / "depths" / image_name,
+                  overwrite=overwrite,
+                  copy=copy)
 
         width, height = image_size(rgb_path)
         c2w = groundtruth[gt_ts]
         w2c = np.linalg.inv(c2w)
         cameras[image_id] = camera_for_model(model, width, height, image_id)
-        images[image_id] = BaseImage(
+        images[image_id] = read_write_model.BaseImage(
             id=image_id,
-            qvec=rotmat2qvec(w2c[:3, :3]).astype(np.float64),
+            qvec=read_write_model.rotmat2qvec(w2c[:3, :3]).astype(np.float64),
             tvec=w2c[:3, 3].astype(np.float64),
             camera_id=image_id,
             name=image_name,
@@ -251,7 +353,13 @@ def materialize_sequence(
     sparse_dir = out_scene / "sparse" / "0"
     if overwrite or not sparse_dir.exists():
         sparse_dir.mkdir(parents=True, exist_ok=True)
-        write_model(cameras, images, {}, str(sparse_dir), ext=".txt")
+        read_write_model.write_model(
+            cameras,
+            images,
+            {},
+            str(sparse_dir),
+            ext=".txt",
+        )
 
     return {
         "dataset_name": "tum_dynamics",
@@ -268,19 +376,29 @@ TUM_DEPTH_PNG_SCALE = 5000.0
 
 
 def write_metadata(output_root: Path, scenes: list[dict]) -> None:
+    """Writes the dataset-level metadata.json over the scene records."""
     output_root.mkdir(parents=True, exist_ok=True)
     total_images = sum(int(scene.get("total_images", 0)) for scene in scenes)
     payload = {
-        "dataset_name": "tum_dynamics",
-        "root_directory": str(output_root),
-        "total_images": total_images,
-        "average_images_per_scene": total_images / len(scenes) if scenes else 0.0,
-        # TUM depth PNGs are 16-bit with 5000 units per metre (cvg.cit.tum.de "File Formats"), not millimetres;
-        # adapter_utils.load_depth_priors reads this instead of guessing.
-        "depth_png_scale": TUM_DEPTH_PNG_SCALE,
-        "scenes": scenes,
+        "dataset_name":
+            "tum_dynamics",
+        "root_directory":
+            str(output_root),
+        "total_images":
+            total_images,
+        "average_images_per_scene":
+            total_images / len(scenes) if scenes else 0.0,
+        # TUM depth PNGs are 16-bit with 5000 units per metre (cvg.cit.tum.de
+        # "File Formats"), not millimetres; adapter_utils.load_depth_priors
+        # reads this instead of guessing.
+        "depth_png_scale":
+            TUM_DEPTH_PNG_SCALE,
+        "scenes":
+            scenes,
     }
-    (output_root / "metadata.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    (output_root / "metadata.json").write_text(json.dumps(payload, indent=2) +
+                                               "\n",
+                                               encoding="utf-8")
 
 
 def materialize_dataset(
@@ -290,30 +408,54 @@ def materialize_dataset(
     copy: bool = True,
     max_difference: float = 0.02,
 ) -> dict:
+    """Materializes every available sequence and writes the metadata.
+
+    Args:
+        source_root: The directory of extracted sequence folders.
+        benchmark_root: The benchmark root to write into.
+        overwrite: Replace existing outputs.
+        copy: Copy frames; when False, symlink to them.
+        max_difference: The timestamp association tolerance (seconds).
+
+    Returns:
+        A summary with the dataset name, scene count and output root.
+    """
     output_root = benchmark_root / "SLAM_source" / "tum_dynamics"
     records = []
     for sequence_name in SEQUENCES:
-        record = materialize_sequence(
-            source_root, sequence_name, output_root, overwrite, copy, max_difference
-        )
+        record = materialize_sequence(source_root, sequence_name, output_root,
+                                      overwrite, copy, max_difference)
         if record is not None:
             records.append(record)
     write_metadata(output_root, records)
-    return {"dataset": "tum_dynamics", "num_scenes": len(records), "output_root": str(output_root)}
+    return {
+        "dataset": "tum_dynamics",
+        "num_scenes": len(records),
+        "output_root": str(output_root)
+    }
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--source_root", type=Path, required=True,
-                        help="Directory holding the extracted rgbd_dataset_* sequence folders.")
+    """Parses the command line."""
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(
+        "--source_root",
+        type=Path,
+        required=True,
+        help="Directory holding the extracted rgbd_dataset_* sequence folders.")
     parser.add_argument("--benchmark_root", type=Path, required=True)
     parser.add_argument("--overwrite", action="store_true")
-    parser.add_argument("--symlink", action="store_true", help="Symlink instead of copying (not self-contained).")
+    parser.add_argument("--symlink",
+                        action="store_true",
+                        help="Symlink instead of copying (not self-contained).")
     parser.add_argument("--max_difference", type=float, default=0.02)
     return parser.parse_args()
 
 
 def main() -> None:
+    """Materializes the dataset and prints the summary."""
     args = parse_args()
     result = materialize_dataset(
         args.source_root,

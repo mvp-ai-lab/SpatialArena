@@ -1,131 +1,183 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+"""Sparse-reconstruction evaluation of COLMAP-style method outputs.
+
+`spatialarena.evaluate` uses this module for the ETH3D, DTU and Tanks and
+Temples runs: the dataset adapters (`Dataset` subclasses) list `SceneInfo`
+entries, `process_scenes` aligns each method reconstruction to the ground
+truth, computes pose-error AUCs and point-cloud accuracy and completeness,
+and writes acc_metrics.json into the scene workspace.
+"""
 
 # pylint: disable=[E1101,E1135]
 
-import os
+import abc
 import argparse
 import dataclasses
 import datetime
 import functools
-import multiprocessing
 import json
+import multiprocessing
+import os
+import pathlib
+from typing import Callable, List, Tuple
 import xml.etree.ElementTree as ET
-from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Tuple, List
 
-import torch
 import numpy as np
-import pycolmap
 import open3d as o3d
-from scipy.spatial import cKDTree as KDTree
+import pycolmap
+from scipy import spatial
+import torch
 
-from spatialarena.geometry.align_poses import align_ate_c2b_use_a2b
-from spatialarena.eval.result_layout import resolve_sparse_model_path
+from spatialarena.eval import result_layout
+from spatialarena.geometry import align_poses
 
 
 def trapezoid_integral(y: np.ndarray, x: np.ndarray) -> float:
+    """Returns the trapezoid-rule integral of y over x (NumPy 1 and 2)."""
     trapezoid = getattr(np, "trapezoid", np.trapz)
     return float(trapezoid(y, x=x))
 
 
 @dataclasses.dataclass(kw_only=True)
 class SceneInfo:
-    # Dataset name.
+    """One scene to evaluate and its ground-truth paths.
+
+    Attributes:
+        dataset: Dataset name.
+        category: Category name.
+        scene: Scene name.
+        workspace_path: Workspace directory of the scene in the run directory.
+        image_path: Input images.
+        sparse_gt_path: Ground-truth sparse reconstruction.
+        dense_gt_path: Ground-truth dense reconstruction.
+        depth_gt_path: Ground-truth depth maps.
+        mask_path: Masks.
+        camera_priors_from_sparse_gt: Whether to update camera priors from the
+            ground-truth reconstruction.
+        colmap_extra_args: Additional arguments for the COLMAP reconstruction
+            command.
+    """
+
     dataset: str
-    # Category name.
     category: str
-    # Scene name.
     scene: str
-    # Path to the workspace directory in the run directory.
-    workspace_path: Path
-    # Path to the input images.
-    image_path: Path
-    # Path to the ground-truth sparse reconstruction.
-    sparse_gt_path: Path
-    # Path to the ground-truth dense reconstruction.
-    dense_gt_path: Path
-    # Path to the ground-truth depth maps.
-    depth_gt_path: Path
-    # Path to the masks.
-    mask_path: List[Path]
-    # Whether to update camera priors from the ground-truth reconstruction.
+    workspace_path: pathlib.Path
+    image_path: pathlib.Path
+    sparse_gt_path: pathlib.Path
+    dense_gt_path: pathlib.Path
+    depth_gt_path: pathlib.Path
+    mask_path: List[pathlib.Path]
     camera_priors_from_sparse_gt: bool
-    # Additional arguments for the COLMAP reconstruction command.
     colmap_extra_args: list[str]
 
 
 @dataclasses.dataclass(kw_only=True)
 class SceneResult:
-    # Scene information for which the result was computed.
+    """The pose errors and registration counts of one scene.
+
+    Attributes:
+        scene_info: Scene the result was computed for.
+        errors: Flat errors: the relative-pose errors, or the (translation,
+            rotation) absolute errors.
+        num_images: Number of images in the scene.
+        num_reg_images: Number of registered images in the scene (over all
+            components).
+        num_components: Number of components in the scene.
+        largest_component: Number of images in the largest component.
+    """
+
     scene_info: SceneInfo
-    # Flat list of errors.
     errors: Tuple[np.ndarray, np.ndarray]
-    # # Accuracy metrics.
-    # accuracy: float
-    # completeness: float
-    # chamfer: float
-    # Number of images in the scene.
     num_images: int
-    # Number of registered images in the scene (over all components).
     num_reg_images: int
-    # Number of components in the scene.
     num_components: int
-    # Number of images in the largest component.
     largest_component: int
 
 
 @dataclasses.dataclass(kw_only=True)
 class SceneMetrics:
-    # Area under the curve (AUC) scores at specified error thresholds.
+    """The AUC scores and registration counts of one scene.
+
+    Attributes:
+        aucs: Area under the curve (AUC) scores at the error thresholds.
+        error_thresholds: Error thresholds of the AUC scores.
+        error_type: "relative" or "absolute".
+        num_images: Number of images in the scene.
+        num_reg_images: Number of registered images in the scene (over all
+            components).
+        num_components: Number of components in the scene.
+        largest_component: Number of images in the largest component.
+    """
+
     aucs: np.ndarray
     error_thresholds: np.ndarray
     error_type: str
-    # Number of images in the scene.
     num_images: int
-    # Number of registered images in the scene (over all components).
     num_reg_images: int
-    # Number of components in the scene.
     num_components: int
-    # Number of images in the largest component.
     largest_component: int
 
 
 @dataclasses.dataclass(kw_only=True)
 class Sim3:
+    """A similarity transform: x -> scale * rotation @ x + translation.
+
+    Attributes:
+        scale: Scale factor.
+        rotation: (3, 3) rotation matrix.
+        translation: Translation vector.
+    """
+
     scale: float
     rotation: np.ndarray
     translation: np.ndarray
 
 
-class Dataset(ABC):
+class Dataset(abc.ABC):
+    """A dataset adapter: lists the scenes of one dataset for evaluation."""
+
     @property
-    @abstractmethod
+    @abc.abstractmethod
     def position_accuracy_gt(self) -> float:
         """Ground-truth position accuracy in meters."""
 
     @property
-    @abstractmethod
+    @abc.abstractmethod
     def rotation_accuracy_gt(self) -> float:
         """Ground-truth rotation accuracy in degrees."""
 
-    @abstractmethod
+    @abc.abstractmethod
     def list_scenes(self) -> list[SceneInfo]:
-        """List all scenes to evaluate."""
+        """Lists all scenes to evaluate."""
 
-    @abstractmethod
+    @abc.abstractmethod
     def prepare_scene(self, scene_info: SceneInfo) -> None:
-        """Prepare the scene for reconstruction."""
+        """Prepares the scene for reconstruction."""
 
 
 class PointCloudMerger:
+    """Merges the scans of a MeshLab project (.mlp) into one point cloud.
+
+    Attributes:
+        mlp_file_path: The MeshLab project file.
+        merged_pcd: The merged point cloud, filled by
+            `merge_all_point_clouds`.
+    """
+
     def __init__(self, mlp_file_path):
         self.mlp_file_path = mlp_file_path
         self.merged_pcd = o3d.geometry.PointCloud()
 
     def merge_all_point_clouds(self, output_path: str = None):
-        """Merge all point clouds from the project"""
+        """Merges every scan of the project, each in its MLMatrix44 pose.
+
+        Args:
+            output_path: Optional .ply file to write the merged cloud to.
+
+        Returns:
+            The merged point cloud.
+        """
         tree = ET.parse(self.mlp_file_path)
         root = tree.getroot()
         base_dir = os.path.dirname(self.mlp_file_path)
@@ -139,7 +191,8 @@ class PointCloudMerger:
             file_path = os.path.join(base_dir, filename)
 
             print(
-                f"Processing {i+1}/{len(root.findall('.//MLMesh'))}: {filename}")
+                f"Processing {i+1}/{len(root.findall('.//MLMesh'))}: {filename}"
+            )
 
             try:
                 pcd = o3d.io.read_point_cloud(file_path)
@@ -160,10 +213,9 @@ class PointCloudMerger:
                 else:
                     print("  No points found")
 
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                print(f"Error processing {filename}: {e}")
+            except Exception as error:  # pylint: disable=broad-exception-caught
+                print(f"Error processing {filename}: {error}")
 
-        # Create final merged point cloud
         self._create_merged_pcd(all_points, all_colors, all_normals)
 
         if output_path:
@@ -173,7 +225,7 @@ class PointCloudMerger:
         return self.merged_pcd
 
     def _get_transform(self, mlmesh_element):
-        """Extract transformation matrix"""
+        """Returns the 4x4 MLMatrix44 of a scan, or the identity."""
         matrix_elem = mlmesh_element.find('MLMatrix44')
         if matrix_elem is not None and matrix_elem.text:
             matrix_text = matrix_elem.text.strip()
@@ -183,34 +235,40 @@ class PointCloudMerger:
 
     @classmethod
     def transform_point_cloud(cls, pcd, transform):
-        """Apply transformation to point cloud and return points, colors, normals"""
+        """Transforms a point cloud by a 4x4 matrix.
+
+        Args:
+            pcd: Open3D point cloud.
+            transform: (4, 4) transform.
+
+        Returns:
+            The transformed (N, 3) points, the colors or None, and the
+            rotated unit normals or None.
+        """
         points = np.asarray(pcd.points)
 
-        # Transform points
         points_homogeneous = np.column_stack([points, np.ones(len(points))])
         transformed_points = (transform @ points_homogeneous.T).T[:, :3]
 
-        # Get colors if available
         colors = None
         if pcd.has_colors():
             colors = np.asarray(pcd.colors)
 
-        # Transform normals if available
         normals = None
         if pcd.has_normals():
             rotation_matrix = transform[:3, :3]
             original_normals = np.asarray(pcd.normals)
             transformed_normals = (rotation_matrix @ original_normals.T).T
-            # Normalize normals
-            norm_magnitudes = np.linalg.norm(
-                transformed_normals, axis=1, keepdims=True)
+            norm_magnitudes = np.linalg.norm(transformed_normals,
+                                             axis=1,
+                                             keepdims=True)
             norm_magnitudes[norm_magnitudes == 0] = 1  # Avoid division by zero
             normals = transformed_normals / norm_magnitudes
 
         return transformed_points, colors, normals
 
     def _create_merged_pcd(self, points, colors, normals):
-        """Create the final merged point cloud"""
+        """Stores the merged points, and colors and normals if complete."""
         self.merged_pcd.points = o3d.utility.Vector3dVector(np.array(points))
 
         if colors and len(colors) == len(points):
@@ -221,17 +279,24 @@ class PointCloudMerger:
             self.merged_pcd.normals = o3d.utility.Vector3dVector(
                 np.array(normals))
 
-        print(
-            f"Final merged point cloud: {len(self.merged_pcd.points)} points")
+        print(f"Final merged point cloud: {len(self.merged_pcd.points)} points")
 
 
 def parse_args() -> argparse.Namespace:
+    """Parses the command line of `spatialarena.evaluate`.
+
+    Overwriting the database or the matches implies overwriting the
+    reconstruction, which implies overwriting the alignment.
+
+    Returns:
+        The parsed arguments, with colmap_path resolved.
+    """
     datetime_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--data_path", default=Path(__file__).parent / "data", type=Path
-    )
+    parser.add_argument("--data_path",
+                        default=pathlib.Path(__file__).parent / "data",
+                        type=pathlib.Path)
     parser.add_argument(
         "--datasets",
         nargs="+",
@@ -252,25 +317,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--eval_methods",
         nargs="+",
-        default=["cut3r", "depthanything3", "fast-vggt", "mapanything", "ttt3r", "vggt"],
+        default=[
+            "cut3r", "depthanything3", "fast-vggt", "mapanything", "ttt3r",
+            "vggt"
+        ],
     )
-    parser.add_argument(
-        "--run_path", default=Path(__file__).parent / "runs", type=Path
-    )
+    parser.add_argument("--run_path",
+                        default=pathlib.Path(__file__).parent / "runs",
+                        type=pathlib.Path)
     parser.add_argument("--run_name", default=datetime_str)
     parser.add_argument("--report_name", default=f"report-{datetime_str}")
-    parser.add_argument(
-        "--overwrite_database", default=False, action="store_true"
-    )
-    parser.add_argument(
-        "--overwrite_matches", default=False, action="store_true"
-    )
-    parser.add_argument(
-        "--overwrite_reconstruction", default=False, action="store_true"
-    )
-    parser.add_argument(
-        "--overwrite_alignment", default=False, action="store_true"
-    )
+    parser.add_argument("--overwrite_database",
+                        default=False,
+                        action="store_true")
+    parser.add_argument("--overwrite_matches",
+                        default=False,
+                        action="store_true")
+    parser.add_argument("--overwrite_reconstruction",
+                        default=False,
+                        action="store_true")
+    parser.add_argument("--overwrite_alignment",
+                        default=False,
+                        action="store_true")
     parser.add_argument("--colmap_path", required=True)
     parser.add_argument("--use_gpu", default=True, action="store_true")
     parser.add_argument("--use_cpu", dest="use_gpu", action="store_false")
@@ -310,29 +378,25 @@ def parse_args() -> argparse.Namespace:
         help="Evaluation thresholds in meters.",
     )
     args = parser.parse_args()
-    args.colmap_path = Path(args.colmap_path).resolve()
+    args.colmap_path = pathlib.Path(args.colmap_path).resolve()
     if args.overwrite_database:
         pycolmap.logging.info(
-            "Overwriting database also overwrites reconstruction"
-        )
+            "Overwriting database also overwrites reconstruction")
         args.overwrite_reconstruction = True
     if args.overwrite_matches:
         pycolmap.logging.info(
-            "Overwriting matches also overwrites reconstruction"
-        )
+            "Overwriting matches also overwrites reconstruction")
         args.overwrite_reconstruction = True
     if args.overwrite_reconstruction:
         pycolmap.logging.info(
-            "Overwriting reconstruction also overwrites alignment"
-        )
+            "Overwriting reconstruction also overwrites alignment")
         args.overwrite_alignment = True
     return args
 
 
 def retrieve_poses_from_reconstruction(
-    sparse: pycolmap.Reconstruction
-) -> dict[str, np.ndarray]:
-    # sparse = pycolmap.Reconstruction(sparse_path)
+        sparse: pycolmap.Reconstruction) -> dict[str, np.ndarray]:
+    """Returns the 4x4 cam_from_world pose of each image, by image name."""
     poses = {}
     for image in sparse.images.values():
         pose = np.eye(4)
@@ -341,15 +405,17 @@ def retrieve_poses_from_reconstruction(
     return poses
 
 
-def rotation_distance(R1, R2, eps=1e-7):
-    """
-    Args:
-        R1: rotation matrix from camera 1 to world
-        R2: rotation matrix from camera 2 to world
-    Return:
-        angle: the angular distance between camera 1 and camera 2.
-    """
+def rotation_distance(R1, R2, eps=1e-7):  # pylint: disable=invalid-name
+    """Returns the angle between two (batches of) rotations, in degrees.
 
+    Args:
+        R1: Rotation matrices from camera 1 to world.
+        R2: Rotation matrices from camera 2 to world.
+        eps: Margin that keeps the arccos argument inside (-1, 1).
+
+    Returns:
+        The angular distance between camera 1 and camera 2.
+    """
     if isinstance(R1, np.ndarray):
         R1 = torch.from_numpy(R1).float()
 
@@ -357,29 +423,64 @@ def rotation_distance(R1, R2, eps=1e-7):
         R2 = torch.from_numpy(R2).float()
 
     # http://www.boris-belousov.net/2016/12/01/quat-dist/
-    # R_diff = R1 @ R2.transpose(-2, -1)
-    R_diff = R1.transpose(-2, -1) @ R2
-    trace = R_diff[..., 0, 0] + R_diff[..., 1, 1] + R_diff[..., 2, 2]
+    rotation_diff = R1.transpose(-2, -1) @ R2
+    trace = (rotation_diff[..., 0, 0] + rotation_diff[..., 1, 1] +
+             rotation_diff[..., 2, 2])
 
-    # numerical stability near -1/+1
+    # Numerical stability near -1/+1.
     angle = ((trace - 1) / 2).clamp(-1 + eps, 1 - eps).acos_()
     angle = np.rad2deg(angle.numpy())
 
     return angle
 
 
+def _merge_images(sparse_merged: pycolmap.Reconstruction,
+                  sparse: pycolmap.Reconstruction) -> None:
+    """Adds the images of `sparse`, with their cameras, rigs and frames."""
+    for image in sparse.images.values():
+        if image.image_id in sparse_merged.images:
+            continue
+        if image.camera_id not in sparse_merged.cameras:
+            sparse_merged.add_camera(image.camera)
+        if image.frame_id not in sparse_merged.frames:
+            if image.frame.rig_id not in sparse_merged.rigs:
+                sparse_merged.add_rig(image.frame.rig)
+            image.frame.reset_rig_ptr()
+            sparse_merged.add_frame(image.frame)
+        image.reset_camera_ptr()
+        image.reset_frame_ptr()
+        sparse_merged.add_image(image)
+
+
 def process_scene(
-    args: argparse.Namespace,
-    scene_info: SceneInfo,
-    prepare_scene: callable,
-    position_accuracy_gt: float,
-    num_threads: int,  # pylint: disable=unused-argument
+        args: argparse.Namespace,
+        scene_info: SceneInfo,
+        prepare_scene: Callable,
+        position_accuracy_gt: float,
+        num_threads: int,  # pylint: disable=unused-argument
 ) -> SceneResult:
-    pycolmap.logging.info(
-        f"Processing dataset={scene_info.dataset}, "
-        f"category={scene_info.category}, "
-        f"scene={scene_info.scene}"
-    )
+    """Aligns one method reconstruction to the ground truth.
+
+    Also writes the reconstruction as sparse/points3D.ply (if missing) and
+    its Sim(3)-aligned copy as sparse/points3D_aligned.ply, and merges the
+    ETH3D scans into scan_alignment_merged.ply (if missing).
+
+    Args:
+        args: Parsed `parse_args` arguments.
+        scene_info: Scene to evaluate.
+        prepare_scene: The dataset's `prepare_scene`.
+        position_accuracy_gt: Ground-truth position accuracy in meters.
+        num_threads: Unused.
+
+    Returns:
+        The pose errors, or None when the workspace has no COLMAP model.
+
+    Raises:
+        ValueError: args.error_type is unknown.
+    """
+    pycolmap.logging.info(f"Processing dataset={scene_info.dataset}, "
+                          f"category={scene_info.category}, "
+                          f"scene={scene_info.scene}")
 
     prepare_scene(scene_info)
 
@@ -394,9 +495,11 @@ def process_scene(
     sparse_merged = pycolmap.Reconstruction()
     num_components = 0
     largest_component = 0
-    sparse_path = resolve_sparse_model_path(scene_info.workspace_path)
+    sparse_path = result_layout.resolve_sparse_model_path(
+        scene_info.workspace_path)
     if sparse_path is None:
-        print(f'[ERROR] No COLMAP model found in {scene_info.workspace_path}/sparse or sparse/0')
+        print(f'[ERROR] No COLMAP model found in '
+              f'{scene_info.workspace_path}/sparse or sparse/0')
         return None
 
     num_components += 1
@@ -404,34 +507,22 @@ def process_scene(
 
     if sparse is not None:
         largest_component = max(largest_component, sparse.num_images())
-        for image in sparse.images.values():
-            if image.image_id in sparse_merged.images:
-                continue
-            if image.camera_id not in sparse_merged.cameras:
-                sparse_merged.add_camera(image.camera)
-            if image.frame_id not in sparse_merged.frames:
-                if image.frame.rig_id not in sparse_merged.rigs:
-                    sparse_merged.add_rig(image.frame.rig)
-                image.frame.reset_rig_ptr()
-                sparse_merged.add_frame(image.frame)
-            image.reset_camera_ptr()
-            image.reset_frame_ptr()
-            sparse_merged.add_image(image)
+        _merge_images(sparse_merged, sparse)
 
     sim3 = Sim3(scale=1.0, rotation=np.eye(3), translation=np.zeros(3))
     if args.error_type == "relative":
-        dts, dRs = compute_rel_errors(
+        translation_errors, rotation_errors = compute_rel_errors(
             sparse_gt=sparse_gt,
             sparse=sparse_merged,
             min_proj_center_dist=position_accuracy_gt,
         )
-        errors = np.maximum(dts, dRs)
+        errors = np.maximum(translation_errors, rotation_errors)
     elif args.error_type == "absolute":
-        dts, dRs, sim3 = compute_abs_errors(
+        translation_errors, rotation_errors, sim3 = compute_abs_errors(
             sparse_gt=sparse_gt,
             sparse=sparse_merged,
         )
-        errors = (dts, dRs)
+        errors = (translation_errors, rotation_errors)
     else:
         raise ValueError(f"Invalid error type: {args.error_type}")
 
@@ -446,7 +537,8 @@ def process_scene(
 
     if scene_info.dataset == "eth3d" and scene_info.dense_gt_path is not None:
         scan_path = scene_info.dense_gt_path / "scan_alignment.mlp"
-        merged_scan_path = scene_info.dense_gt_path / "scan_alignment_merged.ply"
+        merged_scan_path = (scene_info.dense_gt_path /
+                            "scan_alignment_merged.ply")
         if not merged_scan_path.exists():
             merger = PointCloudMerger(scan_path)
             merger.merge_all_point_clouds(output_path=str(merged_scan_path))
@@ -457,8 +549,8 @@ def process_scene(
             sparse_gt.export_PLY(reconstruction_ply)
 
     pcd = pcd.transform(transform)
-    transformed_ply_path = scene_info.workspace_path / \
-        "sparse" / "points3D_aligned.ply"
+    transformed_ply_path = (scene_info.workspace_path / "sparse" /
+                            "points3D_aligned.ply")
     o3d.io.write_point_cloud(str(transformed_ply_path), pcd)
 
     return SceneResult(
@@ -471,20 +563,74 @@ def process_scene(
     )
 
 
+def _point_cloud_metrics(scene_info: SceneInfo) -> tuple[float, float, float]:
+    """Returns the accuracy, completeness and chamfer distance of a scene.
+
+    The Sim(3)-aligned reconstruction is refined to the ground-truth points
+    with point-to-plane ICP first. Returns zeros when either .ply is missing.
+    """
+    ply_path = scene_info.workspace_path / "sparse" / "points3D_aligned.ply"
+    gt_ply_path = scene_info.sparse_gt_path / "points3D.ply"
+
+    if ply_path.exists() and gt_ply_path.exists():
+        pcd_gt = o3d.io.read_point_cloud(str(gt_ply_path))
+        pcd = o3d.io.read_point_cloud(str(ply_path))
+
+        pcd.estimate_normals()
+        pcd_gt.estimate_normals()
+
+        print('Running ICP alignment between reconstruction and GT scan...')
+        threshold = 100 if scene_info.dataset.find("dtu") >= 0 else 0.1
+        trans_init = np.eye(4)
+        reg_p2p = o3d.pipelines.registration.registration_icp(
+            pcd, pcd_gt, threshold, trans_init,
+            o3d.pipelines.registration.TransformationEstimationPointToPlane(),
+            o3d.pipelines.registration.ICPConvergenceCriteria(
+                max_iteration=1000))
+        pcd = pcd.transform(reg_p2p.transformation)
+        pcd.estimate_normals()
+
+        gt_points = np.asarray(pcd_gt.points)
+        pred_points = np.asarray(pcd.points)
+        finite_mask = np.all(np.isfinite(pred_points), axis=1)
+        pred_points = pred_points[finite_mask]
+
+        gt_normal = np.asarray(pcd_gt.normals)
+        pred_normal = np.asarray(pcd.normals)[finite_mask]
+
+        acc = accuracy(gt_points, pred_points, gt_normal, pred_normal)[0]
+        comp = completion(gt_points, pred_points, gt_normal, pred_normal)[0]
+        chamfer = (acc + comp) / 2
+    else:
+        acc, comp, chamfer = 0, 0, 0
+    return acc, comp, chamfer
+
+
 def process_scenes(
     args: argparse.Namespace,
     scene_infos: list[SceneInfo],
-    prepare_scene: callable,
+    prepare_scene: Callable,
     position_accuracy_gt: float,
     rotation_accuracy_gt: float,
 ) -> dict[str, dict[str, SceneMetrics]]:
+    """Evaluates every scene in parallel and writes its acc_metrics.json.
+
+    Args:
+        args: Parsed `parse_args` arguments.
+        scene_infos: Scenes to evaluate.
+        prepare_scene: The dataset's `prepare_scene`.
+        position_accuracy_gt: Ground-truth position accuracy in meters.
+        rotation_accuracy_gt: Ground-truth rotation accuracy in degrees.
+
+    Returns:
+        None; the metrics are written to <workspace>/acc_metrics.json.
+    """
     pos_error_thresholds, rot_error_thresholds = get_error_thresholds(args)
 
-    num_threads = min(
-        args.parallelism, 2 * max(1, int(args.parallelism / len(scene_infos)))
-    )
-    with multiprocessing.Pool(processes=args.parallelism) as p:
-        results = p.map(
+    num_threads = min(args.parallelism,
+                      2 * max(1, int(args.parallelism / len(scene_infos))))
+    with multiprocessing.Pool(processes=args.parallelism) as pool:
+        results = pool.map(
             functools.partial(
                 process_scene,
                 args,
@@ -499,61 +645,21 @@ def process_scenes(
         if result is None:
             continue
         print(f'Processing workspace: {result.scene_info.workspace_path}')
-        dts, dRs = result.errors[0], result.errors[1]
+        translation_errors, rotation_errors = result.errors[0], result.errors[1]
         pos_aucs = compute_auc(
-            dts, pos_error_thresholds,  min_error=position_accuracy_gt,
+            translation_errors,
+            pos_error_thresholds,
+            min_error=position_accuracy_gt,
         )
-        rot_aucs = compute_auc(
-            dRs, rot_error_thresholds, min_error=rotation_accuracy_gt
-        )
-        avg_rotation_error = np.mean(
-            result.errors[1][np.isfinite(result.errors[1])]
-        ).item()
-        avg_translation_error = np.mean(
-            result.errors[0][np.isfinite(result.errors[0])]
-        ).item()
+        rot_aucs = compute_auc(rotation_errors,
+                               rot_error_thresholds,
+                               min_error=rotation_accuracy_gt)
+        avg_rotation_error = np.mean(result.errors[1][np.isfinite(
+            result.errors[1])]).item()
+        avg_translation_error = np.mean(result.errors[0][np.isfinite(
+            result.errors[0])]).item()
 
-        ply_path = result.scene_info.workspace_path / "sparse" / "points3D_aligned.ply"
-        gt_ply_path = result.scene_info.sparse_gt_path / "points3D.ply"
-
-        if ply_path.exists() and gt_ply_path.exists():
-            pcd_gt = o3d.io.read_point_cloud(str(gt_ply_path))
-            pcd = o3d.io.read_point_cloud(str(ply_path))
-
-            # pcd_down = pcd.voxel_down_sample(0.05)
-            # pcd_gt_down = pcd_gt.voxel_down_sample(0.05)
-            pcd.estimate_normals()
-            pcd_gt.estimate_normals()
-
-            print('Running ICP alignment between reconstruction and GT scan...')
-            threshold = 100 if result.scene_info.dataset.find("dtu") >= 0 else 0.1
-            trans_init = np.eye(4)
-            reg_p2p = o3d.pipelines.registration.registration_icp(
-                pcd,
-                pcd_gt,
-                threshold,
-                trans_init,
-                o3d.pipelines.registration.TransformationEstimationPointToPlane(),
-                o3d.pipelines.registration.ICPConvergenceCriteria(
-                    max_iteration=1000)
-            )
-            pcd = pcd.transform(reg_p2p.transformation)
-            pcd.estimate_normals()
-            # pcd_gt.estimate_normals()
-
-            gt_points = np.asarray(pcd_gt.points)
-            pred_points = np.asarray(pcd.points)
-            finite_mask = np.all(np.isfinite(pred_points), axis=1)
-            pred_points = pred_points[finite_mask]
-
-            gt_normal = np.asarray(pcd_gt.normals)
-            pred_normal = np.asarray(pcd.normals)[finite_mask]
-
-            acc = accuracy(gt_points, pred_points, gt_normal, pred_normal)[0]
-            comp = completion(gt_points, pred_points, gt_normal, pred_normal)[0]
-            chamfer = (acc + comp) / 2
-        else:
-            acc, comp, chamfer = 0, 0, 0
+        acc, comp, chamfer = _point_cloud_metrics(result.scene_info)
 
         metrics = {
             "iteration": 0,
@@ -576,7 +682,6 @@ def process_scenes(
         for auc, error_thresh in zip(rot_aucs, rot_error_thresholds):
             metrics[f"auc_rot_{error_thresh}"] = auc
 
-        # print(metrics)
         all_metrics = {"0": metrics}
 
         metrics_path = result.scene_info.workspace_path / "acc_metrics.json"
@@ -587,24 +692,35 @@ def process_scenes(
 
 
 def normalize_vec(vec: np.ndarray, eps: float = 1e-10) -> np.ndarray:
+    """Returns vec scaled to unit length (norms below eps count as eps)."""
     return vec / max(eps, np.linalg.norm(vec))
 
 
 def vec_angular_dist_deg(vec1: np.ndarray, vec2: np.ndarray) -> float:
+    """Returns the angle between two vectors in degrees."""
     cos_dist = np.clip(np.dot(normalize_vec(vec1), normalize_vec(vec2)), -1, 1)
     return np.rad2deg(np.acos(cos_dist))
 
 
 def get_error_thresholds(args: argparse.Namespace) -> list[float]:
+    """Returns the AUC thresholds of args.error_type.
+
+    Args:
+        args: Parsed `parse_args` arguments.
+
+    Returns:
+        The relative thresholds, or the (position, rotation) absolute
+        thresholds.
+
+    Raises:
+        ValueError: args.error_type is unknown.
+    """
     if args.error_type == "relative":
         return np.array(args.rel_error_thresholds)
-    elif args.error_type == "absolute":
-        return (
-            np.array(args.abs_pos_error_thresholds),
-            np.array(args.abs_rot_error_thresholds)
-        )
-    else:
-        raise ValueError(f"Invalid error type: {args.error_type}")
+    if args.error_type == "absolute":
+        return (np.array(args.abs_pos_error_thresholds),
+                np.array(args.abs_rot_error_thresholds))
+    raise ValueError(f"Invalid error type: {args.error_type}")
 
 
 def compute_rel_errors(
@@ -625,8 +741,17 @@ def compute_rel_errors(
     pairwise errors per image. However, this becomes difficult when multiple
     sub-components are incorrectly stitched together in the same reconstruction
     (e.g., in the case of symmetry issues).
-    """
 
+    Args:
+        sparse_gt: Ground-truth reconstruction.
+        sparse: Evaluated reconstruction, or None if it failed.
+        min_proj_center_dist: Below this camera distance only the rotation
+            error is measured.
+
+    Returns:
+        The translation-direction and rotation errors in degrees, one per
+        ordered ground-truth image pair.
+    """
     if sparse is None:
         pycolmap.logging.error("Reconstruction failed")
         return len(sparse_gt.images) * [np.inf], len(sparse_gt.images) * [180]
@@ -635,13 +760,13 @@ def compute_rel_errors(
     for image in sparse.images.values():
         images[image.name] = image
 
-    dts = []
-    dRs = []
+    translation_errors = []
+    rotation_errors = []
     for this_image_gt in sparse_gt.images.values():
         if this_image_gt.name not in images:
             for _ in range(sparse_gt.num_images() - 1):
-                dts.append(np.inf)
-                dRs.append(180)
+                translation_errors.append(np.inf)
+                rotation_errors.append(180)
             continue
 
         this_image = images[this_image_gt.name]
@@ -651,54 +776,54 @@ def compute_rel_errors(
                 continue
 
             if other_image_gt.name not in images:
-                dts.append(np.inf)
-                dRs.append(180)
+                translation_errors.append(np.inf)
+                rotation_errors.append(180)
                 continue
 
             other_image = images[other_image_gt.name]
 
-            other_from_this = (
-                other_image.cam_from_world()
-                * this_image.cam_from_world().inverse()
-            )
-            other_from_this_gt = (
-                other_image_gt.cam_from_world()
-                * this_image_gt.cam_from_world().inverse()
-            )
+            other_from_this = (other_image.cam_from_world() *
+                               this_image.cam_from_world().inverse())
+            other_from_this_gt = (other_image_gt.cam_from_world() *
+                                  this_image_gt.cam_from_world().inverse())
 
             estimated_from_gt = other_from_this.inverse() * other_from_this_gt
 
-            if (
-                np.linalg.norm(other_from_this_gt.translation)
-                < min_proj_center_dist
-            ):
+            if (np.linalg.norm(other_from_this_gt.translation)
+                    < min_proj_center_dist):
                 # If the cameras almost coincide, then the angular direction
                 # distance is unstable, because a small position change can
                 # cause a large rotational error. In this case, we only measure
                 # rotational relative pose error.
-                dt = 0
+                translation_error = 0
             else:
-                dt = vec_angular_dist_deg(
-                    other_from_this.translation, other_from_this_gt.translation
-                )
+                translation_error = vec_angular_dist_deg(
+                    other_from_this.translation, other_from_this_gt.translation)
 
-            dR = np.rad2deg(estimated_from_gt.rotation.angle())
+            rotation_error = np.rad2deg(estimated_from_gt.rotation.angle())
 
-            dts.append(dt)
-            dRs.append(dR)
+            translation_errors.append(translation_error)
+            rotation_errors.append(rotation_error)
 
-    return np.array(dts), np.array(dRs)
+    return np.array(translation_errors), np.array(rotation_errors)
 
 
 def compute_abs_errors(
-    sparse_gt: pycolmap.Reconstruction, sparse: pycolmap.Reconstruction
-) -> tuple[np.ndarray, np.ndarray]:
+        sparse_gt: pycolmap.Reconstruction,
+        sparse: pycolmap.Reconstruction) -> tuple[np.ndarray, np.ndarray]:
     """Computes rotational and translational absolute pose errors.
 
-    Assumes that the input reconstructions are aligned in the same coordinate
-    system. Computes one error per ground-truth image.
-    """
+    Aligns the camera centers with a Sim(3) first, so the reconstructions do
+    not need to share a coordinate system. Computes one error per image.
 
+    Args:
+        sparse_gt: Ground-truth reconstruction.
+        sparse: Evaluated reconstruction with the same image count.
+
+    Returns:
+        The translation errors, the rotation errors in degrees and the
+        estimated `Sim3`; None if an image is missing from the ground truth.
+    """
     sparse_name_to_pose = retrieve_poses_from_reconstruction(sparse)
     sparse_gt_name_to_pose = retrieve_poses_from_reconstruction(sparse_gt)
     assert len(sparse_name_to_pose) == len(sparse_gt_name_to_pose), \
@@ -708,8 +833,7 @@ def compute_abs_errors(
     for name, pose in sparse_name_to_pose.items():
         if name not in sparse_gt_name_to_pose:
             pycolmap.logging.error(
-                f"Cannot align models, image {name} not found in GT"
-            )
+                f"Cannot align models, image {name} not found in GT")
             return
 
         cam_to_world = np.linalg.inv(pose)
@@ -719,33 +843,54 @@ def compute_abs_errors(
     sparse_pose = np.stack(sparse_pose, axis=0)
     sparse_gt_pose = np.stack(sparse_gt_pose, axis=0)
 
-    aligned_pose, scale, rotation, t = align_ate_c2b_use_a2b(
-        sparse_pose,
-        sparse_gt_pose,
-    )
+    aligned_pose, scale, rotation, translation = (
+        align_poses.align_ate_c2b_use_a2b(
+            sparse_pose,
+            sparse_gt_pose,
+        ))
 
-    R_aligned, t_aligned = aligned_pose[...,
-                                        :3, :3], aligned_pose[..., :3, 3:4]
-    R_gt, t_gt = sparse_gt_pose[..., :3, :3], sparse_gt_pose[..., :3, 3:4]
+    rotation_aligned = aligned_pose[..., :3, :3]
+    translation_aligned = aligned_pose[..., :3, 3:4]
+    rotation_gt = sparse_gt_pose[..., :3, :3]
+    translation_gt = sparse_gt_pose[..., :3, 3:4]
 
-    dRs = rotation_distance(R_aligned[..., :3, :3], R_gt[..., :3, :3])
-    dts = np.linalg.norm((t_aligned - t_gt)[..., 0], axis=-1)
+    rotation_errors = rotation_distance(rotation_aligned[..., :3, :3],
+                                        rotation_gt[..., :3, :3])
+    translation_errors = np.linalg.norm(
+        (translation_aligned - translation_gt)[..., 0], axis=-1)
 
-    sim3 = Sim3(scale=scale, rotation=rotation, translation=t)
+    sim3 = Sim3(scale=scale, rotation=rotation, translation=translation)
 
-    return dts, dRs, sim3
+    return translation_errors, rotation_errors, sim3
 
 
 def compute_recall(errors: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Returns the sorted errors and the recall at each of them."""
     num_elements = len(errors)
     errors = np.sort(errors)
     recall = (np.arange(num_elements) + 1) / num_elements
     return errors, recall
 
 
-def compute_auc(
-    errors: np.ndarray, thresholds: list[float], min_error: float = 0
-) -> list[float]:
+def compute_auc(errors: np.ndarray,
+                thresholds: list[float],
+                min_error: float = 0) -> list[float]:
+    """Returns the recall-curve AUC (in percent) at each threshold.
+
+    Errors up to min_error (the ground-truth accuracy) count as zero. The
+    scores are divided by 1.1.
+
+    Args:
+        errors: Errors of all images or image pairs.
+        thresholds: Error thresholds.
+        min_error: Accuracy of the ground truth, in the units of errors.
+
+    Returns:
+        One AUC score per threshold.
+
+    Raises:
+        ValueError: errors is empty.
+    """
     if len(errors) == 0:
         raise ValueError("No errors to evaluate")
 
@@ -761,11 +906,11 @@ def compute_auc(
         errors = np.r_[0, errors]
 
     aucs = np.zeros(len(thresholds), dtype=np.float64)
-    for i, t in enumerate(thresholds):
-        last_index = np.searchsorted(errors, t, side="right")
-        r = np.r_[recall[:last_index], recall[last_index - 1]]
-        e = np.r_[errors[:last_index], t]
-        auc = trapezoid_integral(r, e) / t
+    for i, threshold in enumerate(thresholds):
+        last_index = np.searchsorted(errors, threshold, side="right")
+        recall_curve = np.r_[recall[:last_index], recall[last_index - 1]]
+        error_curve = np.r_[errors[:last_index], threshold]
+        auc = trapezoid_integral(recall_curve, error_curve) / threshold
         aucs[i] = auc * 100
     return aucs / 1.1
 
@@ -773,14 +918,22 @@ def compute_auc(
 def accuracy(
     gt_points: np.ndarray,
     rec_points: np.ndarray,
-    gt_normals: np.ndarray = None,
-    rec_normals: np.ndarray = None,
+    gt_normals: np.ndarray | None = None,
+    rec_normals: np.ndarray | None = None,
 ):
-    # # Filter out non-finite points before KDTree
-    # finite_mask = np.all(np.isfinite(rec_points), axis=1)
-    # rec_points = rec_points[finite_mask]
+    """Returns the distances from the reconstruction to the ground truth.
 
-    gt_points_kd_tree = KDTree(gt_points)
+    Args:
+        gt_points: (N, 3) ground-truth points.
+        rec_points: (M, 3) reconstructed points, all finite.
+        gt_normals: Optional (N, 3) ground-truth normals.
+        rec_normals: Optional (M, 3) reconstructed normals.
+
+    Returns:
+        The mean and median nearest-neighbor distance; with normals, also the
+        mean and median absolute normal dot product.
+    """
+    gt_points_kd_tree = spatial.cKDTree(gt_points)
     distances, idx = gt_points_kd_tree.query(rec_points, workers=-1)
     acc = np.mean(distances)
 
@@ -798,14 +951,22 @@ def accuracy(
 def completion(
     gt_points: np.ndarray,
     rec_points: np.ndarray,
-    gt_normals: np.ndarray = None,
-    rec_normals: np.ndarray = None,
+    gt_normals: np.ndarray | None = None,
+    rec_normals: np.ndarray | None = None,
 ):
-    # # Filter out non-finite points before KDTree
-    # finite_mask = np.all(np.isfinite(rec_points), axis=1)
-    # rec_points = rec_points[finite_mask]
+    """Returns the distances from the ground truth to the reconstruction.
 
-    gt_points_kd_tree = KDTree(rec_points)
+    Args:
+        gt_points: (N, 3) ground-truth points.
+        rec_points: (M, 3) reconstructed points, all finite.
+        gt_normals: Optional (N, 3) ground-truth normals.
+        rec_normals: Optional (M, 3) reconstructed normals.
+
+    Returns:
+        The mean and median nearest-neighbor distance; with normals, also the
+        mean and median absolute normal dot product.
+    """
+    gt_points_kd_tree = spatial.cKDTree(rec_points)
     distances, idx = gt_points_kd_tree.query(gt_points, workers=-1)
     comp = np.mean(distances)
     comp_median = np.median(distances)
@@ -820,25 +981,20 @@ def completion(
 
 
 def randomly_limit_trues(mask: np.ndarray, max_trues: int) -> np.ndarray:
+    """Keeps at most max_trues randomly chosen True values of a mask.
+
+    Draws from the global NumPy random state.
     """
-    If mask has more than max_trues True values,
-    randomly keep only max_trues of them and set the rest to False.
-    """
-    # 1D positions of all True entries
     true_indices = np.flatnonzero(mask)  # shape = (N_true,)
 
-    # if already within budget, return as-is
     if true_indices.size <= max_trues:
         return mask
 
-    # randomly pick which True positions to keep
-    sampled_indices = np.random.choice(
-        true_indices, size=max_trues, replace=False
-    )  # shape = (max_trues,)
+    sampled_indices = np.random.choice(true_indices,
+                                       size=max_trues,
+                                       replace=False)  # shape = (max_trues,)
 
-    # build new flat mask: True only at sampled positions
     limited_flat_mask = np.zeros(mask.size, dtype=bool)
     limited_flat_mask[sampled_indices] = True
 
-    # restore original shape
     return limited_flat_mask.reshape(mask.shape)
