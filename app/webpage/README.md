@@ -173,8 +173,8 @@ track (short, long, large), with each dataset's columns grouped and the range sc
 dataset alone with every metric (for SLAM, one table per range the dataset takes part in). Each task remembers its
 dataset tab, and the URL records the open task and dataset tab. Overall averages the leaderboard datasets only: a
 track whose results are all on datasets left out of it (SpatialArena, ScanNet++, Spring), such as VideoDepth [+C] on
-SpatialArena, shows "SpatialArena only · not scored" instead of empty cells and follows the ranked rows; its numbers
-are in that dataset's tab.
+SpatialArena, is left out of Overall (the collector marks such rows `unscored_only`); its numbers are in that
+dataset's tab.
 
 The overall score of a method is the mean of its task scores, a task without a result counting 0. An rgb method is
 averaged over every task; a conditioned track ([+C], [+D]) only over the tasks the task/track matrix lets it run on a
@@ -186,7 +186,7 @@ methods with no overall rank (`rank` is null), and keep their per-task ranks.
 ## Download view
 
 The Download view (`#download`) explains how to fetch the benchmark from its Hugging Face release
-(`Bluefish2333/benchmark`): install the client, build the `hf download` command for the chosen tasks (or the
+(`Bluefish2333/SpatialArena-Dataset`): install the client, build the `hf download` command for the chosen tasks (or the
 SpatialArena tracks only), unpack the per-scene archives with the bundled `extract_benchmark_archives.py`, link the
 five datasets that two tasks share (packed once; the other task's folder holds a `SEE_INSTEAD.md`), and verify the
 result. The task picker and the release-contents table read the per-dataset sizes and shared-folder pointers in

@@ -1,20 +1,38 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+"""Reader-facing catalog of the benchmark's evaluation datasets.
 
-"""Reader-facing catalog of the benchmark's evaluation datasets for the dashboard gallery.
-
-Counts, scene types and license status mirror ``docs/evaluation.md``;
-update both together. ``thumbnail_scene`` picks a visually representative scene for the
-gallery thumbnail and falls back to the first registered scene when it is not present.
+The dashboard's dataset gallery (build_dataset_gallery.py) shows one card per
+dataset. Counts, scene types and license status mirror docs/evaluation.md;
+update both together.
 """
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+import dataclasses
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class DatasetCard:
+    """One dataset's card in the gallery.
+
+    Attributes:
+        key: The dataset key used by the benchmark, e.g. "marigold".
+        name: The display name.
+        intro: A one- or two-sentence description.
+        citation: The short citation, e.g. "Ke et al., CVPR 2024".
+        url: The dataset's project page.
+        scenes: The number of scenes.
+        total_images: The number of images in the source dataset.
+        evaluated_images: The number of images the benchmark evaluates.
+        scene_type: The kind of scenes, e.g. "indoor, real".
+        license_status: The dataset's license, as far as it is known.
+        thumbnail_scene: A visually representative scene for the gallery
+            thumbnail; the first registered scene is used when it is not
+            present.
+        thumbnail_image_hint: A hint for which image of the scene to use.
+    """
+
     key: str
     name: str
     intro: str
@@ -29,15 +47,17 @@ class DatasetCard:
     thumbnail_image_hint: str = ""
 
     def as_dict(self) -> dict:
-        return asdict(self)
+        """Returns the card's fields as a dict."""
+        return dataclasses.asdict(self)
 
 
 DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="marigold",
         name="Marigold Eval Suite",
-        intro="Five classic monocular depth test splits (NYUv2, KITTI, ETH3D, DIODE, ScanNet) repackaged by the "
-        "Marigold authors; each split is evaluated as one scene.",
+        intro=("Five classic monocular depth test splits (NYUv2, KITTI, "
+               "ETH3D, DIODE, ScanNet) repackaged by the Marigold authors; "
+               "each split is evaluated as one scene."),
         citation="Ke et al., CVPR 2024",
         url="https://marigoldmonodepth.github.io/",
         scenes=5,
@@ -51,8 +71,9 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="aerialmetric",
         name="AerialMetric",
-        intro="UAV views with metric depth: four sites flown at controlled pitch, altitude and FOV (Decoupled), "
-        "oblique photogrammetry captures, and frames from online drone videos (Wild).",
+        intro=("UAV views with metric depth: four sites flown at controlled "
+               "pitch, altitude and FOV (Decoupled), oblique photogrammetry "
+               "captures, and frames from online drone videos (Wild)."),
         citation="Song et al., ECCV 2026",
         url="https://github.com/kuieless/AerialMetric",
         scenes=3,
@@ -65,8 +86,9 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="hammer",
         name="HAMMER",
-        intro="Tabletop scenes with and without household objects, captured by a robot arm, with dense GT depth "
-        "rendered from high-accuracy scanned meshes; sharp object boundaries.",
+        intro=("Tabletop scenes with and without household objects, "
+               "captured by a robot arm, with dense GT depth rendered from "
+               "high-accuracy scanned meshes; sharp object boundaries."),
         citation="Jung et al., CVPR 2023",
         url="https://campar.in.tum.de/public_datasets/2022_arxiv_jung/",
         scenes=1,
@@ -79,8 +101,9 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="ibims1",
         name="iBims-1",
-        intro="100 indoor images with high-quality depth from a terrestrial laser scanner, a standard benchmark for "
-        "planarity and depth-boundary accuracy.",
+        intro=("100 indoor images with high-quality depth from a "
+               "terrestrial laser scanner, a standard benchmark for "
+               "planarity and depth-boundary accuracy."),
         citation="Koch et al., ECCV-W 2018",
         url="https://www.asg.ed.tum.de/lmf/ibims1/",
         scenes=1,
@@ -93,8 +116,10 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="spring",
         name="Spring",
-        intro="Frames rendered from the Blender open movie Spring: dense synthetic depth with very fine structure "
-        "(fur, foliage, branches). Excluded from the aggregate ranking (train-split overlap).",
+        intro=("Frames rendered from the Blender open movie Spring: dense "
+               "synthetic depth with very fine structure (fur, foliage, "
+               "branches). Excluded from the aggregate ranking (train-split "
+               "overlap)."),
         citation="Mehl et al., CVPR 2023",
         url="https://spring-benchmark.org/",
         scenes=1,
@@ -107,8 +132,9 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="synth4k",
         name="Synth4K",
-        intro="3840x2160 RGB-D frames captured from five video games (Cyberpunk 2077, Dead Island 2, two Spider-Man "
-        "titles, Watch Dogs: Legion), testing fine detail at 4K.",
+        intro=("3840x2160 RGB-D frames captured from five video games "
+               "(Cyberpunk 2077, Dead Island 2, two Spider-Man titles, "
+               "Watch Dogs: Legion), testing fine detail at 4K."),
         citation="Yu et al., 2026 (InfiniDepth)",
         url="https://github.com/zju3dv/InfiniDepth",
         scenes=5,
@@ -121,8 +147,9 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="sintel",
         name="MPI Sintel",
-        intro="Short clips from the open-source animated film Sintel with ground-truth depth: fast camera motion, "
-        "moving characters and cloth/water simulation, fully rendered.",
+        intro=("Short clips from the open-source animated film Sintel with "
+               "ground-truth depth: fast camera motion, moving characters "
+               "and cloth/water simulation, fully rendered."),
         citation="Butler et al., ECCV 2012",
         url="http://sintel.is.tue.mpg.de/",
         scenes=23,
@@ -135,8 +162,9 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="bonn",
         name="Bonn RGB-D Dynamic",
-        intro="Kinect RGB-D sequences of people moving boxes and balloons in front of a static background, a "
-        "standard stress test for video depth under dynamic content.",
+        intro=("Kinect RGB-D sequences of people moving boxes and balloons "
+               "in front of a static background, a standard stress test for "
+               "video depth under dynamic content."),
         citation="Palazzolo et al., IROS 2019",
         url="https://www.ipb.uni-bonn.de/data/rgbd-dynamic-dataset/",
         scenes=26,
@@ -149,8 +177,9 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="kitti",
         name="KITTI",
-        intro="Raw KITTI driving sequences with LiDAR-derived depth, covering urban and residential streets with "
-        "other traffic and pedestrians.",
+        intro=("Raw KITTI driving sequences with LiDAR-derived depth, "
+               "covering urban and residential streets with other traffic "
+               "and pedestrians."),
         citation="Geiger et al., CVPR 2012",
         url="https://www.cvlibs.net/datasets/kitti/",
         scenes=13,
@@ -162,8 +191,10 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="dycheck",
         name="DyCheck",
-        intro="Handheld iPhone captures of people, pets and objects in motion (camera 0 of the MegaSaM-distributed "
-        "DyCheck evaluation archive), testing video depth on casual dynamic scenes.",
+        intro=("Handheld iPhone captures of people, pets and objects in "
+               "motion (camera 0 of the MegaSaM-distributed DyCheck "
+               "evaluation archive), testing video depth on casual dynamic "
+               "scenes."),
         citation="Gao et al., NeurIPS 2022",
         url="https://github.com/KAIR-BAIR/dycheck",
         scenes=12,
@@ -175,11 +206,12 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="spatialarena",
         name="SpatialArena",
-        intro="Our own captures with a handheld 3-camera LiDAR rig: 30 indoor and outdoor scenes (stations, "
-        "museums, gardens, streets) with refined metric poses, LiDAR depth and GGGS dense depth, feeding all five "
-        "tasks.",
+        intro=("Our own captures with a handheld 3-camera LiDAR rig: 30 "
+               "indoor and outdoor scenes (stations, museums, gardens, "
+               "streets) with refined metric poses, LiDAR depth and GGGS "
+               "dense depth, feeding all five tasks."),
         citation="SpatialArena, 2026",
-        url="https://huggingface.co/datasets/Bluefish2333/benchmark",
+        url="https://huggingface.co/datasets/Bluefish2333/SpatialArena-Dataset",
         scenes=30,
         total_images=34994,
         evaluated_images=10072,
@@ -189,8 +221,9 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="eth3d",
         name="ETH3D",
-        intro="High-resolution DSLR captures of indoor rooms and outdoor courtyards with laser-scanned geometry, "
-        "used for both camera pose and multi-view reconstruction.",
+        intro=("High-resolution DSLR captures of indoor rooms and outdoor "
+               "courtyards with laser-scanned geometry, used for both "
+               "camera pose and multi-view reconstruction."),
         citation="Schöps et al., CVPR 2017",
         url="https://www.eth3d.net/",
         scenes=13,
@@ -203,8 +236,9 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="tanks_and_temples",
         name="Tanks and Temples",
-        intro="Large-scale handheld video captures of statues, vehicles, buildings and interiors, a long-standing "
-        "reference for reconstruction at scene scale.",
+        intro=("Large-scale handheld video captures of statues, vehicles, "
+               "buildings and interiors, a long-standing reference for "
+               "reconstruction at scene scale."),
         citation="Knapitsch et al., TOG 2017",
         url="https://www.tanksandtemples.org/",
         scenes=6,
@@ -217,8 +251,9 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="imc",
         name="Image Matching Challenge",
-        intro="Phototourism collections of world landmarks from community photos: unstructured viewpoints, "
-        "cameras and lighting make pose estimation hard.",
+        intro=("Phototourism collections of world landmarks from community "
+               "photos: unstructured viewpoints, cameras and lighting make "
+               "pose estimation hard."),
         citation="Jin et al., IJCV 2021",
         url="https://www.cs.ubc.ca/research/image-matching-challenge/",
         scenes=8,
@@ -231,10 +266,13 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="7scenes",
         name="7-Scenes",
-        intro="Handheld Kinect sequences through seven small rooms such as an office, kitchen and stairwell; "
-        "used by the reconstruction task, and by the SLAM task as its 18 official test sequences.",
+        intro=("Handheld Kinect sequences through seven small rooms such as "
+               "an office, kitchen and stairwell; used by the "
+               "reconstruction task, and by the SLAM task as its 18 "
+               "official test sequences."),
         citation="Shotton et al., CVPR 2013",
-        url="https://www.microsoft.com/en-us/research/project/rgb-d-dataset-7-scenes/",
+        url=
+        "https://www.microsoft.com/en-us/research/project/rgb-d-dataset-7-scenes/",
         scenes=7,
         total_images=43000,
         evaluated_images=700,
@@ -245,8 +283,9 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="dtu",
         name="DTU MVS",
-        intro="Tabletop objects captured by a robot-arm camera rig under studio lighting, with structured-light "
-        "reference scans for precise geometry evaluation.",
+        intro=("Tabletop objects captured by a robot-arm camera rig under "
+               "studio lighting, with structured-light reference scans for "
+               "precise geometry evaluation."),
         citation="Aanæs et al., IJCV 2016",
         url="https://roboimagedata.compute.dtu.dk/?page_id=36",
         scenes=15,
@@ -258,8 +297,9 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="scannetpp",
         name="ScanNet++",
-        intro="High-fidelity laser and DSLR scans of real rooms, apartments and offices. Excluded from the "
-        "aggregate leaderboard because many methods train on it.",
+        intro=("High-fidelity laser and DSLR scans of real rooms, "
+               "apartments and offices. Excluded from the aggregate "
+               "leaderboard because many methods train on it."),
         citation="Yeshwanth et al., ICCV 2023",
         url="https://kaldir.vc.in.tum.de/scannetpp/",
         scenes=20,
@@ -271,8 +311,9 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="hiroom",
         name="HiRoom",
-        intro="Photorealistic Blender-rendered living rooms and kitchens from the Depth Anything 3 benchmark; "
-        "never used as training data, so it carries no leakage risk.",
+        intro=("Photorealistic Blender-rendered living rooms and kitchens "
+               "from the Depth Anything 3 benchmark; never used as training "
+               "data, so it carries no leakage risk."),
         citation="Depth Anything 3 (DA3-BENCH), 2025",
         url="https://huggingface.co/datasets/depth-anything/DA3-BENCH",
         scenes=30,
@@ -284,8 +325,9 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="texturepoorsfm",
         name="TexturePoorSfM",
-        intro="Low-texture household objects on a tabletop, where keypoint matching breaks down; the benchmark "
-        "uses 30 bags from five held-out objects (split v2).",
+        intro=("Low-texture household objects on a tabletop, where keypoint "
+               "matching breaks down; the benchmark uses 30 bags from five "
+               "held-out objects (split v2)."),
         citation="He et al., CVPR 2024",
         url="https://zju3dv.github.io/DetectorFreeSfM/",
         scenes=30,
@@ -297,8 +339,9 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="nrgbd",
         name="Neural RGB-D",
-        intro="Rendered indoor scenes (dining rooms, kitchens, a staircase) with clean ground-truth meshes for "
-        "measuring reconstruction accuracy and completeness.",
+        intro=("Rendered indoor scenes (dining rooms, kitchens, a "
+               "staircase) with clean ground-truth meshes for measuring "
+               "reconstruction accuracy and completeness."),
         citation="Azinović et al., CVPR 2022",
         url="https://github.com/dazinovic/neural-rgbd-surface-reconstruction",
         scenes=9,
@@ -311,8 +354,9 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="tum_dynamics",
         name="TUM RGB-D Dynamic",
-        intro="Office sequences from the TUM RGB-D benchmark in which people sit, move and walk through the view, "
-        "testing camera tracking in dynamic scenes.",
+        intro=("Office sequences from the TUM RGB-D benchmark in which "
+               "people sit, move and walk through the view, testing camera "
+               "tracking in dynamic scenes."),
         citation="Sturm et al., IROS 2012",
         url="https://cvg.cit.tum.de/data/datasets/rgbd-dataset",
         scenes=9,
@@ -325,8 +369,10 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="oxford_spires",
         name="Oxford Spires",
-        intro="Handheld walks around Oxford colleges and libraries with LiDAR-derived ground-truth poses: long "
-        "outdoor trajectories with loops, used whole for large-scale camera tracking (large SLAM range).",
+        intro=("Handheld walks around Oxford colleges and libraries with "
+               "LiDAR-derived ground-truth poses: long outdoor trajectories "
+               "with loops, used whole for large-scale camera tracking "
+               "(large SLAM range)."),
         citation="Tao et al., IJRR 2026",
         url="https://dynamic.robots.ox.ac.uk/datasets/oxford-spires/",
         scenes=10,
@@ -339,8 +385,10 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="vbr",
         name="VBR (Vision Benchmark in Rome)",
-        intro="Kilometre-scale handheld and car-mounted sequences across Rome (campus, Colosseum, Spanish Steps, "
-        "Pincio) with LiDAR-inertial ground truth; the longest inputs of the large SLAM range.",
+        intro=("Kilometre-scale handheld and car-mounted sequences across "
+               "Rome (campus, Colosseum, Spanish Steps, Pincio) with "
+               "LiDAR-inertial ground truth; the longest inputs of the "
+               "large SLAM range."),
         citation="Brizi et al., ICRA 2024",
         url="https://rvp-group.net/slam-dataset.html",
         scenes=7,
@@ -353,8 +401,10 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
     DatasetCard(
         key="kitti_odometry",
         name="KITTI Odometry",
-        intro="Car-mounted drives through Karlsruhe streets, residential areas and highways with GPS/INS ground truth: "
-        "the classic visual-odometry benchmark, sequences 00-10 used whole at 10 Hz (large SLAM range).",
+        intro=("Car-mounted drives through Karlsruhe streets, residential "
+               "areas and highways with GPS/INS ground truth: the classic "
+               "visual-odometry benchmark, sequences 00-10 used whole at 10 "
+               "Hz (large SLAM range)."),
         citation="Geiger et al., CVPR 2012",
         url="https://www.cvlibs.net/datasets/kitti/eval_odometry.php",
         scenes=11,

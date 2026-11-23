@@ -1882,6 +1882,9 @@ function buildBenchmarkTableSection(task, tableKey, sourceTable, selectedFamily,
 
     const sectionKey = benchmarkTaskSectionKey(task, tableKey);
     const sourceRows = (sourceTable.methods || [])
+        // Overall leaves out rows whose results are all on datasets outside the leaderboard (e.g. VideoDepth [+C],
+        // SpatialArena only): they are not scored there; their dataset tabs show them.
+        .filter(row => !(tableKey === "all" && row.unscored_only))
         .filter(row => !methodSearch || benchmarkMethodSearchText(row).includes(methodSearch))
         .map(row => {
             if (row.missing) return { ...row, task_score: undefined, task_rank: undefined };
