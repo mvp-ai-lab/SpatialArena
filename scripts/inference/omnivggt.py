@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Run OmniVGGT and export benchmark prediction artifacts."""
 
 from __future__ import annotations
@@ -43,16 +42,25 @@ from adapter_utils import (
     write_adapter_metrics,
 )
 
-
 METHOD = "OMNIVGGT"
 
 TRACKS = (
-    "rgb", "rgb_depth", "rgb_cameras", "rgb_masked_depth", "rgb_masked_depth_cameras", "rgb_sparse_depth",
+    "rgb",
+    "rgb_depth",
+    "rgb_cameras",
+    "rgb_masked_depth",
+    "rgb_masked_depth_cameras",
+    "rgb_sparse_depth",
     "rgb_sparse_depth_cameras",
 )
-CAMERA_TRACKS = ("rgb_cameras", "rgb_masked_depth_cameras", "rgb_sparse_depth_cameras")
+CAMERA_TRACKS = ("rgb_cameras", "rgb_masked_depth_cameras",
+                 "rgb_sparse_depth_cameras")
 DEPTH_TRACKS = (
-    "rgb_depth", "rgb_masked_depth", "rgb_masked_depth_cameras", "rgb_sparse_depth", "rgb_sparse_depth_cameras",
+    "rgb_depth",
+    "rgb_masked_depth",
+    "rgb_masked_depth_cameras",
+    "rgb_sparse_depth",
+    "rgb_sparse_depth_cameras",
 )
 MASKED_DEPTH_TRACKS = ("rgb_masked_depth", "rgb_masked_depth_cameras")
 SPARSE_DEPTH_TRACKS = ("rgb_sparse_depth", "rgb_sparse_depth_cameras")
@@ -64,7 +72,9 @@ def _load_track_depth_priors(data_path, image_paths, track):
     """Depth priors for a depth track: masked GT on the masked-depth tracks (spatialarena/depth_prior_masking.py),
     the real sparse depth (LiDAR / COLMAP keypoints) on the sparse-depth tracks (spatialarena/sparse_depth.py)."""
     if track in SPARSE_DEPTH_TRACKS:
-        return load_sparse_depth_priors(data_path, image_paths, model_long_side=SPARSE_MODEL_LONG_SIDE)
+        return load_sparse_depth_priors(data_path,
+                                        image_paths,
+                                        model_long_side=SPARSE_MODEL_LONG_SIDE)
     loader = load_masked_depth_priors if track in MASKED_DEPTH_TRACKS else load_optional_depth_priors
     return loader(data_path, image_paths)
 
@@ -73,11 +83,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data_path", type=Path, required=True)
     parser.add_argument("--output_path", type=Path, required=True)
-    parser.add_argument("--ckpt_path", default=os.environ.get("OMNIVGGT_CKPT_PATH", "Livioni/OmniVGGT"))
+    parser.add_argument("--ckpt_path",
+                        default=os.environ.get("OMNIVGGT_CKPT_PATH",
+                                               "Livioni/OmniVGGT"))
     parser.add_argument(
         "--omnivggt_code_path",
         type=Path,
-        default=Path(os.environ["OMNIVGGT_CODE_DIR"]) if "OMNIVGGT_CODE_DIR" in os.environ else None,
+        default=Path(os.environ["OMNIVGGT_CODE_DIR"])
+        if "OMNIVGGT_CODE_DIR" in os.environ else None,
     )
     parser.add_argument("--track", choices=TRACKS, default="rgb")
     parser.add_argument("--interval", type=int, default=1)
@@ -106,14 +119,23 @@ def resolve_checkpoint(ckpt_path: str) -> str:
     return hf_hub_download(repo_id=ckpt_path, filename="OmniVGGT.safetensors")
 
 
-def preprocess_omnivggt(image_paths: list[str], *, args: argparse.Namespace, device=None, **_unused):
+def preprocess_omnivggt(image_paths: list[str],
+                        *,
+                        args: argparse.Namespace,
+                        device=None,
+                        **_unused):
     """OmniVGGT's preprocess_<method>(), registered below for prepare_model_input("OMNIVGGT", ...).
     Unconditional (no --spatial_policy toggle). Writes padded images/depths/cameras directories
     (bypassing OmniVGGT's own loader) and the matching per-image SpatialTransform list.
     Returns ({"image_dir": ..., "depth_dir": ... or None, "camera_dir": ... or None}, transforms).
     """
-    image_dir, depth_dir, camera_dir, transforms = _materialize_omnivggt_inputs(args, image_paths)
-    return {"image_dir": image_dir, "depth_dir": depth_dir, "camera_dir": camera_dir}, transforms
+    image_dir, depth_dir, camera_dir, transforms = _materialize_omnivggt_inputs(
+        args, image_paths)
+    return {
+        "image_dir": image_dir,
+        "depth_dir": depth_dir,
+        "camera_dir": camera_dir
+    }, transforms
 
 
 register_preprocessor("OMNIVGGT", preprocess_omnivggt)
@@ -149,7 +171,8 @@ def _materialize_omnivggt_inputs(
             resized_height = max(1, int(round(height * scale)))
             offset_x = (target_size - resized_width) // 2
             offset_y = (target_size - resized_height) // 2
-            resized = image.resize((resized_width, resized_height), Image.Resampling.BICUBIC)
+            resized = image.resize((resized_width, resized_height),
+                                   Image.Resampling.BICUBIC)
             canvas = Image.new("RGB", (target_size, target_size), (0, 0, 0))
             canvas.paste(resized, (offset_x, offset_y))
             canvas.save(dst)
@@ -168,8 +191,7 @@ def _materialize_omnivggt_inputs(
                         target_size - resized_height - offset_y,
                     ),
                     policy="omnivggt_resize_pad_square",
-                )
-            )
+                ))
 
     active_depth_dir = None
     if args.track in DEPTH_TRACKS:
@@ -177,9 +199,11 @@ def _materialize_omnivggt_inputs(
         for existing in depth_dir.iterdir():
             if existing.is_file() or existing.is_symlink():
                 existing.unlink()
-        depths, has_depth, _missing = _load_track_depth_priors(args.data_path, image_paths, args.track)
+        depths, has_depth, _missing = _load_track_depth_priors(
+            args.data_path, image_paths, args.track)
         if not has_depth.any():
-            raise FileNotFoundError(f"No matched depth priors found for {args.data_path}")
+            raise FileNotFoundError(
+                f"No matched depth priors found for {args.data_path}")
         for stem, depth in zip(stems, depths, strict=True):
             if depth is None:
                 continue
@@ -204,22 +228,27 @@ def _materialize_omnivggt_inputs(
             colmap_path=args.colmap_path,
             colmap_model_subdir=args.colmap_model_subdir,
         )
-        for stem, pose, intrinsic, transform in zip(stems, c2w, intrinsics, image_transforms):
+        for stem, pose, intrinsic, transform in zip(stems, c2w, intrinsics,
+                                                    image_transforms):
             adjusted_intrinsic = adjust_intrinsics_for_square_materialization(
                 intrinsic,
                 transform,
             )
-            with (camera_dir / f"{stem}.txt").open("w", encoding="utf-8") as handle:
+            with (camera_dir / f"{stem}.txt").open("w",
+                                                   encoding="utf-8") as handle:
                 for row in pose[:3, :4]:
-                    handle.write(" ".join(f"{value:.9g}" for value in row) + "\n")
+                    handle.write(" ".join(f"{value:.9g}" for value in row) +
+                                 "\n")
                 for row in adjusted_intrinsic:
-                    handle.write(" ".join(f"{value:.9g}" for value in row) + "\n")
+                    handle.write(" ".join(f"{value:.9g}" for value in row) +
+                                 "\n")
         active_camera_dir = camera_dir
 
     return image_dir, active_depth_dir, active_camera_dir, spatial_transforms
 
 
-def resize_depth_prior_for_omnivggt(depth: np.ndarray, target_size: int) -> np.ndarray:
+def resize_depth_prior_for_omnivggt(depth: np.ndarray,
+                                    target_size: int) -> np.ndarray:
     """Resize/pad a depth prior to the square materialized OmniVGGT input."""
 
     depth_array = np.asarray(depth, dtype=np.float32)
@@ -248,7 +277,8 @@ def resize_depth_prior_for_omnivggt(depth: np.ndarray, target_size: int) -> np.n
     canvas = np.zeros((target_size, target_size), dtype=np.float32)
     offset_x = (target_size - resized_width) // 2
     offset_y = (target_size - resized_height) // 2
-    canvas[offset_y : offset_y + resized_height, offset_x : offset_x + resized_width] = resized
+    canvas[offset_y:offset_y + resized_height,
+           offset_x:offset_x + resized_width] = resized
     return canvas
 
 
@@ -287,7 +317,8 @@ def run() -> None:
     # Capping total frames first means the loop always produces exactly one
     # chunk; doesn't change per-chunk memory footprint since chunk_size
     # (already <= max_images_per_run) is unchanged.
-    image_paths = select_interval(image_paths, args.interval, args.max_images_per_run)
+    image_paths = select_interval(image_paths, args.interval,
+                                  args.max_images_per_run)
     if not image_paths:
         raise ValueError(f"No images found in {images_dir}")
     if args.dry_run:
@@ -310,11 +341,13 @@ def run() -> None:
     started_at = time.time()
 
     model = OmniVGGT()
-    model.load_state_dict(load_file(resolve_checkpoint(args.ckpt_path)), strict=True)
+    model.load_state_dict(load_file(resolve_checkpoint(args.ckpt_path)),
+                          strict=True)
     model.to(device).eval()
     mark_model_loaded()
 
-    chunk_size = args.max_images_per_run if args.max_images_per_run > 0 else len(image_paths)
+    chunk_size = args.max_images_per_run if args.max_images_per_run > 0 else len(
+        image_paths)
     if single_view_mode():
         chunk_size = 1  # MonoDepth: one image per forward pass, never a multi-view chunk
     depth_chunks = []
@@ -327,16 +360,21 @@ def run() -> None:
     total_camera_prior_frames = 0
     peak_memory = 0.0
     for start in range(0, len(image_paths), chunk_size):
-        chunk_paths = image_paths[start : start + chunk_size]
-        model_input, chunk_transforms = prepare_model_input("OMNIVGGT", chunk_paths, args=args, device=device)
+        chunk_paths = image_paths[start:start + chunk_size]
+        model_input, chunk_transforms = prepare_model_input("OMNIVGGT",
+                                                            chunk_paths,
+                                                            args=args,
+                                                            device=device)
         materialized_image_dir = model_input["image_dir"]
         materialized_depth_dir = model_input["depth_dir"]
         materialized_camera_dir = model_input["camera_dir"]
         all_transforms.extend(chunk_transforms)
         images, extrinsics, intrinsics, depthmaps, masks, depth_indices, camera_indices = load_images_and_cameras(
             str(materialized_image_dir),
-            str(materialized_camera_dir) if materialized_camera_dir is not None else None,
-            str(materialized_depth_dir) if materialized_depth_dir is not None else None,
+            str(materialized_camera_dir)
+            if materialized_camera_dir is not None else None,
+            str(materialized_depth_dir)
+            if materialized_depth_dir is not None else None,
             args.image_load_resolution,
         )
         record_model_input(images.shape[-1], images.shape[-2])
@@ -366,20 +404,27 @@ def run() -> None:
                 confidence = confidence[0]
             confidence_chunks.append(confidence)
         if args.export_colmap:
-            extrinsic_chunks.append(as_numpy(pred_extrinsics)[0].astype(np.float32))
-            intrinsic_chunks.append(as_numpy(pred_intrinsics)[0].astype(np.float32))
+            extrinsic_chunks.append(
+                as_numpy(pred_extrinsics)[0].astype(np.float32))
+            intrinsic_chunks.append(
+                as_numpy(pred_intrinsics)[0].astype(np.float32))
         if not args.depth_only:
             color_chunks.append(colors_from_torch_images(images))
         total_depth_prior_frames += len(depth_indices)
         total_camera_prior_frames += len(camera_indices)
         if torch.cuda.is_available():
-            peak_memory = max(peak_memory, torch.cuda.max_memory_allocated() / (1024.0**2))
-        cleanup_intermediate_paths([args.output_path / "_omnivggt_inputs"], keep=should_keep_intermediate(args))
+            peak_memory = max(peak_memory,
+                              torch.cuda.max_memory_allocated() / (1024.0**2))
+        cleanup_intermediate_paths([args.output_path / "_omnivggt_inputs"],
+                                   keep=should_keep_intermediate(args))
 
     depths = np.concatenate(depth_chunks, axis=0)
-    confidence = np.concatenate(confidence_chunks, axis=0) if confidence_chunks else None
-    extrinsics_w2c = np.concatenate(extrinsic_chunks, axis=0) if extrinsic_chunks else None
-    intrinsics_np = np.concatenate(intrinsic_chunks, axis=0) if intrinsic_chunks else None
+    confidence = np.concatenate(confidence_chunks,
+                                axis=0) if confidence_chunks else None
+    extrinsics_w2c = np.concatenate(extrinsic_chunks,
+                                    axis=0) if extrinsic_chunks else None
+    intrinsics_np = np.concatenate(intrinsic_chunks,
+                                   axis=0) if intrinsic_chunks else None
     colors = np.concatenate(color_chunks, axis=0) if color_chunks else None
     points = None
 
@@ -398,9 +443,11 @@ def run() -> None:
         # restore_prediction/restore_camera_export machinery already proven on
         # vggt.py/fastvggt.py/da3.py/vggt_omega.py/cut3r.py.
         if args.export_depth:
-            export_spatial_depth_predictions(args.output_path, image_paths, depths, confidence, all_transforms)
+            export_spatial_depth_predictions(args.output_path, image_paths,
+                                             depths, confidence, all_transforms)
         if args.export_colmap and extrinsics_w2c is not None and intrinsics_np is not None:
-            restored_intrinsics, width, height = restore_camera_export(intrinsics_np, all_transforms)
+            restored_intrinsics, width, height = restore_camera_export(
+                intrinsics_np, all_transforms)
             export_camera_pose_priors(
                 args.output_path,
                 images_dir,
@@ -440,12 +487,14 @@ def run() -> None:
             depth_only=args.depth_only,
             colmap_model_subdir=args.colmap_model_subdir,
             max_points=args.max_points,
-            conf_thresh=args.depth_conf_thresh if args.depth_conf_thresh is not None else args.conf_thresh,
+            conf_thresh=args.depth_conf_thresh
+            if args.depth_conf_thresh is not None else args.conf_thresh,
             started_at=started_at,
             checkpoint=args.ckpt_path,
             metrics_extra=metrics_extra,
         )
-    cleanup_intermediate_paths([args.output_path / "_omnivggt_inputs"], keep=should_keep_intermediate(args))
+    cleanup_intermediate_paths([args.output_path / "_omnivggt_inputs"],
+                               keep=should_keep_intermediate(args))
     if not should_keep_intermediate(args):
         shutil.rmtree(args.output_path / "_omnivggt_inputs", ignore_errors=True)
 

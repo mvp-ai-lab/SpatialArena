@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Run IGGT and export benchmark prediction artifacts."""
 
 from __future__ import annotations
@@ -39,7 +38,12 @@ from adapter_utils import (
 )
 
 
-def preprocess_iggt(image_paths: list[str], *, args, device=None, load_and_preprocess_images=None, **_unused):
+def preprocess_iggt(image_paths: list[str],
+                    *,
+                    args,
+                    device=None,
+                    load_and_preprocess_images=None,
+                    **_unused):
     """IGGT's preprocess_<method>(), registered below for prepare_model_input("IGGT", ...).
 
     Trusts IGGT's own vendored load_and_preprocess_images(mode="resize") directly (the same
@@ -55,43 +59,44 @@ def preprocess_iggt(image_paths: list[str], *, args, device=None, load_and_prepr
     images = load_and_preprocess_images(
         image_paths,
         mode="resize",
-        resize_target_size=fixed_input_size(image_paths) or (args.image_load_resolution, args.image_load_resolution),
+        resize_target_size=fixed_input_size(image_paths) or
+        (args.image_load_resolution, args.image_load_resolution),
     ).to(device)
     resized_wh = (images.shape[-1], images.shape[-2])
     transforms: list[SpatialTransform] = []
     for image_path in image_paths:
         with Image.open(image_path) as probe:
             source_wh = probe.size
-        transforms.append(SpatialTransform(source_wh=source_wh, resized_wh=resized_wh))
+        transforms.append(
+            SpatialTransform(source_wh=source_wh, resized_wh=resized_wh))
     return images, transforms
 
 
 register_preprocessor("IGGT", preprocess_iggt)
 
-
 METHOD = "IGGT"
 LOGGER = logging.getLogger("benchmark_iggt")
 
-
 # Shared method checkouts (the engine's METHOD_CODE_ROOT); the engine also passes the *_CODE_PATH below.
 # see spatialarena/paths.py
-SPATIALARENA_ROOT = os.path.expanduser(os.environ.get("SPATIALARENA_ROOT", "~/spatialarena"))
+SPATIALARENA_ROOT = os.path.expanduser(
+    os.environ.get("SPATIALARENA_ROOT", "~/spatialarena"))
 METHOD_CODE_ROOT = Path(
-    os.environ.get("METHOD_CODE_ROOT", f"{SPATIALARENA_ROOT}/benchmarks/_model_codes")
-)
+    os.environ.get("METHOD_CODE_ROOT",
+                   f"{SPATIALARENA_ROOT}/benchmarks/_model_codes"))
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data_path", type=Path, required=True)
     parser.add_argument("--output_path", type=Path, required=True)
-    parser.add_argument("--ckpt_path", default=os.environ.get("IGGT_CKPT_PATH", ""))
+    parser.add_argument("--ckpt_path",
+                        default=os.environ.get("IGGT_CKPT_PATH", ""))
     parser.add_argument(
         "--iggt_code_path",
         type=Path,
-        default=Path(os.environ["IGGT_CODE_PATH"])
-        if "IGGT_CODE_PATH" in os.environ
-        else METHOD_CODE_ROOT / "IGGT_official",
+        default=Path(os.environ["IGGT_CODE_PATH"]) if "IGGT_CODE_PATH"
+        in os.environ else METHOD_CODE_ROOT / "IGGT_official",
     )
     parser.add_argument("--track", choices=("rgb",), default="rgb")
     parser.add_argument("--interval", type=int, default=1)
@@ -115,19 +120,24 @@ def extrinsics_3x4_to_4x4(extrinsics: np.ndarray) -> np.ndarray:
     if extrinsics.shape[-2:] == (4, 4):
         return extrinsics.astype(np.float32, copy=False)
     if extrinsics.shape[-2:] != (3, 4):
-        raise ValueError(f"Expected IGGT extrinsics Nx3x4 or Nx4x4, got {extrinsics.shape}")
-    mats = np.repeat(np.eye(4, dtype=np.float32)[None], extrinsics.shape[0], axis=0)
+        raise ValueError(
+            f"Expected IGGT extrinsics Nx3x4 or Nx4x4, got {extrinsics.shape}")
+    mats = np.repeat(np.eye(4, dtype=np.float32)[None],
+                     extrinsics.shape[0],
+                     axis=0)
     mats[:, :3, :] = extrinsics.astype(np.float32, copy=False)
     return mats
 
 
-def resized_colors(image_paths: list[str], height: int, width: int) -> np.ndarray:
+def resized_colors(image_paths: list[str], height: int,
+                   width: int) -> np.ndarray:
     from PIL import Image, ImageOps
 
     colors = []
     for image_path in image_paths:
         with Image.open(image_path) as image:
-            image = ImageOps.exif_transpose(image).convert("RGB").resize((width, height), Image.Resampling.BICUBIC)
+            image = ImageOps.exif_transpose(image).convert("RGB").resize(
+                (width, height), Image.Resampling.BICUBIC)
             colors.append(np.asarray(image, dtype=np.uint8))
     return np.stack(colors, axis=0)
 
@@ -154,13 +164,14 @@ def resolve_checkpoint_path(checkpoint: str) -> Path:
     except ImportError as exc:
         raise RuntimeError(
             f"IGGT checkpoint {checkpoint!r} is not a local file/directory and "
-            "huggingface_hub is unavailable for HF repo resolution."
-        ) from exc
+            "huggingface_hub is unavailable for HF repo resolution.") from exc
 
-    snapshot_dir = Path(snapshot_download(repo_id=checkpoint, repo_type="model"))
+    snapshot_dir = Path(snapshot_download(repo_id=checkpoint,
+                                          repo_type="model"))
     for candidate in candidate_checkpoint_files(snapshot_dir):
         return candidate
-    raise FileNotFoundError(f"No checkpoint file found in downloaded HF snapshot: {snapshot_dir}")
+    raise FileNotFoundError(
+        f"No checkpoint file found in downloaded HF snapshot: {snapshot_dir}")
 
 
 def load_checkpoint_state_dict(checkpoint_path: Path, device: str):
@@ -170,18 +181,25 @@ def load_checkpoint_state_dict(checkpoint_path: Path, device: str):
         try:
             from safetensors.torch import load_file
         except ImportError as exc:
-            raise RuntimeError("safetensors is required to load IGGT safetensors checkpoints") from exc
+            raise RuntimeError(
+                "safetensors is required to load IGGT safetensors checkpoints"
+            ) from exc
         return load_file(str(checkpoint_path), device=device)
-    return torch.load(str(checkpoint_path), map_location=device, weights_only=False)
+    return torch.load(str(checkpoint_path),
+                      map_location=device,
+                      weights_only=False)
 
 
 def load_iggt_state_dict_aligner(code_path: Path):
     module_path = code_path / "utils" / "model.py"
     if not module_path.is_file():
-        raise FileNotFoundError(f"IGGT state-dict helper is missing: {module_path}")
-    spec = importlib.util.spec_from_file_location("benchmark_iggt_utils_model", module_path)
+        raise FileNotFoundError(
+            f"IGGT state-dict helper is missing: {module_path}")
+    spec = importlib.util.spec_from_file_location("benchmark_iggt_utils_model",
+                                                  module_path)
     if spec is None or spec.loader is None:
-        raise ImportError(f"Could not load IGGT state-dict helper from {module_path}")
+        raise ImportError(
+            f"Could not load IGGT state-dict helper from {module_path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module.align_and_update_state_dicts
@@ -190,7 +208,8 @@ def load_iggt_state_dict_aligner(code_path: Path):
 def run() -> None:
     args = parse_args()
     images_dir = canonical_image_root(args.data_path)
-    image_paths = select_interval(find_image_paths(images_dir), args.interval, args.max_images_per_run)
+    image_paths = select_interval(find_image_paths(images_dir), args.interval,
+                                  args.max_images_per_run)
     if not image_paths:
         raise ValueError(f"No images found in {images_dir}")
     if args.dry_run:
@@ -222,8 +241,14 @@ def run() -> None:
         state_dict = state_dict["state_dict"]
     if isinstance(state_dict, dict) and "model" in state_dict:
         state_dict = state_dict["model"]
-    state_dict = {key.replace("module.", "", 1): value for key, value in state_dict.items()}
-    model.load_state_dict(align_and_update_state_dicts(LOGGER, model.state_dict(), state_dict), strict=False)
+    state_dict = {
+        key.replace("module.", "", 1): value
+        for key, value in state_dict.items()
+    }
+    model.load_state_dict(align_and_update_state_dicts(LOGGER,
+                                                       model.state_dict(),
+                                                       state_dict),
+                          strict=False)
     if hasattr(model, "part_adaptor"):
         model.part_adaptor = None
     if hasattr(model, "part_head"):
@@ -232,23 +257,33 @@ def run() -> None:
 
     started_at = mark_model_loaded()
     images, transforms = prepare_model_input(
-        "IGGT", image_paths, args=args, device=device, load_and_preprocess_images=load_and_preprocess_images
-    )
+        "IGGT",
+        image_paths,
+        args=args,
+        device=device,
+        load_and_preprocess_images=load_and_preprocess_images)
     record_model_input(images.shape[-1], images.shape[-2])
-    dtype = torch.bfloat16 if device == "cuda" and torch.cuda.get_device_capability()[0] >= 8 else torch.float16
+    dtype = torch.bfloat16 if device == "cuda" and torch.cuda.get_device_capability(
+    )[0] >= 8 else torch.float16
     single_view = single_view_mode()
     with torch.no_grad():
-        with torch.amp.autocast("cuda", dtype=dtype) if device == "cuda" else torch.no_grad():
+        with torch.amp.autocast(
+                "cuda", dtype=dtype) if device == "cuda" else torch.no_grad():
             if single_view:
                 # MonoDepth: independent single-view samples [B, 1, 3, H, W], folded back to the sequence layout.
-                predictions = fold_single_view_outputs(model(images[:, None]), images.shape[0])
+                predictions = fold_single_view_outputs(model(images[:, None]),
+                                                       images.shape[0])
             else:
                 predictions = model(images)
     pose_enc = predictions["pose_enc"][-1]
-    extrinsics, intrinsics = pose_encoding_to_extri_intri(pose_enc, images.shape[-2:])
-    depths = normalize_depths(predictions["depth"].detach().float().cpu().numpy().squeeze(0))
-    extrinsics_w2c = extrinsics_3x4_to_4x4(extrinsics.detach().float().cpu().numpy())
-    intrinsics_np = intrinsics.detach().float().cpu().numpy().squeeze(0).astype(np.float32)
+    extrinsics, intrinsics = pose_encoding_to_extri_intri(
+        pose_enc, images.shape[-2:])
+    depths = normalize_depths(
+        predictions["depth"].detach().float().cpu().numpy().squeeze(0))
+    extrinsics_w2c = extrinsics_3x4_to_4x4(
+        extrinsics.detach().float().cpu().numpy())
+    intrinsics_np = intrinsics.detach().float().cpu().numpy().squeeze(0).astype(
+        np.float32)
     confidence = predictions.get("depth_conf")
     if confidence is not None:
         confidence = confidence.detach().float().cpu().numpy().squeeze()
@@ -258,9 +293,11 @@ def run() -> None:
         # restore_prediction/restore_camera_export machinery already proven on
         # vggt.py/fastvggt.py/da3.py/vggt_omega.py/cut3r.py/etc.
         if args.export_depth:
-            export_spatial_depth_predictions(args.output_path, image_paths, depths, confidence, transforms)
+            export_spatial_depth_predictions(args.output_path, image_paths,
+                                             depths, confidence, transforms)
         if args.export_colmap:
-            restored_intrinsics, width, height = restore_camera_export(intrinsics_np, transforms)
+            restored_intrinsics, width, height = restore_camera_export(
+                intrinsics_np, transforms)
             export_camera_pose_priors(
                 args.output_path,
                 images_dir,
@@ -278,14 +315,19 @@ def run() -> None:
             started_at=started_at,
             checkpoint=str(checkpoint_path),
             depth_only=True,
-            metrics_extra={"track": args.track, "single_view": single_view},
+            metrics_extra={
+                "track": args.track,
+                "single_view": single_view
+            },
         )
         return
 
     # Dense/points3D export derives pixel-indexed geometry from the model's own resized grid --
     # not restored to source resolution, same restriction every other patched adapter's "shared"
     # policy has for non-depth-only export.
-    points = normalize_points(unproject_depth_map_to_point_map(depths[..., None], extrinsics_w2c, intrinsics_np))
+    points = normalize_points(
+        unproject_depth_map_to_point_map(depths[..., None], extrinsics_w2c,
+                                         intrinsics_np))
     colors = resized_colors(image_paths, depths.shape[1], depths.shape[2])
     export_standard_artifacts(
         method=METHOD,
@@ -303,10 +345,14 @@ def run() -> None:
         depth_only=args.depth_only,
         colmap_model_subdir=args.colmap_model_subdir,
         max_points=args.max_points,
-        conf_thresh=args.depth_conf_thresh if args.depth_conf_thresh is not None else args.conf_thresh,
+        conf_thresh=args.depth_conf_thresh
+        if args.depth_conf_thresh is not None else args.conf_thresh,
         started_at=started_at,
         checkpoint=str(checkpoint_path),
-        metrics_extra={"track": args.track, "single_view": single_view},
+        metrics_extra={
+            "track": args.track,
+            "single_view": single_view
+        },
     )
 
 

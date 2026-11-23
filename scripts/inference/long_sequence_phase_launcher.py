@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Run VGGT-Long or Pi-Long in two phases: GPU chunk inference, then CPU chunk alignment, in separate processes.
 
 Both systems first run every model forward pass (loop detection, one pass per overlapping chunk and per loop chunk,
@@ -41,9 +40,15 @@ from pathlib import Path
 import fixed_input_launcher  # pylint: disable=import-error  # sibling file; this directory is on sys.path here
 
 # Per-chunk arrays the alignment reads (process_long_sequence up to accumulate_sim3_transforms), per system class.
-ALIGN_KEYS = {"Pi_Long": ("points", "conf"), "VGGT_Long": ("world_points", "world_points_conf", "mask")}
+ALIGN_KEYS = {
+    "Pi_Long": ("points", "conf"),
+    "VGGT_Long": ("world_points", "world_points_conf", "mask")
+}
 # And the ones the per-frame depth export reads (slam_depth_export.export_long_chunks).
-DEPTH_KEYS = {"Pi_Long": ("local_points", "camera_poses"), "VGGT_Long": ("depth", "depth_conf", "extrinsic")}
+DEPTH_KEYS = {
+    "Pi_Long": ("local_points", "camera_poses"),
+    "VGGT_Long": ("depth", "depth_conf", "extrinsic")
+}
 
 
 class GpuPhaseDone(Exception):
@@ -97,14 +102,23 @@ class _CpuTorch:
 
 def parse_args() -> argparse.Namespace:
     """Launcher options, then the system script's own arguments (parsed the way its ``__main__`` does)."""
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--phase", choices=("gpu", "align"), required=True)
     parser.add_argument("--state", type=Path, required=True)
-    parser.add_argument("--patch", action="append", default=[],
-                        help="Module whose load_and_preprocess_images keeps fixed-resolution frames (repeatable).")
+    parser.add_argument(
+        "--patch",
+        action="append",
+        default=[],
+        help=
+        "Module whose load_and_preprocess_images keeps fixed-resolution frames (repeatable)."
+    )
     parser.add_argument("--record", type=Path, default=None)
-    parser.add_argument("--export_depth", action="store_true",
-                        help="GPU phase: also keep the chunk arrays the depth export reads.")
+    parser.add_argument(
+        "--export_depth",
+        action="store_true",
+        help="GPU phase: also keep the chunk arrays the depth export reads.")
     parser.add_argument("script", type=Path)
     parser.add_argument("script_args", nargs=argparse.REMAINDER)
     args = parser.parse_args()
@@ -113,18 +127,23 @@ def parse_args() -> argparse.Namespace:
     script_parser.add_argument("--image_dir", required=True)
     script_parser.add_argument("--config", default="./configs/base_config.yaml")
     script_parser.add_argument("--exp_folder_name", default="./exps")
-    args.script_args = script_parser.parse_args([arg for arg in args.script_args if arg != "--"])
+    args.script_args = script_parser.parse_args(
+        [arg for arg in args.script_args if arg != "--"])
     return args
 
 
 def import_system(script: Path, patches: list[str], record: Path | None):
     """Import the script as a module (its ``__main__`` block does not run) with the fixed-input loaders in place."""
     here = Path(__file__).resolve().parent
-    sys.path[:] = [entry for entry in sys.path if Path(entry or ".").resolve() != here]
+    sys.path[:] = [
+        entry for entry in sys.path if Path(entry or ".").resolve() != here
+    ]
     sys.path.insert(0, str(script.resolve().parent))
 
     def loader(image_path_list, mode="crop"):
-        return fixed_input_launcher.load_fixed_images(image_path_list, mode, record=record)
+        return fixed_input_launcher.load_fixed_images(image_path_list,
+                                                      mode,
+                                                      record=record)
 
     for module_name in patches:
         importlib.import_module(module_name).load_and_preprocess_images = loader
@@ -144,7 +163,8 @@ def slim_saves(keys: tuple[str, ...]):
         if isinstance(array, dict):
             missing = [key for key in keys if key not in array]
             if missing:
-                raise KeyError(f"chunk predictions lack {missing} (have {sorted(array)})")
+                raise KeyError(
+                    f"chunk predictions lack {missing} (have {sorted(array)})")
             array = {key: array[key] for key in keys}
         return original(path, array, *args, **kwargs)
 
@@ -159,7 +179,8 @@ def run_gpu_phase(module, system_class, args: argparse.Namespace) -> None:
     """The script's ``__main__`` up to the first alignment; then the state for the CPU phase."""
     script_args = args.script_args
     config = module.load_config(script_args.config)
-    save_dir = os.path.join(script_args.exp_folder_name, script_args.image_dir.replace("/", "_"),
+    save_dir = os.path.join(script_args.exp_folder_name,
+                            script_args.image_dir.replace("/", "_"),
                             datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -169,7 +190,8 @@ def run_gpu_phase(module, system_class, args: argparse.Namespace) -> None:
     system = system_class(script_args.image_dir, save_dir, config)
 
     process_single_chunk = system.process_single_chunk
-    keys = ALIGN_KEYS[system_class.__name__] + (DEPTH_KEYS[system_class.__name__] if args.export_depth else ())
+    keys = ALIGN_KEYS[system_class.__name__] + (
+        DEPTH_KEYS[system_class.__name__] if args.export_depth else ())
 
     def slim_chunk(*chunk_args, **chunk_kwargs):
         with slim_saves(keys):
@@ -184,11 +206,24 @@ def run_gpu_phase(module, system_class, args: argparse.Namespace) -> None:
     try:
         system.run()
     except GpuPhaseDone:
-        state = {"save_dir": save_dir, "image_dir": script_args.image_dir, "img_list": system.img_list,
-                 "loop_list": system.loop_list, "all_camera_poses": system.all_camera_poses,
-                 "all_camera_intrinsics": getattr(system, "all_camera_intrinsics", None)}
+        state = {
+            "save_dir":
+                save_dir,
+            "image_dir":
+                script_args.image_dir,
+            "img_list":
+                system.img_list,
+            "loop_list":
+                system.loop_list,
+            "all_camera_poses":
+                system.all_camera_poses,
+            "all_camera_intrinsics":
+                getattr(system, "all_camera_intrinsics", None)
+        }
         args.state.write_bytes(pickle.dumps(state))
-        print(f"GPU phase done: {len(system.all_camera_poses)} chunks saved; alignment state in {args.state}")
+        print(
+            f"GPU phase done: {len(system.all_camera_poses)} chunks saved; alignment state in {args.state}"
+        )
         return
     # No alignment was needed: the run is complete, finish it as the script's __main__ does.
     system.close()
@@ -202,11 +237,13 @@ def run_align_phase(module, system_class, args: argparse.Namespace) -> None:
 
     state = pickle.loads(args.state.read_bytes())
     config = module.load_config(args.script_args.config)
-    for name in ("Pi3", "Pi3X", "VGGTAdapter", "Pi3Adapter", "MapAnythingAdapter", "LoopDetector", "RetrievalDBOW"):
+    for name in ("Pi3", "Pi3X", "VGGTAdapter", "Pi3Adapter",
+                 "MapAnythingAdapter", "LoopDetector", "RetrievalDBOW"):
         if hasattr(module, name):
             setattr(module, name, _NoModel)
     safetensors.torch.load_file = lambda *args, **kwargs: {}
-    torch.cuda.get_device_capability = lambda *args, **kwargs: (8, 0)  # only picks the (unused) inference dtype
+    torch.cuda.get_device_capability = lambda *args, **kwargs: (
+        8, 0)  # only picks the (unused) inference dtype
     # Pi-Long's align_lib 'torch' (loop_utils/alignment_torch.py) moves every array to CUDA with .cuda() and
     # torch.tensor(..., device='cuda'); keep both on the CPU (same float32 code).
     torch.Tensor.cuda = lambda tensor, *args, **kwargs: tensor
@@ -226,7 +263,8 @@ def run_align_phase(module, system_class, args: argparse.Namespace) -> None:
         if not (is_loop or range_2 is not None):
             return None  # sequential chunks: already on disk in result_unaligned_dir
         name = f"loop_{range_1[0]}_{range_1[1]}_{range_2[0]}_{range_2[1]}.npy"
-        return module.np.load(os.path.join(system.result_loop_dir, name), allow_pickle=True).item()
+        return module.np.load(os.path.join(system.result_loop_dir, name),
+                              allow_pickle=True).item()
 
     accumulate = module.accumulate_sim3_transforms
 
@@ -240,7 +278,9 @@ def run_align_phase(module, system_class, args: argparse.Namespace) -> None:
     except AlignmentDone as done:
         system.sim3_list = done.transforms
     else:
-        raise RuntimeError("process_long_sequence finished without accumulating the chunk transforms")
+        raise RuntimeError(
+            "process_long_sequence finished without accumulating the chunk transforms"
+        )
     system.save_camera_poses()
     print("Alignment phase done")
 
@@ -248,7 +288,8 @@ def run_align_phase(module, system_class, args: argparse.Namespace) -> None:
 def main() -> None:
     """Import the system and run the requested phase."""
     args = parse_args()
-    module, system_class = import_system(args.script, args.patch, args.record if args.phase == "gpu" else None)
+    module, system_class = import_system(
+        args.script, args.patch, args.record if args.phase == "gpu" else None)
     if args.phase == "gpu":
         run_gpu_phase(module, system_class, args)
     else:

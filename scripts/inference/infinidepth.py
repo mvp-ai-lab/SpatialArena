@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Official InfiniDepth (zju3dv/InfiniDepth) RGB-only depth.
 
 Uses the official ``inference_depth.run_depth_inference`` with the RGB model (``InfiniDepth``, not the depth-sensor
@@ -28,26 +27,40 @@ def run() -> None:
     depth_ckpt = resolve_checkpoint_file(args.ckpt_path, "infinidepth.ckpt")
     moge2_ckpt = resolve_checkpoint_file(args.ckpt_path, "moge2.pt")
     add_code_path(args.code_path, ("InfiniDepth",))
-    os.chdir(args.code_path)  # the official code resolves some of its own files relative to the repository root
+    os.chdir(
+        args.code_path
+    )  # the official code resolves some of its own files relative to the repository root
     import torch
     from inference_depth import DepthInferenceArgs, load_depth_model, run_depth_inference
 
     torch.manual_seed(args.seed)
-    options = DepthInferenceArgs(input_image_path=image_paths[0], model_type="InfiniDepth",
-                                 depth_model_path=depth_ckpt, moge2_pretrained=moge2_ckpt,
-                                 output_resolution_mode="original", save_pcd=False, enable_skyseg_model=False)
+    options = DepthInferenceArgs(input_image_path=image_paths[0],
+                                 model_type="InfiniDepth",
+                                 depth_model_path=depth_ckpt,
+                                 moge2_pretrained=moge2_ckpt,
+                                 output_resolution_mode="original",
+                                 save_pcd=False,
+                                 enable_skyseg_model=False)
     model, device = load_depth_model(options)
 
     paths = iter(image_paths)
 
     def predict(_rgb):
-        result = run_depth_inference(options, model=model, device=device, input_image_path=next(paths))
+        result = run_depth_inference(options,
+                                     model=model,
+                                     device=device,
+                                     input_image_path=next(paths))
         return result.pred_depthmap.float().cpu().numpy(), None
 
-    run_single_image_depth(args, image_paths, predict, metrics_extra={
-        "model_type": "InfiniDepth", "input_size": list(options.input_size), "output_resolution_mode": "original",
-        "metric_scale": "MoGe-2 (bundled moge2.pt)",
-    })
+    run_single_image_depth(args,
+                           image_paths,
+                           predict,
+                           metrics_extra={
+                               "model_type": "InfiniDepth",
+                               "input_size": list(options.input_size),
+                               "output_resolution_mode": "original",
+                               "metric_scale": "MoGe-2 (bundled moge2.pt)",
+                           })
 
 
 if __name__ == "__main__":

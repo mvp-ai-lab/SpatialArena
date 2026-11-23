@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Per-frame depth and confidence export for the SLAM wrappers (streaming_slam.py, long_sequence_slam.py).
 
 With ``--export_depth`` (the engine's ``EXPORT_POSE_DEPTH=1`` for SfM / SLAM), each wrapper writes every returned
@@ -66,8 +65,10 @@ class DepthSink:
             depth = np.squeeze(np.asarray(depths[position], dtype=np.float32))
             save_prediction_map(depth_dir, stem, depth)
             if confidences is not None:
-                save_confidence_map(self.output_path, self.image_paths[index],
-                                    np.squeeze(np.asarray(confidences[position], dtype=np.float32)))
+                save_confidence_map(
+                    self.output_path, self.image_paths[index],
+                    np.squeeze(
+                        np.asarray(confidences[position], dtype=np.float32)))
                 self.with_confidence = True
             self.written.add(index)
 
@@ -78,14 +79,18 @@ class DepthSink:
             stop = min(start + WRITE_BATCH, count)
             started = time.perf_counter()
             depths = depth[start:stop].float().cpu().numpy()
-            confs = confidence[start:stop].float().cpu().numpy() if confidence is not None else None
+            confs = confidence[start:stop].float().cpu().numpy(
+            ) if confidence is not None else None
             self.export_seconds += time.perf_counter() - started
             self.write(range(offset + start, offset + stop), depths, confs)
 
     def metrics(self) -> dict:
         """What was exported, for the adapter's metrics.json."""
-        return {"depth_frames": len(self.written), "depth_confidence": self.with_confidence,
-                "depth_export_seconds": self.export_seconds}
+        return {
+            "depth_frames": len(self.written),
+            "depth_confidence": self.with_confidence,
+            "depth_export_seconds": self.export_seconds
+        }
 
 
 def chunk_scale(chunk_c2w: np.ndarray, final_c2w: np.ndarray) -> float:
@@ -106,16 +111,19 @@ def chunk_scale(chunk_c2w: np.ndarray, final_c2w: np.ndarray) -> float:
     return float(np.median(final_steps[usable] / chunk_steps[usable]))
 
 
-def chunk_ranges(frame_count: int, chunk_size: int, overlap: int) -> list[tuple[int, int]]:
+def chunk_ranges(frame_count: int, chunk_size: int,
+                 overlap: int) -> list[tuple[int, int]]:
     """VGGT-Long / Pi-Long ``process_long_sequence`` chunking: ``chunk_size`` frames, ``overlap`` shared."""
     if frame_count <= chunk_size:
         return [(0, frame_count)]
     step = chunk_size - overlap
     count = (frame_count - overlap + step - 1) // step
-    return [(index * step, min(index * step + chunk_size, frame_count)) for index in range(count)]
+    return [(index * step, min(index * step + chunk_size, frame_count))
+            for index in range(count)]
 
 
-def export_long_chunks(sink: DepthSink, chunk_dir: Path, ranges: list[tuple[int, int]],
+def export_long_chunks(sink: DepthSink, chunk_dir: Path,
+                       ranges: list[tuple[int, int]],
                        final_poses: dict[int, np.ndarray], method: str) -> None:
     """Depth of VGGT-Long / Pi-Long chunks (``_tmp_results_unaligned/chunk_<k>.npy``) in the final trajectory's scale.
 
@@ -125,7 +133,8 @@ def export_long_chunks(sink: DepthSink, chunk_dir: Path, ranges: list[tuple[int,
     for chunk_index, (start, stop) in enumerate(ranges):
         path = chunk_dir / f"chunk_{chunk_index}.npy"
         if not path.is_file():
-            raise FileNotFoundError(f"{method}: missing chunk prediction {path}")
+            raise FileNotFoundError(
+                f"{method}: missing chunk prediction {path}")
         data = np.load(path, allow_pickle=True).item()
         if method == "PI_LONG":
             depth = np.asarray(data["local_points"])[..., 2]
@@ -133,26 +142,35 @@ def export_long_chunks(sink: DepthSink, chunk_dir: Path, ranges: list[tuple[int,
             chunk_c2w = np.asarray(data["camera_poses"])
         else:
             depth = np.asarray(data["depth"])
-            confidence = np.asarray(data.get("depth_conf")) if data.get("depth_conf") is not None else None
+            confidence = np.asarray(data.get("depth_conf")) if data.get(
+                "depth_conf") is not None else None
             chunk_c2w = np.asarray(data["extrinsic"])
         if chunk_c2w.shape[-2:] == (3, 4):
-            bottom = np.broadcast_to(np.array([0.0, 0.0, 0.0, 1.0]), (*chunk_c2w.shape[:-2], 1, 4))
+            bottom = np.broadcast_to(np.array([0.0, 0.0, 0.0, 1.0]),
+                                     (*chunk_c2w.shape[:-2], 1, 4))
             chunk_c2w = np.concatenate([chunk_c2w, bottom], axis=-2)
         indices = list(range(start, stop))
         final = np.stack([final_poses[index] for index in indices])
-        scale = chunk_scale(chunk_c2w[: len(indices)], final)
-        kept_confidence = confidence[: len(indices)] if confidence is not None else None
-        sink.write(indices, depth[: len(indices)] * scale, kept_confidence)
+        scale = chunk_scale(chunk_c2w[:len(indices)], final)
+        kept_confidence = confidence[:len(indices
+                                         )] if confidence is not None else None
+        sink.write(indices, depth[:len(indices)] * scale, kept_confidence)
         del data, depth, confidence
 
 
-def export_numbered_maps(sink: DepthSink, depth_dir: Path, frame_ids: list[int], conf_dir: Path | None = None) -> None:
+def export_numbered_maps(sink: DepthSink,
+                         depth_dir: Path,
+                         frame_ids: list[int],
+                         conf_dir: Path | None = None) -> None:
     """R3-style output: ``<depth_dir>/<k:06d>.npy`` (and ``<conf_dir>/<k:06d>.npy``) for the k-th returned frame."""
     for position, frame_id in enumerate(frame_ids):
         depth = np.load(depth_dir / f"{position:06d}.npy")
         conf_path = conf_dir / f"{position:06d}.npy" if conf_dir is not None else None
-        confidence = np.load(conf_path) if conf_path is not None and conf_path.is_file() else None
-        sink.write([frame_id], [depth], [confidence] if confidence is not None else None)
+        confidence = np.load(
+            conf_path
+        ) if conf_path is not None and conf_path.is_file() else None
+        sink.write([frame_id], [depth],
+                   [confidence] if confidence is not None else None)
 
 
 def read_exr_depth(path: Path) -> np.ndarray:

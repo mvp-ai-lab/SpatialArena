@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Run Co-Me through its Hydra inference entry point and export artifacts."""
 
 from __future__ import annotations
@@ -42,7 +41,6 @@ from adapter_utils import (
 )
 from PIL import Image, ImageOps
 
-
 METHOD = "COME"
 
 
@@ -54,24 +52,28 @@ def parse_args() -> argparse.Namespace:
         "--ckpt_path",
         type=str,
         default=os.environ.get("COME_CKPT_PATH", ""),
-        help="Reserved for local Co-Me/backbone checkpoints; most Co-Me configs carry their own ckpt paths.",
+        help=
+        "Reserved for local Co-Me/backbone checkpoints; most Co-Me configs carry their own ckpt paths.",
     )
     parser.add_argument(
         "--come_code_path",
         type=Path,
-        default=Path(os.environ["COME_CODE_DIR"]) if "COME_CODE_DIR" in os.environ else None,
+        default=Path(os.environ["COME_CODE_DIR"])
+        if "COME_CODE_DIR" in os.environ else None,
     )
     parser.add_argument(
         "--come_model",
         type=str,
         default=os.environ.get("COME_MODEL", "co_me_fused_vggt_3x3"),
-        help="Hydra model config name, e.g. co_me_fused_vggt_3x3 or co_me_fused_pi3x_3x3.",
+        help=
+        "Hydra model config name, e.g. co_me_fused_vggt_3x3 or co_me_fused_pi3x_3x3.",
     )
     parser.add_argument(
         "--come_extra_override",
         action="append",
         default=[],
-        help="Additional Hydra override passed through to Co-Me. Can be repeated.",
+        help=
+        "Additional Hydra override passed through to Co-Me. Can be repeated.",
     )
     parser.add_argument("--interval", type=int, default=1)
     parser.add_argument("--resolution", type=int, default=504)
@@ -82,8 +84,7 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help=(
             "Co-Me model resolution. Defaults to the nearest larger size whose "
-            "VGGT patch grid is compatible with the configured 3x3 merger."
-        ),
+            "VGGT patch grid is compatible with the configured 3x3 merger."),
     )
     parser.add_argument("--patch_size", type=int, default=14)
     parser.add_argument("--token_merge_group", type=int, default=3)
@@ -100,7 +101,8 @@ def parse_args() -> argparse.Namespace:
         "--spatial_policy",
         choices=("legacy", "shared"),
         default="legacy",
-        help="'legacy' (default): depth stays on the padded square canvas Co-Me actually sees. "
+        help=
+        "'legacy' (default): depth stays on the padded square canvas Co-Me actually sees. "
         "'shared': restore depth/confidence/intrinsics to each image's true source resolution "
         "via restore_prediction/restore_camera_export (depth_only export only).",
     )
@@ -115,9 +117,12 @@ def load_come_archive(path: Path) -> dict[str, np.ndarray]:
         return {key: archive[key] for key in archive.files}
 
 
-def run_come(args: argparse.Namespace, image_paths: list[str], run_name: str = "") -> Path:
+def run_come(args: argparse.Namespace,
+             image_paths: list[str],
+             run_name: str = "") -> Path:
     if args.come_code_path is None:
-        raise ValueError("--come_code_path or COME_CODE_DIR is required for real Co-Me runs")
+        raise ValueError(
+            "--come_code_path or COME_CODE_DIR is required for real Co-Me runs")
     code_path = args.come_code_path.expanduser().resolve()
     if not code_path.is_dir():
         raise FileNotFoundError(f"Co-Me code path not found: {code_path}")
@@ -134,22 +139,19 @@ def run_come(args: argparse.Namespace, image_paths: list[str], run_name: str = "
             "Co-Me's own src.infer hardcodes .resize(504, 504) regardless of --image_load_resolution; "
             "changing --image_load_resolution away from 504 would make that resize crop real image "
             "content instead of a no-op. Leave it at the default (504) until that upstream hardcoding "
-            "is fixed."
-        )
+            "is fixed.")
     args.output_path.mkdir(parents=True, exist_ok=True)
     suffix = f"_{run_name}" if run_name else ""
     temp_images = args.output_path / f"_come_input_images{suffix}"
     raw_dir = args.output_path / f"_come_raw{suffix}"
-    materialize_resized_images(image_paths, temp_images, args.image_load_resolution)
-    internal_resolution = (
-        args.internal_resolution
-        if args.internal_resolution > 0
-        else patch_grid_compatible_resolution(
-            args.resolution,
-            patch_size=args.patch_size,
-            grid_multiple=args.token_merge_group,
-        )
-    )
+    materialize_resized_images(image_paths, temp_images,
+                               args.image_load_resolution)
+    internal_resolution = (args.internal_resolution if args.internal_resolution
+                           > 0 else patch_grid_compatible_resolution(
+                               args.resolution,
+                               patch_size=args.patch_size,
+                               grid_multiple=args.token_merge_group,
+                           ))
 
     command = [
         sys.executable,
@@ -197,14 +199,19 @@ def preprocess_come(
     for image_path in image_paths:
         with Image.open(image_path) as probe:
             source_wh = ImageOps.exif_transpose(probe).size
-        transforms.append(plan_spatial_transform(source_wh, method="vggt", size=internal_resolution, mode="pad"))
+        transforms.append(
+            plan_spatial_transform(source_wh,
+                                   method="vggt",
+                                   size=internal_resolution,
+                                   mode="pad"))
     return image_paths, transforms
 
 
 register_preprocessor("COME", preprocess_come)
 
 
-def come_intermediate_paths(args: argparse.Namespace, raw_path: Path) -> list[Path]:
+def come_intermediate_paths(args: argparse.Namespace,
+                            raw_path: Path) -> list[Path]:
     raw_dir = raw_path.parent
     input_name = raw_dir.name.replace("_come_raw", "_come_input_images", 1)
     return [args.output_path / input_name, raw_dir]
@@ -251,7 +258,8 @@ def run() -> None:
     images_dir = canonical_image_root(args.data_path)
     if not images_dir.is_dir():
         raise FileNotFoundError(f"images directory not found: {images_dir}")
-    image_paths = select_interval(find_image_paths(images_dir), args.interval, args.max_images_per_run)
+    image_paths = select_interval(find_image_paths(images_dir), args.interval,
+                                  args.max_images_per_run)
     if not image_paths:
         raise ValueError(f"No images found in {images_dir}")
 
@@ -262,36 +270,47 @@ def run() -> None:
     started_at = time.time()
     keep_intermediate = should_keep_intermediate(args)
     is_shared_spatial_policy = args.spatial_policy == "shared"
-    validate_shared_spatial_policy_depth_only(is_shared=is_shared_spatial_policy, depth_only=args.depth_only)
+    validate_shared_spatial_policy_depth_only(
+        is_shared=is_shared_spatial_policy, depth_only=args.depth_only)
     if args.depth_only:
         if not args.export_depth:
             raise ValueError("--depth_only requires --export_depth")
-        images_per_run = args.max_images_per_run if args.max_images_per_run > 0 else len(image_paths)
-        internal_resolution = (
-            args.internal_resolution
-            if args.internal_resolution > 0
-            else patch_grid_compatible_resolution(
-                args.resolution, patch_size=args.patch_size, grid_multiple=args.token_merge_group
-            )
-        )
+        images_per_run = args.max_images_per_run if args.max_images_per_run > 0 else len(
+            image_paths)
+        internal_resolution = (args.internal_resolution
+                               if args.internal_resolution > 0 else
+                               patch_grid_compatible_resolution(
+                                   args.resolution,
+                                   patch_size=args.patch_size,
+                                   grid_multiple=args.token_merge_group))
         pose_extrinsics: list[np.ndarray] = []
         pose_intrinsics: list[np.ndarray] = []
         pose_output_size: tuple[int, int] | None = None
-        for batch_index, batch_image_paths in enumerate(batched_image_paths(image_paths, images_per_run)):
-            raw_path = run_come(args, batch_image_paths, run_name=f"batch_{batch_index:04d}")
+        for batch_index, batch_image_paths in enumerate(
+                batched_image_paths(image_paths, images_per_run)):
+            raw_path = run_come(args,
+                                batch_image_paths,
+                                run_name=f"batch_{batch_index:04d}")
             raw = load_come_archive(raw_path)
-            depths, _points, _colors, confidence, extrinsics_w2c, intrinsics = parse_scene_arrays(raw)
+            depths, _points, _colors, confidence, extrinsics_w2c, intrinsics = parse_scene_arrays(
+                raw)
             if depths is None:
-                raise ValueError("Co-Me raw output did not include depth predictions")
+                raise ValueError(
+                    "Co-Me raw output did not include depth predictions")
             if is_shared_spatial_policy:
                 _paths, transforms = prepare_model_input(
-                    "COME", batch_image_paths, args=args, device=None, internal_resolution=internal_resolution
-                )
-                export_spatial_depth_predictions(
-                    args.output_path, batch_image_paths, normalize_depths(depths), confidence, transforms
-                )
+                    "COME",
+                    batch_image_paths,
+                    args=args,
+                    device=None,
+                    internal_resolution=internal_resolution)
+                export_spatial_depth_predictions(args.output_path,
+                                                 batch_image_paths,
+                                                 normalize_depths(depths),
+                                                 confidence, transforms)
                 if args.export_colmap and extrinsics_w2c is not None and intrinsics is not None:
-                    restored_intrinsics, width, height = restore_camera_export(np.asarray(intrinsics), transforms)
+                    restored_intrinsics, width, height = restore_camera_export(
+                        np.asarray(intrinsics), transforms)
                     pose_extrinsics.append(np.asarray(extrinsics_w2c))
                     pose_intrinsics.append(restored_intrinsics)
                     if pose_output_size is None:
@@ -301,13 +320,15 @@ def run() -> None:
                     keep=keep_intermediate,
                 )
                 continue
-            export_depth_predictions(args.output_path, batch_image_paths, depths, confidence)
+            export_depth_predictions(args.output_path, batch_image_paths,
+                                     depths, confidence)
             if args.export_colmap and extrinsics_w2c is not None and intrinsics is not None:
                 pose_extrinsics.append(np.asarray(extrinsics_w2c))
                 pose_intrinsics.append(np.asarray(intrinsics))
                 if pose_output_size is None:
                     depth_array = np.asarray(depths)
-                    pose_output_size = (depth_array.shape[2], depth_array.shape[1])
+                    pose_output_size = (depth_array.shape[2],
+                                        depth_array.shape[1])
             cleanup_intermediate_paths(
                 come_intermediate_paths(args, raw_path),
                 keep=keep_intermediate,
@@ -332,30 +353,37 @@ def run() -> None:
             checkpoint=args.ckpt_path or None,
             depth_only=True,
             metrics_extra={
-                "come_model": args.come_model,
-                "max_images_per_run": images_per_run,
-                "resolution": args.resolution,
-                "image_load_resolution": args.image_load_resolution,
-                "internal_resolution": (
-                    args.internal_resolution
-                    if args.internal_resolution > 0
-                    else patch_grid_compatible_resolution(
-                        args.resolution,
-                        patch_size=args.patch_size,
-                        grid_multiple=args.token_merge_group,
-                    )
-                ),
-                "patch_size": args.patch_size,
-                "token_merge_group": args.token_merge_group,
-                "resized_input": True,
-                **spatial_policy_metrics(args.spatial_policy, is_shared=is_shared_spatial_policy),
+                "come_model":
+                    args.come_model,
+                "max_images_per_run":
+                    images_per_run,
+                "resolution":
+                    args.resolution,
+                "image_load_resolution":
+                    args.image_load_resolution,
+                "internal_resolution":
+                    (args.internal_resolution if args.internal_resolution > 0
+                     else patch_grid_compatible_resolution(
+                         args.resolution,
+                         patch_size=args.patch_size,
+                         grid_multiple=args.token_merge_group,
+                     )),
+                "patch_size":
+                    args.patch_size,
+                "token_merge_group":
+                    args.token_merge_group,
+                "resized_input":
+                    True,
+                **spatial_policy_metrics(args.spatial_policy,
+                                         is_shared=is_shared_spatial_policy),
             },
         )
         return
 
     raw_path = run_come(args, image_paths)
     raw = load_come_archive(raw_path)
-    depths, points, colors, confidence, extrinsics_w2c, intrinsics = parse_scene_arrays(raw)
+    depths, points, colors, confidence, extrinsics_w2c, intrinsics = parse_scene_arrays(
+        raw)
     conf_thresh = args.depth_conf_thresh if args.depth_conf_thresh is not None else args.conf_thresh
 
     export_standard_artifacts(
@@ -383,15 +411,13 @@ def run() -> None:
             "max_images_per_run": args.max_images_per_run,
             "resolution": args.resolution,
             "image_load_resolution": args.image_load_resolution,
-            "internal_resolution": (
-                args.internal_resolution
-                if args.internal_resolution > 0
-                else patch_grid_compatible_resolution(
-                    args.resolution,
-                    patch_size=args.patch_size,
-                    grid_multiple=args.token_merge_group,
-                )
-            ),
+            "internal_resolution":
+                (args.internal_resolution if args.internal_resolution > 0 else
+                 patch_grid_compatible_resolution(
+                     args.resolution,
+                     patch_size=args.patch_size,
+                     grid_multiple=args.token_merge_group,
+                 )),
             "patch_size": args.patch_size,
             "token_merge_group": args.token_merge_group,
             "resized_input": True,

@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Shared loop for the official single-image MonoDepth baselines (MoGe, Marigold, Lotus, Depth Pro, UniDepth V2,
 InfiniDepth).
 
@@ -35,22 +34,31 @@ from adapter_utils import (
 
 # Shared method checkouts (the engine's METHOD_CODE_ROOT); the engine also passes --code_path.
 # see spatialarena/paths.py
-SPATIALARENA_ROOT = os.path.expanduser(os.environ.get("SPATIALARENA_ROOT", "~/spatialarena"))
+SPATIALARENA_ROOT = os.path.expanduser(
+    os.environ.get("SPATIALARENA_ROOT", "~/spatialarena"))
 METHOD_CODE_ROOT = Path(
-    os.environ.get("METHOD_CODE_ROOT", f"{SPATIALARENA_ROOT}/benchmarks/_model_codes")
-)
+    os.environ.get("METHOD_CODE_ROOT",
+                   f"{SPATIALARENA_ROOT}/benchmarks/_model_codes"))
 
 Predictor = Callable[[np.ndarray], "tuple[np.ndarray, np.ndarray | None]"]
 
 
-def parse_args(description: str, methods: dict[str, str], code_dirname: str) -> argparse.Namespace:
+def parse_args(description: str, methods: dict[str, str],
+               code_dirname: str) -> argparse.Namespace:
     """The adapter CLI: ``methods`` maps each method name this adapter serves to its default checkpoint."""
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument("--method", choices=sorted(methods), default=next(iter(methods)))
+    parser.add_argument("--method",
+                        choices=sorted(methods),
+                        default=next(iter(methods)))
     parser.add_argument("--data_path", type=Path, required=True)
     parser.add_argument("--output_path", type=Path, required=True)
-    parser.add_argument("--ckpt_path", default="", help="HF repo id, directory or file; default: the method's own")
-    parser.add_argument("--code_path", type=Path, default=METHOD_CODE_ROOT / code_dirname)
+    parser.add_argument(
+        "--ckpt_path",
+        default="",
+        help="HF repo id, directory or file; default: the method's own")
+    parser.add_argument("--code_path",
+                        type=Path,
+                        default=METHOD_CODE_ROOT / code_dirname)
     parser.add_argument("--track", choices=("rgb",), default="rgb")
     parser.add_argument("--interval", type=int, default=1)
     parser.add_argument("--max_images_per_run", type=int, default=0)
@@ -68,9 +76,14 @@ def parse_args(description: str, methods: dict[str, str], code_dirname: str) -> 
 def select_images(args: argparse.Namespace) -> list[str] | None:
     """The frames this call predicts (absolute paths); None after a --dry_run report."""
     if args.export_colmap or not args.export_depth:
-        raise ValueError(f"{args.method} predicts dense depth only: pass --export_depth, not --export_colmap")
+        raise ValueError(
+            f"{args.method} predicts dense depth only: pass --export_depth, not --export_colmap"
+        )
     images_dir = canonical_image_root(args.data_path)
-    image_paths = [str(Path(path).resolve()) for path in select_interval(find_image_paths(images_dir), args.interval)]
+    image_paths = [
+        str(Path(path).resolve())
+        for path in select_interval(find_image_paths(images_dir), args.interval)
+    ]
     if not image_paths:
         raise ValueError(f"No images found in {images_dir}")
     if args.dry_run:
@@ -114,15 +127,21 @@ def run_single_image_depth(
         depth, raw = predict(rgb)
         depth = np.asarray(depth, dtype=np.float32).squeeze()
         for name, array in (("depth", depth), ("raw disparity", raw)):
-            if array is not None and np.asarray(array).squeeze().shape != rgb.shape[:2]:
-                raise ValueError(f"{args.method} {name} for {path} has shape {np.asarray(array).squeeze().shape}, "
-                                 f"not the source image's {rgb.shape[:2]}")
+            if array is not None and np.asarray(
+                    array).squeeze().shape != rgb.shape[:2]:
+                raise ValueError(
+                    f"{args.method} {name} for {path} has shape {np.asarray(array).squeeze().shape}, "
+                    f"not the source image's {rgb.shape[:2]}")
         nonfinite += int((~np.isfinite(depth)).sum())
         export_depth_predictions(args.output_path, [path], depth[None])
         if raw is not None:
             raw_dir.mkdir(exist_ok=True)
-            save_prediction_map(raw_dir, Path(path).stem, np.asarray(raw, dtype=np.float32).squeeze())
-        print(f"[{args.method}] {index + 1}/{len(image_paths)} {Path(path).name}", flush=True)
+            save_prediction_map(raw_dir,
+                                Path(path).stem,
+                                np.asarray(raw, dtype=np.float32).squeeze())
+        print(
+            f"[{args.method}] {index + 1}/{len(image_paths)} {Path(path).name}",
+            flush=True)
     write_adapter_metrics(
         output_path=args.output_path,
         method=args.method,
@@ -130,6 +149,10 @@ def run_single_image_depth(
         started_at=started_at,
         checkpoint=args.ckpt_path,
         depth_only=True,
-        metrics_extra={"track": args.track, "seed": args.seed, "nonfinite_depth_pixels": nonfinite,
-                       **(metrics_extra or {})},
+        metrics_extra={
+            "track": args.track,
+            "seed": args.seed,
+            "nonfinite_depth_pixels": nonfinite,
+            **(metrics_extra or {})
+        },
     )

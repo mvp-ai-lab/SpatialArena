@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Run SenseNova-Vision dense-perception depth output for benchmark evaluation."""
 
 from __future__ import annotations
@@ -25,21 +24,19 @@ from adapter_utils import (
     write_adapter_metrics,
 )
 
-
 METHOD = "SENSENOVA_VISION"
 PROMPT = (
     "<image> Estimate relative depth for each pixel in the image, with closer "
     "objects appearing brighter and distant objects appearing darker. Output "
-    "is a grayscale image with pixel values ranging from 0-255."
-)
-
+    "is a grayscale image with pixel values ranging from 0-255.")
 
 # Shared method checkouts (the engine's METHOD_CODE_ROOT); the engine also passes the *_CODE_PATH below.
 # see spatialarena/paths.py
-SPATIALARENA_ROOT = os.path.expanduser(os.environ.get("SPATIALARENA_ROOT", "~/spatialarena"))
+SPATIALARENA_ROOT = os.path.expanduser(
+    os.environ.get("SPATIALARENA_ROOT", "~/spatialarena"))
 METHOD_CODE_ROOT = Path(
-    os.environ.get("METHOD_CODE_ROOT", f"{SPATIALARENA_ROOT}/benchmarks/_model_codes")
-)
+    os.environ.get("METHOD_CODE_ROOT",
+                   f"{SPATIALARENA_ROOT}/benchmarks/_model_codes"))
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,13 +44,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data_path", type=Path, required=True)
     parser.add_argument("--output_path", type=Path, required=True)
     parser.add_argument("--ckpt_path",
-                        default=os.environ.get("SENSENOVA_VISION_CKPT_PATH", "sensenova/SenseNova-Vision-7B-MoT"))
+                        default=os.environ.get(
+                            "SENSENOVA_VISION_CKPT_PATH",
+                            "sensenova/SenseNova-Vision-7B-MoT"))
     parser.add_argument(
         "--sensenova_vision_code_path",
         type=Path,
         default=Path(os.environ["SENSENOVA_VISION_CODE_PATH"])
-        if "SENSENOVA_VISION_CODE_PATH" in os.environ
-        else METHOD_CODE_ROOT / "SenseNova-Vision",
+        if "SENSENOVA_VISION_CODE_PATH" in os.environ else METHOD_CODE_ROOT /
+        "SenseNova-Vision",
     )
     parser.add_argument("--track", choices=("rgb",), default="rgb")
     parser.add_argument("--interval", type=int, default=1)
@@ -81,7 +80,8 @@ def relative_depth_from_output(image: Image.Image) -> np.ndarray:
 def run() -> None:
     args = parse_args()
     if args.export_colmap and not args.depth_only:
-        raise ValueError("SenseNova-Vision depth adapter only exports dense depth maps.")
+        raise ValueError(
+            "SenseNova-Vision depth adapter only exports dense depth maps.")
 
     images_dir = canonical_image_root(args.data_path)
     image_paths = select_interval(find_image_paths(images_dir), args.interval)
@@ -91,16 +91,21 @@ def run() -> None:
         print_dry_run(args, METHOD, len(image_paths))
         return
     if not args.export_depth:
-        raise ValueError("SenseNova-Vision depth adapter requires --export_depth.")
+        raise ValueError(
+            "SenseNova-Vision depth adapter requires --export_depth.")
 
     os.environ.setdefault("USE_TF", "0")
     os.environ.setdefault("TRANSFORMERS_NO_TF", "1")
     os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
-    add_code_path(args.sensenova_vision_code_path, ("inference", "modeling", "data"))
+    add_code_path(args.sensenova_vision_code_path,
+                  ("inference", "modeling", "data"))
     from inference.sensenova_vision import SenseNovaVisionModel
 
-    device = "cuda" if os.environ.get("CUDA_VISIBLE_DEVICES", "") != "" else "auto"
-    model = SenseNovaVisionModel(model_path=args.ckpt_path, device=device, dtype="bf16")
+    device = "cuda" if os.environ.get("CUDA_VISIBLE_DEVICES",
+                                      "") != "" else "auto"
+    model = SenseNovaVisionModel(model_path=args.ckpt_path,
+                                 device=device,
+                                 dtype="bf16")
 
     args.output_path.mkdir(parents=True, exist_ok=True)
     started_at = mark_model_loaded()
@@ -113,15 +118,18 @@ def run() -> None:
             mode="dense_perception",
             return_intermediate_outputs=True,
         )
-        output_image = result.get("image") if isinstance(result, dict) else result
+        output_image = result.get("image") if isinstance(result,
+                                                         dict) else result
         if not isinstance(output_image, Image.Image):
-            raise RuntimeError(f"SenseNova-Vision did not return an image for {image_path}")
+            raise RuntimeError(
+                f"SenseNova-Vision did not return an image for {image_path}")
         depth = relative_depth_from_output(output_image)
         # ImageTransform's MaxLongEdgeMinShortEdgeResize (data/transforms.py) is a pure resize --
         # no crop, no pad -- so restoring this generated depth map back to the image's true
         # source resolution is the plain-resize degenerate case restore_prediction already
         # handles (same as depthvlm.py/point_query_depth_adapter.py).
-        transform = SpatialTransform(source_wh=source_wh, resized_wh=output_image.size)
+        transform = SpatialTransform(source_wh=source_wh,
+                                     resized_wh=output_image.size)
         restored = restore_prediction(depth, transform)
         export_depth_predictions(args.output_path, [image_path], restored[None])
 

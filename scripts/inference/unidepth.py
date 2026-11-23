@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Official UniDepth V2 (lpiccinelli-eth/UniDepth) metric depth.
 
 Each image goes through ``UniDepthV2.infer`` without a camera (rgb track) and with ``resolution_level`` unset, the
@@ -33,7 +32,10 @@ def run() -> None:
             output = model.infer(torch.from_numpy(rgb).permute(2, 0, 1))
         return output["depth"].float().cpu().numpy(), None
 
-    run_single_image_depth(args, image_paths, predict, metrics_extra={"camera": None})
+    run_single_image_depth(args,
+                           image_paths,
+                           predict,
+                           metrics_extra={"camera": None})
 
 
 if __name__ == "__main__":

@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Bridge adapter for methods whose native integration is not in this repo yet.
 
 The external command must write standardized benchmark artifacts into
@@ -37,10 +36,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from scripts.inference.adapter_utils import (  # noqa: E402
-    IMAGE_SUBSET_ENV,
-    canonical_image_root,
-    find_image_paths,
-    print_dry_run,
+    IMAGE_SUBSET_ENV, canonical_image_root, find_image_paths, print_dry_run,
     restrict_to_image_subset,
 )
 
@@ -53,7 +49,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--track", default="rgb")
     parser.add_argument("--code_path", type=Path, default=None)
     parser.add_argument("--ckpt_path", default="")
-    parser.add_argument("--command", default="", help="External command template. Overrides METHOD_COMMAND env.")
+    parser.add_argument(
+        "--command",
+        default="",
+        help="External command template. Overrides METHOD_COMMAND env.")
     parser.add_argument("--interval", type=int, default=1)
     parser.add_argument("--resolution", type=int, default=224)
     parser.add_argument("--image_load_resolution", type=int, default=224)
@@ -112,7 +111,8 @@ def subset_scene_view(data_path: Path, image_paths: list[str]):
         view = Path(tmp) / data_path.name
         (view / "images").mkdir(parents=True)
         for image_path in image_paths:
-            (view / "images" / Path(image_path).name).symlink_to(Path(image_path).resolve())
+            (view / "images" / Path(image_path).name).symlink_to(
+                Path(image_path).resolve())
         for entry in data_path.iterdir():
             if entry.name != "images" and entry.resolve() != image_root:
                 (view / entry.name).symlink_to(entry.resolve())
@@ -129,12 +129,14 @@ def main() -> None:
         print_dry_run(args, args.method_name, len(image_paths))
         return
     if args.track == "rgb_depth" and not (args.data_path / "depths").is_dir():
-        raise FileNotFoundError(f"RGB+depth track requires canonical depth directory: {args.data_path / 'depths'}")
-    if args.track == "rgb_cameras" and not (args.data_path / "sparse" / args.colmap_model_subdir).is_dir():
+        raise FileNotFoundError(
+            f"RGB+depth track requires canonical depth directory: {args.data_path / 'depths'}"
+        )
+    if args.track == "rgb_cameras" and not (args.data_path / "sparse" /
+                                            args.colmap_model_subdir).is_dir():
         raise FileNotFoundError(
             f"RGB+cameras track requires canonical COLMAP camera directory: "
-            f"{args.data_path / 'sparse' / args.colmap_model_subdir}"
-        )
+            f"{args.data_path / 'sparse' / args.colmap_model_subdir}")
     args.output_path.mkdir(parents=True, exist_ok=True)
     env_name = command_env_name(args.method_name)
     template = args.command or os.environ.get(env_name, "")
@@ -147,13 +149,22 @@ def main() -> None:
     with contextlib.ExitStack() as stack:
         render_args = args
         if os.environ.get(IMAGE_SUBSET_ENV, "").strip():
-            view = stack.enter_context(subset_scene_view(args.data_path, image_paths))
-            render_args = argparse.Namespace(**{**vars(args), "data_path": view, "interval": 1})
+            view = stack.enter_context(
+                subset_scene_view(args.data_path, image_paths))
+            render_args = argparse.Namespace(**{
+                **vars(args), "data_path": view,
+                "interval": 1
+            })
         command = render_command(render_args, template)
         with log_path.open("a", encoding="utf-8") as log_file:
             log_file.write(f"[external_command_adapter] {command}\n")
             log_file.flush()
-            subprocess.run(command, shell=True, check=True, cwd=ROOT_DIR, stdout=log_file, stderr=subprocess.STDOUT)
+            subprocess.run(command,
+                           shell=True,
+                           check=True,
+                           cwd=ROOT_DIR,
+                           stdout=log_file,
+                           stderr=subprocess.STDOUT)
     metrics = {
         "method": args.method_name,
         "track": args.track,
@@ -163,7 +174,8 @@ def main() -> None:
         "output_path": str(args.output_path),
         "num_images": len(image_paths),
     }
-    (args.output_path / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
+    (args.output_path / "metrics.json").write_text(
+        json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

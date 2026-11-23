@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Run MapAnything and export benchmark prediction artifacts."""
 
 from __future__ import annotations
@@ -54,16 +53,25 @@ _MAPANYTHING_NORM_TYPE = "dinov2"
 _MAPANYTHING_NORM_MEAN = (0.485, 0.456, 0.406)
 _MAPANYTHING_NORM_STD = (0.229, 0.224, 0.225)
 
-
 METHOD = "MAPANYTHING"
 
 TRACKS = (
-    "rgb", "rgb_depth", "rgb_cameras", "rgb_masked_depth", "rgb_masked_depth_cameras", "rgb_sparse_depth",
+    "rgb",
+    "rgb_depth",
+    "rgb_cameras",
+    "rgb_masked_depth",
+    "rgb_masked_depth_cameras",
+    "rgb_sparse_depth",
     "rgb_sparse_depth_cameras",
 )
-CAMERA_TRACKS = ("rgb_cameras", "rgb_masked_depth_cameras", "rgb_sparse_depth_cameras")
+CAMERA_TRACKS = ("rgb_cameras", "rgb_masked_depth_cameras",
+                 "rgb_sparse_depth_cameras")
 DEPTH_TRACKS = (
-    "rgb_depth", "rgb_masked_depth", "rgb_masked_depth_cameras", "rgb_sparse_depth", "rgb_sparse_depth_cameras",
+    "rgb_depth",
+    "rgb_masked_depth",
+    "rgb_masked_depth_cameras",
+    "rgb_sparse_depth",
+    "rgb_sparse_depth_cameras",
 )
 MASKED_DEPTH_TRACKS = ("rgb_masked_depth", "rgb_masked_depth_cameras")
 SPARSE_DEPTH_TRACKS = ("rgb_sparse_depth", "rgb_sparse_depth_cameras")
@@ -75,7 +83,9 @@ def _load_track_depth_priors(data_path, image_paths, track):
     """Depth priors for a depth track: masked GT on the masked-depth tracks (spatialarena/depth_prior_masking.py),
     the real sparse depth (LiDAR / COLMAP keypoints) on the sparse-depth tracks (spatialarena/sparse_depth.py)."""
     if track in SPARSE_DEPTH_TRACKS:
-        return load_sparse_depth_priors(data_path, image_paths, model_long_side=SPARSE_MODEL_LONG_SIDE)
+        return load_sparse_depth_priors(data_path,
+                                        image_paths,
+                                        model_long_side=SPARSE_MODEL_LONG_SIDE)
     loader = load_masked_depth_priors if track in MASKED_DEPTH_TRACKS else load_optional_depth_priors
     return loader(data_path, image_paths)
 
@@ -84,11 +94,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data_path", type=Path, required=True)
     parser.add_argument("--output_path", type=Path, required=True)
-    parser.add_argument("--ckpt_path", default=os.environ.get("MAPANYTHING_CKPT_PATH", "facebook/map-anything"))
+    parser.add_argument("--ckpt_path",
+                        default=os.environ.get("MAPANYTHING_CKPT_PATH",
+                                               "facebook/map-anything"))
     parser.add_argument(
         "--mapanything_code_path",
         type=Path,
-        default=Path(os.environ["MAPANYTHING_CODE_DIR"]) if "MAPANYTHING_CODE_DIR" in os.environ else None,
+        default=Path(os.environ["MAPANYTHING_CODE_DIR"])
+        if "MAPANYTHING_CODE_DIR" in os.environ else None,
     )
     parser.add_argument("--track", choices=TRACKS, default="rgb")
     parser.add_argument("--interval", type=int, default=1)
@@ -107,7 +120,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def build_rgb_views(image_paths: list[str], resolution_set: int) -> tuple[list[dict], list[SpatialTransform]]:
+def build_rgb_views(
+        image_paths: list[str],
+        resolution_set: int) -> tuple[list[dict], list[SpatialTransform]]:
     """Build MapAnything view dicts (img/data_norm_type/true_shape/idx/instance) for the plain
     "rgb" track directly from a padded tensor, bypassing mapanything.utils.image.load_images --
     like the shared mapanything_dense_wrapper.py's build_views, that loader computes one target
@@ -118,33 +133,37 @@ def build_rgb_views(image_paths: list[str], resolution_set: int) -> tuple[list[d
     import torch
 
     size = resolution_set if resolution_set % _MAPANYTHING_PATCH_SIZE == 0 else (
-        ((resolution_set + _MAPANYTHING_PATCH_SIZE - 1) // _MAPANYTHING_PATCH_SIZE) * _MAPANYTHING_PATCH_SIZE
-    )
+        ((resolution_set + _MAPANYTHING_PATCH_SIZE - 1) //
+         _MAPANYTHING_PATCH_SIZE) * _MAPANYTHING_PATCH_SIZE)
     # exif_transpose=True to match mapanything.utils.image.load_images's own convention (the
     # loader this bypasses still applies it).
-    images, transforms = preprocess_images(
-        image_paths, method="vggt", size=size, mode="pad", exif_transpose=True
-    )
+    images, transforms = preprocess_images(image_paths,
+                                           method="vggt",
+                                           size=size,
+                                           mode="pad",
+                                           exif_transpose=True)
     mean = torch.tensor(_MAPANYTHING_NORM_MEAN).view(1, 3, 1, 1)
     std = torch.tensor(_MAPANYTHING_NORM_STD).view(1, 3, 1, 1)
     images = (images - mean) / std
     views = []
     for index, image_path in enumerate(image_paths):
-        frame = images[index : index + 1]
+        frame = images[index:index + 1]
         height, width = frame.shape[-2:]
-        views.append(
-            {
-                "img": frame,
-                "data_norm_type": [_MAPANYTHING_NORM_TYPE],
-                "true_shape": np.int32([[height, width]]),
-                "idx": index,
-                "instance": [Path(image_path).name],
-            }
-        )
+        views.append({
+            "img": frame,
+            "data_norm_type": [_MAPANYTHING_NORM_TYPE],
+            "true_shape": np.int32([[height, width]]),
+            "idx": index,
+            "instance": [Path(image_path).name],
+        })
     return views, transforms
 
 
-def preprocess_mapanything(image_paths: list[str], *, args: argparse.Namespace, device=None, **_unused):
+def preprocess_mapanything(image_paths: list[str],
+                           *,
+                           args: argparse.Namespace,
+                           device=None,
+                           **_unused):
     """MapAnything's preprocess_<method>(), registered below for prepare_model_input("MAPANYTHING",
     ...). "rgb" track: delegates to build_rgb_views (the pad-based fix). "rgb_depth"/"rgb_cameras":
     still routes through the vendored mapanything.utils.image.preprocess_inputs (real, documented
@@ -167,7 +186,8 @@ def preprocess_mapanything(image_paths: list[str], *, args: argparse.Namespace, 
     camera_poses = None
     intrinsics = None
     if args.track in DEPTH_TRACKS:
-        depths, _has_depth, _missing = _load_track_depth_priors(args.data_path, image_paths, args.track)
+        depths, _has_depth, _missing = _load_track_depth_priors(
+            args.data_path, image_paths, args.track)
     if args.track in CAMERA_TRACKS:
         camera_poses, intrinsics = load_colmap_camera_priors(
             args.data_path,
@@ -189,8 +209,10 @@ def preprocess_mapanything(image_paths: list[str], *, args: argparse.Namespace, 
                         colmap_model_subdir=args.colmap_model_subdir,
                     )
                 except FileNotFoundError:
-                    _camera_poses, intrinsics = build_default_camera_priors(image_paths)
-            view["depth_z"] = resize_depth_to_image_size(depths[index], view["img"].size)
+                    _camera_poses, intrinsics = build_default_camera_priors(
+                        image_paths)
+            view["depth_z"] = resize_depth_to_image_size(
+                depths[index], view["img"].size)
             view["intrinsics"] = intrinsics[index]
             view["is_metric_scale"] = metric_scale
         if camera_poses is not None:
@@ -225,7 +247,8 @@ def run() -> None:
             image_paths,
             colmap_path=args.colmap_path,
         )
-    image_paths = select_interval(image_paths, args.interval, args.max_images_per_run)
+    image_paths = select_interval(image_paths, args.interval,
+                                  args.max_images_per_run)
     if not image_paths:
         raise ValueError(f"No images found in {images_dir}")
     if args.dry_run:
@@ -249,14 +272,18 @@ def run() -> None:
     mark_model_loaded()
 
     if args.depth_only:
-        batch_size = args.max_images_per_run if args.max_images_per_run > 0 else len(image_paths)
+        batch_size = args.max_images_per_run if args.max_images_per_run > 0 else len(
+            image_paths)
         peak_memory = 0.0
         pose_image_paths: list[str] = []
         pose_extrinsics: list[np.ndarray] = []
         pose_intrinsics: list[np.ndarray] = []
         pose_output_size: tuple[int, int] | None = None
         for batch_paths in batched_image_paths(image_paths, batch_size):
-            views, transforms = prepare_model_input("MAPANYTHING", batch_paths, args=args, device=device)
+            views, transforms = prepare_model_input("MAPANYTHING",
+                                                    batch_paths,
+                                                    args=args,
+                                                    device=device)
             with torch.no_grad():
                 # Dense depth (MonoDepth / VideoDepth / MVRecon) is unmasked: MapAnything's non-ambiguous and edge
                 # masks write depth 0 on the pixels they reject (up to ~14% of KITTI's GT pixels), a method-specific
@@ -270,20 +297,28 @@ def run() -> None:
                     apply_mask=False,
                     mask_edges=False,
                 )
-            depths = normalize_depths([as_numpy(pred["depth_z"])[0, ..., 0] for pred in outputs])
-            confidence = normalize_confidence([as_numpy(pred["conf"])[0] for pred in outputs], depths.shape)
+            depths = normalize_depths(
+                [as_numpy(pred["depth_z"])[0, ..., 0] for pred in outputs])
+            confidence = normalize_confidence(
+                [as_numpy(pred["conf"])[0] for pred in outputs], depths.shape)
             if transforms is not None:
-                export_spatial_depth_predictions(args.output_path, batch_paths, depths, confidence, transforms)
+                export_spatial_depth_predictions(args.output_path, batch_paths,
+                                                 depths, confidence, transforms)
             else:
-                export_depth_predictions(args.output_path, batch_paths, depths, confidence)
+                export_depth_predictions(args.output_path, batch_paths, depths,
+                                         confidence)
             if args.export_colmap:
                 pose_image_paths.extend(batch_paths)
                 pose_extrinsics.append(
-                    c2w_to_w2c([as_numpy(pred["camera_poses"])[0] for pred in outputs])
-                )
-                intrinsics = as_numpy([as_numpy(pred["intrinsics"])[0] for pred in outputs]).astype("float32")
+                    c2w_to_w2c([
+                        as_numpy(pred["camera_poses"])[0] for pred in outputs
+                    ]))
+                intrinsics = as_numpy([
+                    as_numpy(pred["intrinsics"])[0] for pred in outputs
+                ]).astype("float32")
                 if transforms is not None:
-                    restored_intrinsics, width, height = restore_camera_export(intrinsics, transforms)
+                    restored_intrinsics, width, height = restore_camera_export(
+                        intrinsics, transforms)
                     pose_intrinsics.append(restored_intrinsics)
                     pose_output_size = (width, height)
                 else:
@@ -291,7 +326,9 @@ def run() -> None:
                     if pose_output_size is None:
                         pose_output_size = (depths.shape[2], depths.shape[1])
             if torch.cuda.is_available():
-                peak_memory = max(peak_memory, torch.cuda.max_memory_allocated() / (1024.0**2))
+                peak_memory = max(
+                    peak_memory,
+                    torch.cuda.max_memory_allocated() / (1024.0**2))
                 torch.cuda.empty_cache()
         if pose_extrinsics:
             width, height = pose_output_size
@@ -321,7 +358,10 @@ def run() -> None:
         )
         return
 
-    views, _transforms = prepare_model_input("MAPANYTHING", image_paths, args=args, device=device)
+    views, _transforms = prepare_model_input("MAPANYTHING",
+                                             image_paths,
+                                             args=args,
+                                             device=device)
     with torch.no_grad():
         outputs = model.infer(
             views,
@@ -333,18 +373,20 @@ def run() -> None:
             mask_edges=True,
         )
 
-    depths = normalize_depths([as_numpy(pred["depth_z"])[0, ..., 0] for pred in outputs])
+    depths = normalize_depths(
+        [as_numpy(pred["depth_z"])[0, ..., 0] for pred in outputs])
     points = normalize_points([as_numpy(pred["pts3d"])[0] for pred in outputs])
-    colors = colors_from_torch_images([as_numpy(pred["img_no_norm"])[0] for pred in outputs])
-    confidence = normalize_confidence([as_numpy(pred["conf"])[0] for pred in outputs], depths.shape)
-    extrinsics_w2c = c2w_to_w2c([as_numpy(pred["camera_poses"])[0] for pred in outputs])
-    intrinsics = as_numpy([as_numpy(pred["intrinsics"])[0] for pred in outputs]).astype("float32")
+    colors = colors_from_torch_images(
+        [as_numpy(pred["img_no_norm"])[0] for pred in outputs])
+    confidence = normalize_confidence(
+        [as_numpy(pred["conf"])[0] for pred in outputs], depths.shape)
+    extrinsics_w2c = c2w_to_w2c(
+        [as_numpy(pred["camera_poses"])[0] for pred in outputs])
+    intrinsics = as_numpy([as_numpy(pred["intrinsics"])[0] for pred in outputs
+                          ]).astype("float32")
 
-    peak_memory = (
-        torch.cuda.max_memory_allocated() / (1024.0**2)
-        if torch.cuda.is_available()
-        else 0.0
-    )
+    peak_memory = (torch.cuda.max_memory_allocated() /
+                   (1024.0**2) if torch.cuda.is_available() else 0.0)
     export_standard_artifacts(
         method=METHOD,
         output_path=args.output_path,
@@ -361,7 +403,8 @@ def run() -> None:
         depth_only=args.depth_only,
         colmap_model_subdir=args.colmap_model_subdir,
         max_points=args.max_points,
-        conf_thresh=args.depth_conf_thresh if args.depth_conf_thresh is not None else args.conf_thresh,
+        conf_thresh=args.depth_conf_thresh
+        if args.depth_conf_thresh is not None else args.conf_thresh,
         started_at=started_at,
         checkpoint=args.ckpt_path,
         metrics_extra={

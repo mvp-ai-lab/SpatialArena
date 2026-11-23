@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Run a streaming / long-context reconstruction method on a SLAM sequence and export its camera poses.
 
 Each method runs its own released code, unmodified, with the settings of its own evaluation (or, where none is
@@ -53,16 +52,9 @@ if str(ROOT_DIR) not in sys.path:
 # checkout joins sys.path only then.
 # pylint: disable=wrong-import-position,import-outside-toplevel
 from scripts.inference.adapter_utils import (  # noqa: E402
-    canonical_image_root,
-    export_camera_pose_priors,
-    find_image_paths,
-    fixed_input_size,
-    slam_work_dir,
-    mark_model_loaded,
-    record_model_input,
-    runtime_metrics,
-    select_interval,
-    write_adapter_metrics,
+    canonical_image_root, export_camera_pose_priors, find_image_paths,
+    fixed_input_size, slam_work_dir, mark_model_loaded, record_model_input,
+    runtime_metrics, select_interval, write_adapter_metrics,
 )
 from scripts.inference.long_sequence_slam import GpuMemorySampler, stage_images  # noqa: E402
 from scripts.inference.slam_depth_export import DepthSink, export_numbered_maps, read_exr_depth  # noqa: E402
@@ -71,7 +63,8 @@ from scripts.inference.slam_depth_export import DepthSink, export_numbered_maps,
 LOOP_INFO: dict = {}
 METHODS = ("LOGER", "ZIPMAP", "LINGBOT_MAP", "R3", "SCAL3R", "ABOT_RECON")
 # see spatialarena/paths.py
-SPATIALARENA_ROOT = os.path.expanduser(os.environ.get("SPATIALARENA_ROOT", "~/spatialarena"))
+SPATIALARENA_ROOT = os.path.expanduser(
+    os.environ.get("SPATIALARENA_ROOT", "~/spatialarena"))
 DEFAULT_CODE_ROOT = Path(f"{SPATIALARENA_ROOT}/benchmarks/_model_codes")
 DEFAULT_CKPT_ROOT = Path(f"{SPATIALARENA_ROOT}/benchmarks/_checkpoints")
 CODE_DIRS = {
@@ -95,8 +88,14 @@ ZIPMAP_MODEL_CONFIG = {
     "enable_depth": True,
     "ttt_config": {
         "ttt_mode": True,
-        "params": {"bias": True, "head_dim": 1024, "inter_multi": 2, "base_lr": 0.01, "muon_update_steps": 5,
-                   "use_gate_fn": True},
+        "params": {
+            "bias": True,
+            "head_dim": 1024,
+            "inter_multi": 2,
+            "base_lr": 0.01,
+            "muon_update_steps": 5,
+            "use_gate_fn": True
+        },
     },
     "other_config": {
         "use_gradient_checkpointing_local_point": False,
@@ -121,11 +120,16 @@ LINGBOT_SETTINGS = {
 
 def parse_args() -> argparse.Namespace:
     """Adapter CLI (the flags run_method_case_list.sh passes to every adapter)."""
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--method", choices=METHODS, required=True)
     parser.add_argument("--data_path", type=Path, required=True)
     parser.add_argument("--output_path", type=Path, required=True)
-    parser.add_argument("--code_path", type=Path, default=None, help="Method checkout (default: _model_codes/<repo>).")
+    parser.add_argument("--code_path",
+                        type=Path,
+                        default=None,
+                        help="Method checkout (default: _model_codes/<repo>).")
     parser.add_argument("--ckpt_root", type=Path, default=DEFAULT_CKPT_ROOT)
     parser.add_argument("--interval", type=int, default=1)
     parser.add_argument("--max_images_per_run", type=int, default=0)
@@ -133,8 +137,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--colmap_model_subdir", default="0")
     parser.add_argument("--keep_work_dir", action="store_true")
     parser.add_argument("--dry_run", action="store_true")
-    parser.add_argument("--export_depth", action="store_true",
-                        help="Also write each returned frame's depth and confidence (depths/, confidences/).")
+    parser.add_argument(
+        "--export_depth",
+        action="store_true",
+        help=
+        "Also write each returned frame's depth and confidence (depths/, confidences/)."
+    )
     # Shared flags run_method_case_list.sh appends to every adapter; poses are always exported here.
     for flag in ("--export_colmap", "--depth_only"):
         parser.add_argument(flag, action="store_true", help=argparse.SUPPRESS)
@@ -151,8 +159,11 @@ def weight_paths(ckpt_root: Path) -> dict[str, Path]:
         "LINGBOT_MAP": local / "lingbot_map" / "lingbot-map.pt",
         "R3": local / "r3" / "r3.safetensors",
         "SCAL3R": local / "scal3r" / "scal3r.pt",
-        "SALAD": local / "slam_long" / "dino_salad.ckpt",  # shared with VGGT-Long / Pi-Long
-        "DINO": local / "slam_long" / "dinov2_vitb14_pretrain.pth",  # ABot-Recon's SALAD backbone, also shared
+        "SALAD": local / "slam_long" /
+                 "dino_salad.ckpt",  # shared with VGGT-Long / Pi-Long
+        "DINO":
+            local / "slam_long" /
+            "dinov2_vitb14_pretrain.pth",  # ABot-Recon's SALAD backbone, also shared
         "ABOT_RECON": local / "abot_recon" / "abot_recon.safetensors",
     }
 
@@ -165,26 +176,30 @@ def load_weights(model, state: dict, method: str) -> None:
         raise RuntimeError(
             f"{method} checkpoint does not match the model: {len(result.missing_keys)} missing keys "
             f"{list(result.missing_keys)[:5]}, {len(result.unexpected_keys)} unexpected keys "
-            f"{list(result.unexpected_keys)[:5]}"
-        )
+            f"{list(result.unexpected_keys)[:5]}")
 
 
 def _cuda_dtype():
     import torch
 
-    return torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16
+    return torch.bfloat16 if torch.cuda.get_device_capability(
+    )[0] >= 8 else torch.float16
 
 
 def _poses_by_index(c2w) -> dict[int, np.ndarray]:
     array = np.asarray(c2w, dtype=np.float64)
     if array.shape[-2:] == (3, 4):
-        bottom = np.broadcast_to(np.array([0.0, 0.0, 0.0, 1.0]), (*array.shape[:-2], 1, 4))
+        bottom = np.broadcast_to(np.array([0.0, 0.0, 0.0, 1.0]),
+                                 (*array.shape[:-2], 1, 4))
         array = np.concatenate([array, bottom], axis=-2)
     return {index: pose for index, pose in enumerate(array)}
 
 
-def run_loger(staged: list[Path], code_path: Path, weights: dict[str, Path],
-              fixed: tuple[int, int] | None = None, sink: DepthSink | None = None) -> dict[int, np.ndarray]:
+def run_loger(staged: list[Path],
+              code_path: Path,
+              weights: dict[str, Path],
+              fixed: tuple[int, int] | None = None,
+              sink: DepthSink | None = None) -> dict[int, np.ndarray]:
     """LoGeR through its eval/pi3_adapter (window 64, overlap 3; 512 px, or exactly ``fixed`` = (width, height));
     returns {input index: c2w}."""
     sys.path.insert(0, str(code_path))
@@ -192,36 +207,50 @@ def run_loger(staged: list[Path], code_path: Path, weights: dict[str, Path],
     from eval.pi3_adapter import _coerce_view_image, load_pi3_model, merge_forward_kwargs
     from eval.relpose.launch import _load_images_basic
 
-    model, forward_kwargs = load_pi3_model(str(weights["LOGER"]), config_path=str(weights["LOGER_CONFIG"]),
+    model, forward_kwargs = load_pi3_model(str(weights["LOGER"]),
+                                           config_path=str(
+                                               weights["LOGER_CONFIG"]),
                                            device=torch.device("cuda"))
     forward_kwargs = merge_forward_kwargs(
         forward_kwargs,
-        {"window_size": LOGER_SETTINGS["window_size"], "overlap_size": LOGER_SETTINGS["overlap_size"]},
+        {
+            "window_size": LOGER_SETTINGS["window_size"],
+            "overlap_size": LOGER_SETTINGS["overlap_size"]
+        },
     )
     mark_model_loaded()
     # A (width, height) size equal to the frames' own is a no-op resize in _load_images_basic.
-    images = _load_images_basic([str(path) for path in staged], size=fixed or LOGER_SETTINGS["size"], crop=True)
+    images = _load_images_basic([str(path) for path in staged],
+                                size=fixed or LOGER_SETTINGS["size"],
+                                crop=True)
     # eval/pi3_adapter.run_pi3_inference_on_views with only the poses kept: it also re-expresses every frame's point
     # map in float32 copies on the host (~6x the 28 GB of point maps at 18,846 frames of 504x252, beyond the
     # protocol's 180 GB). Same input tensor, model call and autocast; poses relative to the first frame as there.
-    batch = torch.stack([_coerce_view_image(image["img"]) for image in images]).unsqueeze(0)
+    batch = torch.stack([_coerce_view_image(image["img"]) for image in images
+                        ]).unsqueeze(0)
     del images
     record_model_input(batch.shape[-1], batch.shape[-2])
-    with torch.no_grad(), torch.autocast(device_type="cuda", dtype=_cuda_dtype()):
+    with torch.no_grad(), torch.autocast(device_type="cuda",
+                                         dtype=_cuda_dtype()):
         output = model(batch, **forward_kwargs)
     camera_poses = output["camera_poses"].squeeze(0).detach().float().cpu()
     if sink is not None:
         # Depth = z of the local point map; confidence = sigmoid of its logit (Pi3 convention), streamed from GPU.
         confidence = output.get("conf")
-        sink.write_tensors(output["local_points"][0, ..., 2],
-                           torch.sigmoid(confidence[0, ..., 0].float()) if confidence is not None else None)
+        sink.write_tensors(
+            output["local_points"][0, ..., 2],
+            torch.sigmoid(confidence[0, ..., 0].float())
+            if confidence is not None else None)
     del output
     camera_poses = torch.linalg.inv(camera_poses[0]).unsqueeze(0) @ camera_poses
     return _poses_by_index(camera_poses.numpy())  # camera-to-world
 
 
-def run_zipmap(staged: list[Path], code_path: Path, weights: dict[str, Path],
-               fixed: tuple[int, int] | None = None, sink: DepthSink | None = None) -> dict[int, np.ndarray]:
+def run_zipmap(staged: list[Path],
+               code_path: Path,
+               weights: dict[str, Path],
+               fixed: tuple[int, int] | None = None,
+               sink: DepthSink | None = None) -> dict[int, np.ndarray]:
     """ZipMap in one forward pass over all frames (518 px wide, or ``fixed``'s width); returns {input index: c2w}."""
     sys.path[:0] = [str(code_path), str(code_path / "zipmap")]
     import torch
@@ -230,21 +259,28 @@ def run_zipmap(staged: list[Path], code_path: Path, weights: dict[str, Path],
     from zipmap.utils.pose_enc import pose_encoding_to_extri_intri
 
     model = ZipMap(**ZIPMAP_MODEL_CONFIG)
-    checkpoint = torch.load(weights["ZIPMAP"], map_location="cpu", weights_only=True)
-    load_weights(model, checkpoint.get("model", checkpoint), "ZipMap")  # all 1,499 tensors match (2026-10-21)
+    checkpoint = torch.load(weights["ZIPMAP"],
+                            map_location="cpu",
+                            weights_only=True)
+    load_weights(model, checkpoint.get("model", checkpoint),
+                 "ZipMap")  # all 1,499 tensors match (2026-10-21)
     model = model.eval().to("cuda")
     mark_model_loaded()
     # "crop" mode sets the width to target_size and rounds the height to 14 px: the frames' own size when fixed.
-    images = load_and_preprocess_images([str(path) for path in staged],
-                                        target_size=fixed[0] if fixed else 518).to("cuda")
+    images = load_and_preprocess_images(
+        [str(path) for path in staged],
+        target_size=fixed[0] if fixed else 518).to("cuda")
     record_model_input(images.shape[-1], images.shape[-2])
     with torch.no_grad(), torch.amp.autocast("cuda", dtype=_cuda_dtype()):
         predictions = model(images)
-    extrinsic, _ = pose_encoding_to_extri_intri(predictions["pose_enc"], images.shape[-2:])
+    extrinsic, _ = pose_encoding_to_extri_intri(predictions["pose_enc"],
+                                                images.shape[-2:])
     if sink is not None:
         confidence = predictions.get("depth_conf")
-        sink.write_tensors(predictions["depth"][0, ..., 0], confidence[0] if confidence is not None else None)
-    w2c = _poses_by_index(extrinsic[0].float().cpu().numpy())  # VGGT convention: world-to-camera
+        sink.write_tensors(predictions["depth"][0, ..., 0],
+                           confidence[0] if confidence is not None else None)
+    w2c = _poses_by_index(
+        extrinsic[0].float().cpu().numpy())  # VGGT convention: world-to-camera
     return {index: np.linalg.inv(pose) for index, pose in w2c.items()}
 
 
@@ -255,14 +291,18 @@ def _lingbot_resize(image: np.ndarray) -> np.ndarray:
 
     height, width = image.shape[:2]
     align = LINGBOT_SETTINGS["align"]
-    scale = min(np.sqrt(LINGBOT_SETTINGS["area_budget"] / (width * height)), 1.0)
+    scale = min(np.sqrt(LINGBOT_SETTINGS["area_budget"] / (width * height)),
+                1.0)
     new_w = max((int(width * scale) // align) * align, align)
     new_h = max((int(height * scale) // align) * align, align)
     return cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
 
 
-def run_lingbot_map(staged: list[Path], code_path: Path, weights: dict[str, Path],
-                    fixed: tuple[int, int] | None = None, sink: DepthSink | None = None) -> dict[int, np.ndarray]:
+def run_lingbot_map(staged: list[Path],
+                    code_path: Path,
+                    weights: dict[str, Path],
+                    fixed: tuple[int, int] | None = None,
+                    sink: DepthSink | None = None) -> dict[int, np.ndarray]:
     """LingBot-Map streaming inference with its benchmark settings (its area-budget resize, skipped for ``fixed``
     inputs); returns {input index: c2w}."""
     sys.path.insert(0, str(code_path))
@@ -283,19 +323,24 @@ def run_lingbot_map(staged: list[Path], code_path: Path, weights: dict[str, Path
         kv_cache_include_scale_frames=True,
         use_sdpa=True,
     )
-    checkpoint = torch.load(weights["LINGBOT_MAP"], map_location="cpu", weights_only=False)
-    load_weights(model, checkpoint.get("model", checkpoint), "LingBot-Map")  # all 1,342 tensors match (2026-10-21)
+    checkpoint = torch.load(weights["LINGBOT_MAP"],
+                            map_location="cpu",
+                            weights_only=False)
+    load_weights(model, checkpoint.get("model", checkpoint),
+                 "LingBot-Map")  # all 1,342 tensors match (2026-10-21)
     model = model.to("cuda").eval()
     mark_model_loaded()
     to_tensor = transforms.ToTensor()
     resize = (lambda image: image) if fixed else _lingbot_resize
-    images = torch.stack(
-        [to_tensor(resize(np.asarray(Image.open(path).convert("RGB")))) for path in staged]
-    ).to("cuda")
+    images = torch.stack([
+        to_tensor(resize(np.asarray(Image.open(path).convert("RGB"))))
+        for path in staged
+    ]).to("cuda")
     record_model_input(images.shape[-1], images.shape[-2])
     # benchmark/methods/lingbot_map.py::_resolve_keyframe_interval ("auto").
     threshold = settings["auto_keyframe_threshold"]
-    keyframe_interval = 1 if len(staged) <= threshold else -(-len(staged) // threshold)
+    keyframe_interval = 1 if len(staged) <= threshold else -(-len(staged) //
+                                                             threshold)
     with torch.no_grad(), torch.amp.autocast("cuda", dtype=_cuda_dtype()):
         predictions = model.inference_streaming(
             images,
@@ -303,15 +348,21 @@ def run_lingbot_map(staged: list[Path], code_path: Path, weights: dict[str, Path
             keyframe_interval=keyframe_interval,
             output_device=torch.device("cpu"),
         )
-    extrinsic, _ = pose_encoding_to_extri_intri(predictions["pose_enc"], images.shape[-2:])
+    extrinsic, _ = pose_encoding_to_extri_intri(predictions["pose_enc"],
+                                                images.shape[-2:])
     if sink is not None:
-        sink.write_tensors(predictions["depth"][0, ..., 0], predictions["depth_conf"][0]
-                           if predictions.get("depth_conf") is not None else None)
-    return _poses_by_index(extrinsic[0].float().cpu().numpy())  # lingbot-map's pose encoding decodes to c2w
+        sink.write_tensors(
+            predictions["depth"][0, ..., 0], predictions["depth_conf"][0]
+            if predictions.get("depth_conf") is not None else None)
+    return _poses_by_index(extrinsic[0].float().cpu().numpy()
+                          )  # lingbot-map's pose encoding decodes to c2w
 
 
-def run_abot_recon(staged: list[Path], code_path: Path, weights: dict[str, Path],
-                   fixed: tuple[int, int] | None = None, sink: DepthSink | None = None) -> dict[int, np.ndarray]:
+def run_abot_recon(staged: list[Path],
+                   code_path: Path,
+                   weights: dict[str, Path],
+                   fixed: tuple[int, int] | None = None,
+                   sink: DepthSink | None = None) -> dict[int, np.ndarray]:
     """ABot-Recon (SDPA attention, loop closure on; its 504x280 canvas, or ``fixed``); returns {input index: c2w}, the
     loop-refined trajectory. The loop backend's summary (loop_info.json) goes into ``LOOP_INFO`` for metrics.json."""
     sys.path.insert(0, str(code_path))
@@ -319,24 +370,37 @@ def run_abot_recon(staged: list[Path], code_path: Path, weights: dict[str, Path]
 
     # Its preprocessing locks the width to ``width`` and crops/pads to ``height``: a no-op at the frames' own size.
     size = {"width": fixed[0], "height": fixed[1]} if fixed else {}
-    loop_dir = staged[0].parent.parent / "abot_loop"  # in the case's work directory (staging is <work>/images)
-    model = ABotRecon.from_pretrained(str(weights["ABOT_RECON"]), device="cuda", attention_backend="sdpa",
-                                      loop_closure=True, loop_salad_checkpoint=weights["SALAD"],
-                                      loop_dino_checkpoint=weights["DINO"], loop_output_dir=loop_dir, **size)
+    loop_dir = staged[
+        0].parent.parent / "abot_loop"  # in the case's work directory (staging is <work>/images)
+    model = ABotRecon.from_pretrained(str(weights["ABOT_RECON"]),
+                                      device="cuda",
+                                      attention_backend="sdpa",
+                                      loop_closure=True,
+                                      loop_salad_checkpoint=weights["SALAD"],
+                                      loop_dino_checkpoint=weights["DINO"],
+                                      loop_output_dir=loop_dir,
+                                      **size)
     record_model_input(model.config.width, model.config.height)
     mark_model_loaded()
     # Local points / confidence only when depth is exported; threshold 0 keeps every pixel (no NaN masking).
     with_maps = sink is not None
-    result = model.infer(staged, output_local_points=with_maps, output_world_points=False,
-                         output_confidence=with_maps, confidence_threshold=0.0, loop_closure=True)
+    result = model.infer(staged,
+                         output_local_points=with_maps,
+                         output_world_points=False,
+                         output_confidence=with_maps,
+                         confidence_threshold=0.0,
+                         loop_closure=True)
     info = loop_dir / "loop_info.json"
     if info.is_file():
         LOOP_INFO.update(json.loads(info.read_text(encoding="utf-8")))
-        print(f"ABot-Recon loop closure: {LOOP_INFO.get('num_loop_edges')} loop edges from "
-              f"{LOOP_INFO.get('num_candidates')} candidates", flush=True)
+        print(
+            f"ABot-Recon loop closure: {LOOP_INFO.get('num_loop_edges')} loop edges from "
+            f"{LOOP_INFO.get('num_candidates')} candidates",
+            flush=True)
     if with_maps:
         sink.write_tensors(result.local_points[..., 2], result.confidence)
-    return _poses_by_index(result.camera_poses.float().cpu().numpy())  # camera-to-world
+    return _poses_by_index(
+        result.camera_poses.float().cpu().numpy())  # camera-to-world
 
 
 def _run_subprocess(command: list[str], cwd: Path, env: dict[str, str]) -> dict:
@@ -351,33 +415,59 @@ def _run_subprocess(command: list[str], cwd: Path, env: dict[str, str]) -> dict:
         raise SystemExit(f"{command[1]} exited with status {status}")
     # The method runs in a child process: wall time includes its model loading, and peak memory is the child's
     # process-tree peak from nvidia-smi (sampled at 1 s), not torch.cuda.max_memory_allocated.
-    return {"inference_seconds": time.time() - started_at, "model_load_seconds": None,
-            "peak_gpu_memory_mib": peak, "runtime_scope": "subprocess_wall"}
+    return {
+        "inference_seconds": time.time() - started_at,
+        "model_load_seconds": None,
+        "peak_gpu_memory_mib": peak,
+        "runtime_scope": "subprocess_wall"
+    }
 
 
-def run_r3(staging: Path, work: Path, code_path: Path, weights: dict[str, Path],
-           fixed: tuple[int, int] | None = None, sink: DepthSink | None = None) -> tuple[dict, dict]:
+def run_r3(staging: Path,
+           work: Path,
+           code_path: Path,
+           weights: dict[str, Path],
+           fixed: tuple[int, int] | None = None,
+           sink: DepthSink | None = None) -> tuple[dict, dict]:
     """R3's demo.py (local mode, no viewer) in a subprocess; returns ({input index: c2w}, runtime). ``--size`` is the
     long edge it resizes to before cropping to 14 px: its default 504, or ``fixed``'s long edge (a no-op)."""
     output = work / "r3"
-    env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(code_path), os.environ.get("PYTHONPATH", "")]))
+    env = dict(os.environ,
+               PYTHONPATH=os.pathsep.join(
+                   [str(code_path),
+                    os.environ.get("PYTHONPATH", "")]))
     runtime = _run_subprocess(
-        [sys.executable, str(code_path / "demo.py"), "--mode", "local", "--no_viewer", "--seq_path", str(staging),
-         "--output_dir", str(output), "--ckpt", str(weights["R3"]), "--size", str(max(fixed) if fixed else 504)],
-        code_path, env,
+        [
+            sys.executable,
+            str(code_path / "demo.py"), "--mode", "local", "--no_viewer",
+            "--seq_path",
+            str(staging), "--output_dir",
+            str(output), "--ckpt",
+            str(weights["R3"]), "--size",
+            str(max(fixed) if fixed else 504)
+        ],
+        code_path,
+        env,
     )
-    depth = np.load(output / "depth" / "000000.npy", mmap_mode="r")  # predicted at the model's input size
+    depth = np.load(output / "depth" / "000000.npy",
+                    mmap_mode="r")  # predicted at the model's input size
     runtime["model_input_size"] = [int(depth.shape[1]), int(depth.shape[0])]
     if sink is not None:  # infer.py always writes depth/ and conf/ for the k-th returned frame
-        frame_ids = json.loads((output / "run_params.json").read_text(encoding="utf-8"))["output_frame_ids"]
-        export_numbered_maps(sink, output / "depth", [int(frame_id) for frame_id in frame_ids], output / "conf")
+        frame_ids = json.loads(
+            (output /
+             "run_params.json").read_text(encoding="utf-8"))["output_frame_ids"]
+        export_numbered_maps(sink, output / "depth",
+                             [int(frame_id) for frame_id in frame_ids],
+                             output / "conf")
     return read_r3_poses(output), runtime
 
 
 def read_r3_poses(output: Path) -> dict[int, np.ndarray]:
     """R3 infer.py output: ``camera/<k>.npz`` (``pose`` = 3x4 or 4x4 camera-to-world) for the k-th returned frame,
     whose input index is ``run_params.json`` ``output_frame_ids[k]``."""
-    frame_ids = json.loads((output / "run_params.json").read_text(encoding="utf-8"))["output_frame_ids"]
+    frame_ids = json.loads(
+        (output /
+         "run_params.json").read_text(encoding="utf-8"))["output_frame_ids"]
     poses = {}
     for index, frame_id in enumerate(frame_ids):
         pose = np.eye(4)
@@ -386,8 +476,12 @@ def read_r3_poses(output: Path) -> dict[int, np.ndarray]:
     return poses
 
 
-def run_scal3r(staging: Path, work: Path, code_path: Path, weights: dict[str, Path],
-               fixed: tuple[int, int] | None = None, sink: DepthSink | None = None) -> tuple[dict, dict]:
+def run_scal3r(staging: Path,
+               work: Path,
+               code_path: Path,
+               weights: dict[str, Path],
+               fixed: tuple[int, int] | None = None,
+               sink: DepthSink | None = None) -> tuple[dict, dict]:
     """``python -m scal3r.run`` with the release config in a subprocess; returns ({input index: c2w}, runtime). Its
     frames are resized to ``proc_max_size`` px wide (518), or kept at ``fixed``'s width."""
     output = work / "scal3r"
@@ -395,16 +489,36 @@ def run_scal3r(staging: Path, work: Path, code_path: Path, weights: dict[str, Pa
     config = work / "scal3r.yaml"
     config.write_text(yaml.safe_dump({
         "configs": [str(code_path / "configs" / "models" / "scal3r.yaml")],
-        "model": {"checkpoint": str(weights["SCAL3R"])},
-        "data": {"loop_ckpt": str(weights["SALAD"])},
-        **({"val_dataloader_cfg": {"dataset_cfg": {"proc_max_size": fixed[0]}}} if fixed else {}),
-    }), encoding="utf-8")
-    env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(code_path), os.environ.get("PYTHONPATH", "")]))
+        "model": {
+            "checkpoint": str(weights["SCAL3R"])
+        },
+        "data": {
+            "loop_ckpt": str(weights["SALAD"])
+        },
+        **({
+            "val_dataloader_cfg": {
+                "dataset_cfg": {
+                    "proc_max_size": fixed[0]
+                }
+            }
+        } if fixed else {}),
+    }),
+                      encoding="utf-8")
+    env = dict(os.environ,
+               PYTHONPATH=os.pathsep.join(
+                   [str(code_path),
+                    os.environ.get("PYTHONPATH", "")]))
     runtime = _run_subprocess(
-        [sys.executable, "-m", "scal3r.run", "--config", str(config), "--input_dir", str(staging),
-         "--output_dir", str(output), "--checkpoint", str(weights["SCAL3R"]),
-         "--save_dpt", "1" if sink is not None else "0", "--save_xyz", "0"],
-        code_path, env,
+        [
+            sys.executable, "-m", "scal3r.run", "--config",
+            str(config), "--input_dir",
+            str(staging), "--output_dir",
+            str(output), "--checkpoint",
+            str(weights["SCAL3R"]), "--save_dpt",
+            "1" if sink is not None else "0", "--save_xyz", "0"
+        ],
+        code_path,
+        env,
     )
     # Without --export_depth Scal3R saves no per-frame maps (--save_dpt 0). At proc_max_size = the fixed width its
     # resize is a no-op (scripts/test/probe_slam_input_sizes.py), so the model sees the fixed frames as they are.
@@ -419,11 +533,17 @@ def read_scal3r_poses(output: Path) -> dict[int, np.ndarray]:
     """Scal3R ``mat.txt``: one raveled 4x4 camera-to-world per input image, in the (sorted) input order."""
     rows = np.loadtxt(output / "mat.txt", ndmin=2)
     if rows.shape[1] != 16:
-        raise RuntimeError(f"{output / 'mat.txt'} has {rows.shape[1]} columns, expected 16")
+        raise RuntimeError(
+            f"{output / 'mat.txt'} has {rows.shape[1]} columns, expected 16")
     return {index: row.reshape(4, 4) for index, row in enumerate(rows)}
 
 
-IN_PROCESS = {"LOGER": run_loger, "ZIPMAP": run_zipmap, "LINGBOT_MAP": run_lingbot_map, "ABOT_RECON": run_abot_recon}
+IN_PROCESS = {
+    "LOGER": run_loger,
+    "ZIPMAP": run_zipmap,
+    "LINGBOT_MAP": run_lingbot_map,
+    "ABOT_RECON": run_abot_recon
+}
 SUBPROCESS = {"R3": run_r3, "SCAL3R": run_scal3r}
 
 
@@ -431,16 +551,27 @@ def run() -> None:
     """Stage the strided frames, run the method and export its poses as a COLMAP model."""
     args = parse_args()
     if args.track != "rgb":
-        raise SystemExit(f"{args.method} takes RGB only (track {args.track!r} is not supported)")
+        raise SystemExit(
+            f"{args.method} takes RGB only (track {args.track!r} is not supported)"
+        )
     images_dir = canonical_image_root(args.data_path)
-    image_paths = select_interval(find_image_paths(images_dir), args.interval, args.max_images_per_run)
+    image_paths = select_interval(find_image_paths(images_dir), args.interval,
+                                  args.max_images_per_run)
     if len(image_paths) < 3:
-        raise ValueError(f"Need at least 3 frames, found {len(image_paths)} in {images_dir}")
+        raise ValueError(
+            f"Need at least 3 frames, found {len(image_paths)} in {images_dir}")
     code_path = args.code_path or DEFAULT_CODE_ROOT / CODE_DIRS[args.method]
     weights = weight_paths(args.ckpt_root)
     if args.dry_run:
-        print({"method": args.method, "frames": len(image_paths), "code_path": str(code_path),
-               "weights": {k: str(v) for k, v in weights.items()}, "output": str(args.output_path)})
+        print({
+            "method": args.method,
+            "frames": len(image_paths),
+            "code_path": str(code_path),
+            "weights": {
+                k: str(v) for k, v in weights.items()
+            },
+            "output": str(args.output_path)
+        })
         return
 
     args.output_path.mkdir(parents=True, exist_ok=True)
@@ -449,26 +580,40 @@ def run() -> None:
         staging = work / "images"
         staged = [staging / name for name in stage_images(image_paths, staging)]
         fixed = fixed_input_size(image_paths)
-        sink = DepthSink(args.output_path, image_paths) if args.export_depth else None
+        sink = DepthSink(args.output_path,
+                         image_paths) if args.export_depth else None
         started_at = time.time()
         if args.method in IN_PROCESS:
-            poses = IN_PROCESS[args.method](staged, code_path, weights, fixed, sink)
+            poses = IN_PROCESS[args.method](staged, code_path, weights, fixed,
+                                            sink)
             runtime = runtime_metrics(started_at)
             if sink is not None:  # the maps were written while the method ran; time inference without that export
                 runtime["inference_seconds"] -= sink.export_seconds
         else:
-            poses, runtime = SUBPROCESS[args.method](staging, work, code_path, weights, fixed, sink)
+            poses, runtime = SUBPROCESS[args.method](staging, work, code_path,
+                                                     weights, fixed, sink)
 
-        indices = sorted(index for index in poses if 0 <= index < len(image_paths))
+        indices = sorted(
+            index for index in poses if 0 <= index < len(image_paths))
         if not indices:
-            raise RuntimeError(f"{args.method} returned no poses for the {len(image_paths)} input frames")
+            raise RuntimeError(
+                f"{args.method} returned no poses for the {len(image_paths)} input frames"
+            )
         returned = [image_paths[index] for index in indices]
-        w2c = np.stack([np.linalg.inv(poses[index]) for index in indices])[:, :3, :4]
+        w2c = np.stack([np.linalg.inv(poses[index]) for index in indices
+                       ])[:, :3, :4]
         width, height = Image.open(returned[0]).size
         focal = float(max(width, height))
-        intrinsics = np.tile(np.array([[focal, 0, width / 2], [0, focal, height / 2], [0, 0, 1]]),
-                             (len(returned), 1, 1))
-        export_camera_pose_priors(args.output_path, images_dir, returned, w2c, intrinsics, width=width, height=height,
+        intrinsics = np.tile(
+            np.array([[focal, 0, width / 2], [0, focal, height / 2],
+                      [0, 0, 1]]), (len(returned), 1, 1))
+        export_camera_pose_priors(args.output_path,
+                                  images_dir,
+                                  returned,
+                                  w2c,
+                                  intrinsics,
+                                  width=width,
+                                  height=height,
                                   colmap_model_subdir=args.colmap_model_subdir)
         write_adapter_metrics(
             output_path=args.output_path,
@@ -477,9 +622,20 @@ def run() -> None:
             started_at=started_at,
             checkpoint=str(weights.get(args.method, code_path)),
             depth_only=False,
-            metrics_extra={"track": args.track, "frames_with_pose": len(returned), "intrinsics": "nominal",
-                           **(sink.metrics() | {"depth_frame": "trajectory"} if sink is not None else {}),
-                           **({"loop_closure": dict(LOOP_INFO)} if LOOP_INFO else {})},
+            metrics_extra={
+                "track":
+                    args.track,
+                "frames_with_pose":
+                    len(returned),
+                "intrinsics":
+                    "nominal",
+                **(sink.metrics() | {
+                       "depth_frame": "trajectory"
+                   } if sink is not None else {}),
+                **({
+                    "loop_closure": dict(LOOP_INFO)
+                } if LOOP_INFO else {})
+            },
             runtime=runtime,
         )
         if not args.keep_work_dir:

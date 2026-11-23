@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Run a method's own script with its VGGT image loader replaced by one that keeps fixed-resolution frames as is.
 
 VGGT-Long and VGGT-SLAM call VGGT's ``load_and_preprocess_images``, which hardcodes a 518 px width, so the SLAM
@@ -30,7 +29,9 @@ from pathlib import Path
 PATCH_SIZE = 14  # VGGT's ViT patch
 
 
-def load_fixed_images(image_path_list, mode: str = "crop", record: Path | None = None):
+def load_fixed_images(image_path_list,
+                      mode: str = "crop",
+                      record: Path | None = None):
     """VGGT ``load_and_preprocess_images`` replacement for frames already at the protocol size: no resize, no crop."""
     import torch  # pylint: disable=import-outside-toplevel  # the method's own environment provides it
     from PIL import Image  # pylint: disable=import-outside-toplevel
@@ -48,12 +49,18 @@ def load_fixed_images(image_path_list, mode: str = "crop", record: Path | None =
             tensors.append(TF.to_tensor(image.convert("RGB")))
     shapes = {tuple(tensor.shape[-2:]) for tensor in tensors}
     if len(shapes) != 1:
-        raise ValueError(f"Fixed-resolution frames must share one size, found {sorted(shapes)}")
+        raise ValueError(
+            f"Fixed-resolution frames must share one size, found {sorted(shapes)}"
+        )
     height, width = shapes.pop()
     if height % PATCH_SIZE or width % PATCH_SIZE:
-        raise ValueError(f"Fixed-resolution frames {width}x{height} are not on the {PATCH_SIZE} px patch grid")
+        raise ValueError(
+            f"Fixed-resolution frames {width}x{height} are not on the {PATCH_SIZE} px patch grid"
+        )
     if record is not None:
-        record.write_text(json.dumps({"model_input_size": [width, height]}) + "\n", encoding="utf-8")
+        record.write_text(json.dumps({"model_input_size": [width, height]}) +
+                          "\n",
+                          encoding="utf-8")
     return torch.stack(tensors)
 
 
@@ -67,10 +74,13 @@ def install_vggt_slam_depth_dump(directory: Path) -> None:
 
     def run_predictions(self, image_names, *args, **kwargs):
         predictions = original(self, image_names, *args, **kwargs)
-        depth = np.asarray(predictions["depth"])  # (S, H, W, 1): the submap's frames, in image_names order
+        depth = np.asarray(
+            predictions["depth"]
+        )  # (S, H, W, 1): the submap's frames, in image_names order
         confidence = np.asarray(predictions["depth_conf"])
         for index, name in enumerate(image_names):
-            np.savez(directory / f"{Path(name).stem}.npz", depth=depth[index, ..., 0].astype(np.float32),
+            np.savez(directory / f"{Path(name).stem}.npz",
+                     depth=depth[index, ..., 0].astype(np.float32),
                      depth_conf=confidence[index].astype(np.float32))
         return predictions
 
@@ -79,11 +89,20 @@ def install_vggt_slam_depth_dump(directory: Path) -> None:
 
 def main() -> None:
     """Patch the loaders, then run the script as ``__main__`` with its own arguments."""
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--patch", action="append", default=[],
-                        help="Module whose load_and_preprocess_images is replaced (repeatable).")
-    parser.add_argument("--dump_vggt_slam_depth", type=Path, default=None,
-                        help="VGGT-SLAM: save each submap frame's depth and confidence here.")
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(
+        "--patch",
+        action="append",
+        default=[],
+        help="Module whose load_and_preprocess_images is replaced (repeatable)."
+    )
+    parser.add_argument(
+        "--dump_vggt_slam_depth",
+        type=Path,
+        default=None,
+        help="VGGT-SLAM: save each submap frame's depth and confidence here.")
     parser.add_argument("--record", type=Path, default=None)
     parser.add_argument("script", type=Path)
     parser.add_argument("script_args", nargs=argparse.REMAINDER)
@@ -91,7 +110,9 @@ def main() -> None:
     # Python put this file's directory first on sys.path; its adapters (vggt.py, ...) would shadow the methods'
     # packages of the same name. Replace it with the script's directory, as `python script.py` would have.
     here = Path(__file__).resolve().parent
-    sys.path[:] = [entry for entry in sys.path if Path(entry or ".").resolve() != here]
+    sys.path[:] = [
+        entry for entry in sys.path if Path(entry or ".").resolve() != here
+    ]
     sys.path.insert(0, str(args.script.resolve().parent))
 
     def loader(image_path_list, mode="crop"):

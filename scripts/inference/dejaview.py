@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Run Déjà View / DVLT and export benchmark prediction artifacts."""
 
 from __future__ import annotations
@@ -32,29 +31,29 @@ from adapter_utils import (
     write_adapter_metrics,
 )
 
-
 METHOD = "DEJAVIEW"
-
 
 # Shared method checkouts (the engine's METHOD_CODE_ROOT); the engine also passes the *_CODE_PATH below.
 # see spatialarena/paths.py
-SPATIALARENA_ROOT = os.path.expanduser(os.environ.get("SPATIALARENA_ROOT", "~/spatialarena"))
+SPATIALARENA_ROOT = os.path.expanduser(
+    os.environ.get("SPATIALARENA_ROOT", "~/spatialarena"))
 METHOD_CODE_ROOT = Path(
-    os.environ.get("METHOD_CODE_ROOT", f"{SPATIALARENA_ROOT}/benchmarks/_model_codes")
-)
+    os.environ.get("METHOD_CODE_ROOT",
+                   f"{SPATIALARENA_ROOT}/benchmarks/_model_codes"))
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data_path", type=Path, required=True)
     parser.add_argument("--output_path", type=Path, required=True)
-    parser.add_argument("--ckpt_path", default=os.environ.get("DEJAVIEW_CKPT_PATH", "nvidia/dvlt"))
+    parser.add_argument("--ckpt_path",
+                        default=os.environ.get("DEJAVIEW_CKPT_PATH",
+                                               "nvidia/dvlt"))
     parser.add_argument(
         "--dejaview_code_path",
         type=Path,
         default=Path(os.environ["DEJAVIEW_CODE_PATH"])
-        if "DEJAVIEW_CODE_PATH" in os.environ
-        else METHOD_CODE_ROOT / "dvlt",
+        if "DEJAVIEW_CODE_PATH" in os.environ else METHOD_CODE_ROOT / "dvlt",
     )
     parser.add_argument("--track", choices=("rgb",), default="rgb")
     parser.add_argument("--interval", type=int, default=1)
@@ -80,13 +79,20 @@ def to_4x4_camera_to_world(camera_to_worlds):
     if c2w.shape[-2:] == (3, 4):
         c2w = to4x4(c2w)
     if c2w.shape[-2:] != (4, 4):
-        raise ValueError(f"Expected DVLT camera_to_worlds with shape Sx3x4 or Sx4x4, got {tuple(c2w.shape)}")
+        raise ValueError(
+            f"Expected DVLT camera_to_worlds with shape Sx3x4 or Sx4x4, got {tuple(c2w.shape)}"
+        )
     if isinstance(c2w, torch.Tensor):
         return c2w.detach().float().cpu().numpy()
     return as_numpy(c2w).astype("float32", copy=False)
 
 
-def preprocess_dejaview(image_paths: list[str], *, args, device=None, patch_size: int = 14, **_unused):
+def preprocess_dejaview(image_paths: list[str],
+                        *,
+                        args,
+                        device=None,
+                        patch_size: int = 14,
+                        **_unused):
     """DejaView's preprocess_<method>(), registered below for prepare_model_input("DEJAVIEW", ...).
 
     Builds DVLT's own batch dict (DataField.IMAGES/"gradio_valid_pixels", matching
@@ -112,13 +118,14 @@ def preprocess_dejaview(image_paths: list[str], *, args, device=None, patch_size
         img = ImageOps.exif_transpose(Image.open(path)).convert("RGB")
         source_w, source_h = img.size
         scale = args.image_load_resolution / max(source_h, source_w)
-        new_h, new_w = max(1, round(source_h * scale)), max(1, round(source_w * scale))
-        resized_images.append(img.resize((new_w, new_h), Image.Resampling.LANCZOS))
+        new_h, new_w = max(1, round(source_h * scale)), max(
+            1, round(source_w * scale))
+        resized_images.append(
+            img.resize((new_w, new_h), Image.Resampling.LANCZOS))
         source_and_resized.append((source_w, source_h, new_w, new_h))
         ceil_dims.append(
             (((new_w + patch_size - 1) // patch_size) * patch_size,
-             ((new_h + patch_size - 1) // patch_size) * patch_size)
-        )
+             ((new_h + patch_size - 1) // patch_size) * patch_size))
 
     max_w = max(ceil_w for ceil_w, _ in ceil_dims)
     max_h = max(ceil_h for _, ceil_h in ceil_dims)
@@ -126,13 +133,18 @@ def preprocess_dejaview(image_paths: list[str], *, args, device=None, patch_size
     aligned: list[torch.Tensor] = []
     valid_masks: list[torch.Tensor] = []
     transforms: list[SpatialTransform] = []
-    for resized, (source_w, source_h, new_w, new_h) in zip(resized_images, source_and_resized):
-        tensor = torch.from_numpy(np.array(resized)).permute(2, 0, 1).float() / 255.0
+    for resized, (source_w, source_h, new_w,
+                  new_h) in zip(resized_images, source_and_resized):
+        tensor = torch.from_numpy(np.array(resized)).permute(2, 0,
+                                                             1).float() / 255.0
         pad_w, pad_h = max_w - new_w, max_h - new_h
         pad_left, pad_right = pad_w // 2, pad_w - pad_w // 2
         pad_top, pad_bottom = pad_h // 2, pad_h - pad_h // 2
-        aligned.append(F.pad(tensor, (pad_left, pad_right, pad_top, pad_bottom), value=0.0))
-        valid = F.pad(torch.ones(1, new_h, new_w, dtype=torch.float32), (pad_left, pad_right, pad_top, pad_bottom),
+        aligned.append(
+            F.pad(tensor, (pad_left, pad_right, pad_top, pad_bottom),
+                  value=0.0))
+        valid = F.pad(torch.ones(1, new_h, new_w, dtype=torch.float32),
+                      (pad_left, pad_right, pad_top, pad_bottom),
                       value=0.0)
         valid_masks.append(valid.squeeze(0).bool())
         transforms.append(
@@ -140,12 +152,15 @@ def preprocess_dejaview(image_paths: list[str], *, args, device=None, patch_size
                 source_wh=(source_w, source_h),
                 resized_wh=(new_w, new_h),
                 padding=(pad_left, pad_top, pad_right, pad_bottom),
-            )
-        )
+            ))
 
     images = torch.stack(aligned, dim=0).unsqueeze(0).to(device)
-    gradio_valid_pixels = torch.stack(valid_masks, dim=0).unsqueeze(0).to(device)
-    return {DataField.IMAGES: images, "gradio_valid_pixels": gradio_valid_pixels}, transforms
+    gradio_valid_pixels = torch.stack(valid_masks,
+                                      dim=0).unsqueeze(0).to(device)
+    return {
+        DataField.IMAGES: images,
+        "gradio_valid_pixels": gradio_valid_pixels
+    }, transforms
 
 
 register_preprocessor("DEJAVIEW", preprocess_dejaview)
@@ -162,7 +177,8 @@ def run() -> None:
     # Capping total frames first means the loop always produces exactly one
     # chunk; doesn't change per-chunk memory footprint since chunk_size
     # (already <= max_images_per_run) is unchanged.
-    image_paths = select_interval(find_image_paths(images_dir), args.interval, args.max_images_per_run)
+    image_paths = select_interval(find_image_paths(images_dir), args.interval,
+                                  args.max_images_per_run)
     if not image_paths:
         raise ValueError(f"No images found in {images_dir}")
     if args.dry_run:
@@ -180,13 +196,15 @@ def run() -> None:
     from accelerate import Accelerator
     from dvlt.model.dvlt.model import DVLT
 
-    accelerator = Accelerator(mixed_precision="bf16" if torch.cuda.is_available() else "no")
+    accelerator = Accelerator(
+        mixed_precision="bf16" if torch.cuda.is_available() else "no")
     model = DVLT(img_size=args.image_load_resolution)
     model.load_pretrained(args.ckpt_path, strict=True)
     model.setup_test(accelerator)
 
     started_at = mark_model_loaded()
-    chunk_size = args.max_images_per_run if args.max_images_per_run > 0 else len(image_paths)
+    chunk_size = args.max_images_per_run if args.max_images_per_run > 0 else len(
+        image_paths)
     if single_view_mode():
         chunk_size = 1  # MonoDepth: one image per forward pass, never a multi-view chunk
     depth_chunks = []
@@ -197,15 +215,17 @@ def run() -> None:
     intrinsic_chunks = []
     all_transforms: list[SpatialTransform] = []
     for start in range(0, len(image_paths), chunk_size):
-        chunk_paths = image_paths[start : start + chunk_size]
-        batch, chunk_transforms = prepare_model_input(
-            "DEJAVIEW", chunk_paths, args=args, device=accelerator.device
-        )
+        chunk_paths = image_paths[start:start + chunk_size]
+        batch, chunk_transforms = prepare_model_input("DEJAVIEW",
+                                                      chunk_paths,
+                                                      args=args,
+                                                      device=accelerator.device)
         all_transforms.extend(chunk_transforms)
         with torch.no_grad(), accelerator.autocast():
             predictions = model.predict(batch, accelerator)
 
-        depths = as_numpy(predictions["depths"][0]).astype("float32", copy=False)
+        depths = as_numpy(predictions["depths"][0]).astype("float32",
+                                                           copy=False)
         depth_chunks.append(depths)
         confidence = predictions.get("depth_conf", None)
         if confidence is None:
@@ -215,25 +235,32 @@ def run() -> None:
         if confidence is not None:
             confidence = as_numpy(confidence).squeeze()
             # A one-image chunk squeezes to (H, W); keep the frame axis so chunks concatenate per frame.
-            confidence_chunks.append(confidence[None] if confidence.ndim == 2 else confidence)
+            confidence_chunks.append(confidence[None] if confidence.ndim ==
+                                     2 else confidence)
 
         if args.export_colmap:
             cameras = predictions["cameras"][0]
             c2w = to_4x4_camera_to_world(cameras.camera_to_worlds)
             extrinsic_chunks.append(c2w_to_w2c(c2w))
             intrinsic_chunks.append(
-                as_numpy(cameras.get_intrinsics_matrices()).astype("float32", copy=False)
-            )
+                as_numpy(cameras.get_intrinsics_matrices()).astype("float32",
+                                                                   copy=False))
         if not args.depth_only:
             point_chunks.append(
-                as_numpy(predictions["world_points"][0]).astype("float32", copy=False)
-            )
+                as_numpy(predictions["world_points"][0]).astype("float32",
+                                                                copy=False))
             color_chunks.append(colors_from_torch_images(batch["images"]))
 
-    confidence = np.concatenate(confidence_chunks, axis=0) if confidence_chunks else None
-    extrinsics_w2c = np.concatenate(extrinsic_chunks, axis=0) if extrinsic_chunks else None
-    intrinsics = np.concatenate(intrinsic_chunks, axis=0) if intrinsic_chunks else None
-    metrics_extra = {"track": args.track, "adapter": "dvlt.model.dvlt.model.DVLT"}
+    confidence = np.concatenate(confidence_chunks,
+                                axis=0) if confidence_chunks else None
+    extrinsics_w2c = np.concatenate(extrinsic_chunks,
+                                    axis=0) if extrinsic_chunks else None
+    intrinsics = np.concatenate(intrinsic_chunks,
+                                axis=0) if intrinsic_chunks else None
+    metrics_extra = {
+        "track": args.track,
+        "adapter": "dvlt.model.dvlt.model.DVLT"
+    }
 
     if args.depth_only:
         # Restore depth/camera predictions to each image's true source resolution -- the same
@@ -241,9 +268,11 @@ def run() -> None:
         # vggt.py/fastvggt.py/da3.py/vggt_omega.py/cut3r.py/etc.
         if args.export_depth:
             depths = np.concatenate(depth_chunks, axis=0)
-            export_spatial_depth_predictions(args.output_path, image_paths, depths, confidence, all_transforms)
+            export_spatial_depth_predictions(args.output_path, image_paths,
+                                             depths, confidence, all_transforms)
         if args.export_colmap and extrinsics_w2c is not None and intrinsics is not None:
-            restored_intrinsics, width, height = restore_camera_export(intrinsics, all_transforms)
+            restored_intrinsics, width, height = restore_camera_export(
+                intrinsics, all_transforms)
             export_camera_pose_priors(
                 args.output_path,
                 images_dir,
@@ -287,7 +316,8 @@ def run() -> None:
         depth_only=args.depth_only,
         colmap_model_subdir=args.colmap_model_subdir,
         max_points=args.max_points,
-        conf_thresh=args.depth_conf_thresh if args.depth_conf_thresh is not None else args.conf_thresh,
+        conf_thresh=args.depth_conf_thresh
+        if args.depth_conf_thresh is not None else args.conf_thresh,
         started_at=started_at,
         checkpoint=args.ckpt_path,
         metrics_extra=metrics_extra,

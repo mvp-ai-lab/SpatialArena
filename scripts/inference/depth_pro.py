@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Official Depth Pro (apple/ml-depth-pro) metric depth.
 
 Each image goes through the official transform and ``DepthPro.infer`` in fp32 with ``f_px=None``: the focal length
@@ -29,8 +28,10 @@ def run() -> None:
     from depth_pro.depth_pro import DEFAULT_MONODEPTH_CONFIG_DICT  # pylint: disable=no-name-in-module
 
     config = replace(DEFAULT_MONODEPTH_CONFIG_DICT,
-                     checkpoint_uri=resolve_checkpoint_file(args.ckpt_path, "depth_pro.pt"))
-    model, transform = depth_pro.create_model_and_transforms(config=config, device=torch.device("cuda"))
+                     checkpoint_uri=resolve_checkpoint_file(
+                         args.ckpt_path, "depth_pro.pt"))
+    model, transform = depth_pro.create_model_and_transforms(
+        config=config, device=torch.device("cuda"))
     model.eval()
 
     def predict(rgb):
@@ -38,7 +39,10 @@ def run() -> None:
             output = model.infer(transform(rgb), f_px=None)
         return output["depth"].float().cpu().numpy(), None
 
-    run_single_image_depth(args, image_paths, predict, metrics_extra={"f_px": "predicted (FoV head)"})
+    run_single_image_depth(args,
+                           image_paths,
+                           predict,
+                           metrics_extra={"f_px": "predicted (FoV head)"})
 
 
 if __name__ == "__main__":

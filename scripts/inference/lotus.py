@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Official Lotus-D v2 disparity (EnVision-Research/Lotus), in-process.
 
 Mirrors the official infer.py regression path (and PR #21's lotus_official.py settings): one image per forward,
@@ -31,25 +30,40 @@ def run() -> None:
     from pipeline import LotusDPipeline
 
     torch.manual_seed(args.seed)
-    pipe = LotusDPipeline.from_pretrained(args.ckpt_path, torch_dtype=torch.float16).to("cuda")
+    pipe = LotusDPipeline.from_pretrained(args.ckpt_path,
+                                          torch_dtype=torch.float16).to("cuda")
     pipe.set_progress_bar_config(disable=True)
     task_emb = torch.tensor([1, 0]).float().unsqueeze(0).cuda()
     task_emb = torch.cat([torch.sin(task_emb), torch.cos(task_emb)], dim=-1)
 
     def predict(rgb):
-        image = torch.from_numpy(rgb.astype(np.float32)).permute(2, 0, 1).unsqueeze(0).cuda() / 127.5 - 1.0
+        image = torch.from_numpy(rgb.astype(np.float32)).permute(
+            2, 0, 1).unsqueeze(0).cuda() / 127.5 - 1.0
         generator = torch.Generator("cuda").manual_seed(args.seed)
         with torch.no_grad(), torch.autocast("cuda"):
-            output = pipe(rgb_in=image, prompt="", num_inference_steps=1, generator=generator, output_type="np",
-                          timesteps=[999], task_emb=task_emb, processing_res=PROCESSING_RES, match_input_res=True,
+            output = pipe(rgb_in=image,
+                          prompt="",
+                          num_inference_steps=1,
+                          generator=generator,
+                          output_type="np",
+                          timesteps=[999],
+                          task_emb=task_emb,
+                          processing_res=PROCESSING_RES,
+                          match_input_res=True,
                           resample_method="bilinear").images[0]
         disparity = output.mean(axis=-1).astype(np.float32)
         return 1.0 / np.maximum(disparity, DISPARITY_FLOOR), disparity
 
-    run_single_image_depth(args, image_paths, predict, metrics_extra={
-        "raw_representation": "normalized_disparity", "depth_conversion": f"1 / max(q, {DISPARITY_FLOOR})",
-        "processing_res": PROCESSING_RES, "timestep": 999,
-    })
+    run_single_image_depth(
+        args,
+        image_paths,
+        predict,
+        metrics_extra={
+            "raw_representation": "normalized_disparity",
+            "depth_conversion": f"1 / max(q, {DISPARITY_FLOOR})",
+            "processing_res": PROCESSING_RES,
+            "timestep": 999,
+        })
 
 
 if __name__ == "__main__":

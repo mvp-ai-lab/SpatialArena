@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Run GenCeption and export benchmark prediction artifacts.
 
 GenCeption (google-deepmind/representations4d) is a single-forward-pass
@@ -44,17 +43,10 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from scripts.inference.adapter_utils import (  # noqa: E402
-    canonical_image_root,
-    batched_image_paths,
-    c2w_to_w2c,
-    export_camera_pose_priors,
-    export_depth_predictions,
-    find_image_paths,
-    mark_model_loaded,
-    select_interval,
-    write_adapter_metrics,
+    canonical_image_root, batched_image_paths, c2w_to_w2c,
+    export_camera_pose_priors, export_depth_predictions, find_image_paths,
+    mark_model_loaded, select_interval, write_adapter_metrics,
 )
-
 
 METHOD = "GenCeption"
 
@@ -71,41 +63,50 @@ POSE_SOLVERS = ("robust2", "svd")
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run GenCeption benchmark adapter.")
+    parser = argparse.ArgumentParser(
+        description="Run GenCeption benchmark adapter.")
     parser.add_argument("--data_path", type=Path, required=True)
     parser.add_argument("--output_path", type=Path, required=True)
     parser.add_argument(
         "--task",
         choices=("depth", "pose"),
         required=True,
-        help="depth: official depth prompt and decoder. pose: official raymap prompt and decode.",
+        help=
+        "depth: official depth prompt and decoder. pose: official raymap prompt and decode.",
     )
     parser.add_argument(
         "--ckpt_dir",
         type=Path,
-        default=Path(os.environ["GENCEPTION_CKPT_DIR"]) if "GENCEPTION_CKPT_DIR" in os.environ else None,
-        help="Directory with genception_{model_size}_transformer.npz + vae/ (see scripts/download/genception.sh).",
+        default=Path(os.environ["GENCEPTION_CKPT_DIR"])
+        if "GENCEPTION_CKPT_DIR" in os.environ else None,
+        help=
+        "Directory with genception_{model_size}_transformer.npz + vae/ (see scripts/download/genception.sh).",
     )
     parser.add_argument(
         "--prompt_embeddings_dir",
         type=Path,
-        default=(
-            Path(os.environ["GENCEPTION_EMBEDDINGS_DIR"])
-            if "GENCEPTION_EMBEDDINGS_DIR" in os.environ
-            else None
-        ),
+        default=(Path(os.environ["GENCEPTION_EMBEDDINGS_DIR"])
+                 if "GENCEPTION_EMBEDDINGS_DIR" in os.environ else None),
     )
-    parser.add_argument("--model_size", type=str, default=os.environ.get("GENCEPTION_MODEL_SIZE", "14b"))
+    parser.add_argument("--model_size",
+                        type=str,
+                        default=os.environ.get("GENCEPTION_MODEL_SIZE", "14b"))
     parser.add_argument("--interval", type=int, default=1)
     parser.add_argument("--max_images_per_run", type=int, default=0)
     parser.add_argument("--colmap_model_subdir", type=str, default="0")
     parser.add_argument(
-        "--pose_solver", choices=POSE_SOLVERS, default=os.environ.get("GENCEPTION_POSE_SOLVER", "robust2"),
-        help="Rotation solver of the official raymap decode (both are reported upstream; robust2 first).",
+        "--pose_solver",
+        choices=POSE_SOLVERS,
+        default=os.environ.get("GENCEPTION_POSE_SOLVER", "robust2"),
+        help=
+        "Rotation solver of the official raymap decode (both are reported upstream; robust2 first).",
     )
     parser.add_argument(
-        "--raw_poses", action="store_true", default=os.environ.get("GENCEPTION_RAW_POSES", "0") == "1",
-        help="Export the per-frame poses instead of the temporally smoothed ones (official headline).",
+        "--raw_poses",
+        action="store_true",
+        default=os.environ.get("GENCEPTION_RAW_POSES", "0") == "1",
+        help=
+        "Export the per-frame poses instead of the temporally smoothed ones (official headline).",
     )
     parser.add_argument("--dry_run", action="store_true")
     # run_method_case_list.sh appends these shared flags to every adapter command; --task alone decides what
@@ -121,27 +122,39 @@ def _print_dry_run(args: argparse.Namespace, num_images: int) -> None:
     # adapter_utils.print_dry_run()'s generic planned_layout(), so this is
     # its own small equivalent rather than forcing an artificial fit.
     plan = {
-        "method": METHOD,
-        "data_path": str(args.data_path),
-        "output_path": str(args.output_path),
-        "num_images": num_images,
-        "task": args.task,
-        "pose_decode": (
-            f"{args.pose_solver}, {'raw' if args.raw_poses else 'smoothed'}" if args.task == "pose" else None
-        ),
-        "model_size": args.model_size,
-        "ckpt_dir": str(args.ckpt_dir) if args.ckpt_dir else None,
-        "prompt_embeddings_dir": str(args.prompt_embeddings_dir) if args.prompt_embeddings_dir else None,
-        "metrics": str(args.output_path / "metrics.json"),
-        "depths": str(args.output_path / "depths") if args.task == "depth" else None,
-        "sparse": (
-            str(args.output_path / "sparse" / args.colmap_model_subdir) if args.task == "pose" else None
-        ),
+        "method":
+            METHOD,
+        "data_path":
+            str(args.data_path),
+        "output_path":
+            str(args.output_path),
+        "num_images":
+            num_images,
+        "task":
+            args.task,
+        "pose_decode":
+            (f"{args.pose_solver}, {'raw' if args.raw_poses else 'smoothed'}"
+             if args.task == "pose" else None),
+        "model_size":
+            args.model_size,
+        "ckpt_dir":
+            str(args.ckpt_dir) if args.ckpt_dir else None,
+        "prompt_embeddings_dir":
+            str(args.prompt_embeddings_dir)
+            if args.prompt_embeddings_dir else None,
+        "metrics":
+            str(args.output_path / "metrics.json"),
+        "depths":
+            str(args.output_path / "depths") if args.task == "depth" else None,
+        "sparse":
+            (str(args.output_path / "sparse" /
+                 args.colmap_model_subdir) if args.task == "pose" else None),
     }
     print(json.dumps(plan, indent=2))
 
 
-def _load_video(image_paths: list[str]) -> tuple[np.ndarray, list[tuple[int, int]]]:
+def _load_video(
+        image_paths: list[str]) -> tuple[np.ndarray, list[tuple[int, int]]]:
     """Frames resized on the CPU to GenCeption's input size, and each frame's original (height, width).
 
     preprocess_video resizes on the GPU in float32 and runs out of memory on full-resolution photos (e.g. MonoDepth
@@ -152,11 +165,16 @@ def _load_video(image_paths: list[str]) -> tuple[np.ndarray, list[tuple[int, int
         with Image.open(path) as image:
             image = image.convert("RGB")
             sizes.append((image.height, image.width))
-            frames.append(np.asarray(image.resize((GENCEPTION_WIDTH, GENCEPTION_HEIGHT), Image.BILINEAR)))
+            frames.append(
+                np.asarray(
+                    image.resize((GENCEPTION_WIDTH, GENCEPTION_HEIGHT),
+                                 Image.BILINEAR)))
     return np.stack(frames, axis=0).astype(np.uint8), sizes  # [T, 480, 832, 3]
 
 
-def _cover_crop_frame(image: Image.Image) -> tuple[np.ndarray, tuple[float, float, float, float]]:
+def _cover_crop_frame(
+        image: Image.Image
+) -> tuple[np.ndarray, tuple[float, float, float, float]]:
     """The official pose evaluation's resize: scale to cover 480x832 keeping the aspect ratio, then center-crop.
 
     Returns the (480, 832, 3) uint8 frame and (scale_x, scale_y, offset_x, offset_y): a pixel ``u`` of the original
@@ -165,23 +183,30 @@ def _cover_crop_frame(image: Image.Image) -> tuple[np.ndarray, tuple[float, floa
     """
     width, height = image.size
     scale = max(GENCEPTION_WIDTH / width, GENCEPTION_HEIGHT / height)
-    new_width, new_height = max(1, int(round(width * scale))), max(1, int(round(height * scale)))
+    new_width, new_height = max(1, int(round(width * scale))), max(
+        1, int(round(height * scale)))
     frame = np.asarray(image)
     if (new_width, new_height) != (width, height):
         if importlib.util.find_spec("cv2") is not None:
             import cv2  # pylint: disable=import-outside-toplevel
 
             interpolation = cv2.INTER_AREA if scale < 1.0 else cv2.INTER_LINEAR
-            frame = cv2.resize(frame, (new_width, new_height), interpolation=interpolation)
+            frame = cv2.resize(frame, (new_width, new_height),
+                               interpolation=interpolation)
         else:
             resample = Image.BOX if scale < 1.0 else Image.BILINEAR
             frame = np.asarray(image.resize((new_width, new_height), resample))
-    offset_x, offset_y = (new_width - GENCEPTION_WIDTH) // 2, (new_height - GENCEPTION_HEIGHT) // 2
-    crop = frame[offset_y:offset_y + GENCEPTION_HEIGHT, offset_x:offset_x + GENCEPTION_WIDTH]
-    return np.ascontiguousarray(crop), (new_width / width, new_height / height, float(offset_x), float(offset_y))
+    offset_x, offset_y = (new_width - GENCEPTION_WIDTH) // 2, (
+        new_height - GENCEPTION_HEIGHT) // 2
+    crop = frame[offset_y:offset_y + GENCEPTION_HEIGHT,
+                 offset_x:offset_x + GENCEPTION_WIDTH]
+    return np.ascontiguousarray(crop), (new_width / width, new_height / height,
+                                        float(offset_x), float(offset_y))
 
 
-def _load_pose_video(image_paths: list[str]) -> tuple[np.ndarray, list[tuple[int, int]], list[tuple]]:
+def _load_pose_video(
+    image_paths: list[str]
+) -> tuple[np.ndarray, list[tuple[int, int]], list[tuple]]:
     """Cover-resized, center-cropped (T, 480, 832, 3) frames, each original (height, width) and crop transform."""
     frames, sizes, transforms = [], [], []
     for path in image_paths:
@@ -198,7 +223,11 @@ def _pad_to_81(video: np.ndarray) -> np.ndarray:
     """Repeat the last frame up to 81 frames, as preprocess_video and the official evaluation do."""
     if len(video) >= GENCEPTION_NUM_FRAMES:
         return video[:GENCEPTION_NUM_FRAMES]
-    return np.concatenate([video, np.repeat(video[-1:], GENCEPTION_NUM_FRAMES - len(video), axis=0)], axis=0)
+    return np.concatenate([
+        video,
+        np.repeat(video[-1:], GENCEPTION_NUM_FRAMES - len(video), axis=0)
+    ],
+                          axis=0)
 
 
 def _float_output(pipe, result: dict) -> np.ndarray:
@@ -209,9 +238,12 @@ def _float_output(pipe, result: dict) -> np.ndarray:
     return np.asarray(result["video"], dtype=np.float32) / 255.0
 
 
-def _intrinsics_on_originals(intrinsics: np.ndarray, transforms: list[tuple]) -> np.ndarray:
+def _intrinsics_on_originals(intrinsics: np.ndarray,
+                             transforms: list[tuple]) -> np.ndarray:
     """Per-frame K on each original image from K on the 480x832 crop (``u_crop = u * scale - offset``)."""
-    per_frame = np.repeat(intrinsics[None].astype(np.float64), len(transforms), axis=0)
+    per_frame = np.repeat(intrinsics[None].astype(np.float64),
+                          len(transforms),
+                          axis=0)
     for index, (scale_x, scale_y, offset_x, offset_y) in enumerate(transforms):
         per_frame[index, 0, 0] /= scale_x
         per_frame[index, 0, 2] = (intrinsics[0, 2] + offset_x) / scale_x
@@ -246,33 +278,47 @@ def _select_output_frame_indices(num_real_frames: int) -> np.ndarray:
     return np.arange(num_real_frames)
 
 
-def _depth_pass(pipe, video: np.ndarray, prompt_path: Path, sizes: list[tuple[int, int]]) -> list[np.ndarray]:
+def _depth_pass(pipe, video: np.ndarray, prompt_path: Path,
+                sizes: list[tuple[int, int]]) -> list[np.ndarray]:
     """GenCeption's official depth prompt on ``video`` (<= 81 frames): one relative depth map per input frame, at
     that frame's original size."""
     result = pipe(prompt_embeds=str(prompt_path), input_video=video)
-    relative_depth = pipe.decode_depth(result["video"])[_select_output_frame_indices(len(video))]  # [T, 480, 832]
-    return [_resize_to_original(depth[None], height, width)[0] for depth, (height, width) in zip(relative_depth, sizes)]
+    relative_depth = pipe.decode_depth(
+        result["video"])[_select_output_frame_indices(
+            len(video))]  # [T, 480, 832]
+    return [
+        _resize_to_original(depth[None], height, width)[0]
+        for depth, (height, width) in zip(relative_depth, sizes)
+    ]
 
 
-def _export_clip_depths(pipe, image_paths: list[str], prompt_path: Path, output_path: Path) -> None:
+def _export_clip_depths(pipe, image_paths: list[str], prompt_path: Path,
+                        output_path: Path) -> None:
     """The depth task: consecutive clips of at most 81 frames, so every input frame gets its own depth map."""
     for clip_paths in batched_image_paths(image_paths, GENCEPTION_NUM_FRAMES):
         video, sizes = _load_video(clip_paths)
-        for image_path, depth in zip(clip_paths, _depth_pass(pipe, video, prompt_path, sizes), strict=True):
+        for image_path, depth in zip(clip_paths,
+                                     _depth_pass(pipe, video, prompt_path,
+                                                 sizes),
+                                     strict=True):
             export_depth_predictions(output_path, [image_path], depth[None])
 
 
-def _resize_to_original(frames: np.ndarray, target_height: int, target_width: int) -> np.ndarray:
+def _resize_to_original(frames: np.ndarray, target_height: int,
+                        target_width: int) -> np.ndarray:
     """GenCeption anisotropically resizes to (480, 832) with no
     aspect-preserving crop (see representations4d/genception/utils.py's
     preprocess_video and google-deepmind/representations4d#10's own note on
     this), so recovering the original resolution is a plain resize back,
     not a crop."""
-    resized = np.empty((frames.shape[0], target_height, target_width) + frames.shape[3:], dtype=frames.dtype)
+    resized = np.empty(
+        (frames.shape[0], target_height, target_width) + frames.shape[3:],
+        dtype=frames.dtype)
     for index, frame in enumerate(frames):
         mode = "F" if frame.dtype == np.float32 else None
         image = Image.fromarray(frame, mode=mode)
-        resized[index] = np.asarray(image.resize((target_width, target_height), Image.BILINEAR))
+        resized[index] = np.asarray(
+            image.resize((target_width, target_height), Image.BILINEAR))
     return resized
 
 
@@ -281,7 +327,8 @@ def run() -> None:
     images_dir = canonical_image_root(args.data_path)
     if not images_dir.is_dir():
         raise FileNotFoundError(f"images directory not found: {images_dir}")
-    image_paths = select_interval(find_image_paths(images_dir), args.interval, args.max_images_per_run)
+    image_paths = select_interval(find_image_paths(images_dir), args.interval,
+                                  args.max_images_per_run)
     if not image_paths:
         raise ValueError(f"No images found in {images_dir}")
 
@@ -292,20 +339,26 @@ def run() -> None:
     if args.ckpt_dir is None:
         raise ValueError("--ckpt_dir or GENCEPTION_CKPT_DIR is required")
     if args.prompt_embeddings_dir is None:
-        raise ValueError("--prompt_embeddings_dir or GENCEPTION_EMBEDDINGS_DIR is required")
+        raise ValueError(
+            "--prompt_embeddings_dir or GENCEPTION_EMBEDDINGS_DIR is required")
 
     from representations4d.genception import GenCeptionPipeline
 
     started_at = time.time()
-    pipe = GenCeptionPipeline.from_pretrained(str(args.ckpt_dir), model_size=args.model_size)
+    pipe = GenCeptionPipeline.from_pretrained(str(args.ckpt_dir),
+                                              model_size=args.model_size)
     mark_model_loaded()
 
     depth_prompt_path = args.prompt_embeddings_dir / DEPTH_PROMPT_FILENAME
-    if (args.task == "depth" or args.export_depth) and not depth_prompt_path.is_file():
-        raise FileNotFoundError(f"{depth_prompt_path} not found -- run scripts/download/genception.sh first.")
+    if (args.task == "depth" or
+            args.export_depth) and not depth_prompt_path.is_file():
+        raise FileNotFoundError(
+            f"{depth_prompt_path} not found -- run scripts/download/genception.sh first."
+        )
 
     if args.task == "depth":
-        _export_clip_depths(pipe, image_paths, depth_prompt_path, args.output_path)
+        _export_clip_depths(pipe, image_paths, depth_prompt_path,
+                            args.output_path)
         write_adapter_metrics(
             output_path=args.output_path,
             method=METHOD,
@@ -325,27 +378,35 @@ def run() -> None:
 
     # --task pose: the official raymap decode (see module docstring). One clip: at most 81 frames get poses.
     selected = _select_input_frame_indices(len(image_paths))
-    image_paths = [image_paths[index] for index in selected]  # the frames GenCeption predicts, by name
-    video, sizes, transforms = _load_pose_video(image_paths)  # [T <= 81, 480, 832, 3] uint8, cover-cropped
+    image_paths = [image_paths[index] for index in selected
+                  ]  # the frames GenCeption predicts, by name
+    video, sizes, transforms = _load_pose_video(
+        image_paths)  # [T <= 81, 480, 832, 3] uint8, cover-cropped
     from spatialarena.geometry.genception_raymap import decode_poses_from_raymap
 
     prompt_path = args.prompt_embeddings_dir / RAYMAP_PROMPT_FILENAME
     if not prompt_path.is_file():
-        raise FileNotFoundError(f"{prompt_path} not found -- run scripts/download/genception.sh first.")
+        raise FileNotFoundError(
+            f"{prompt_path} not found -- run scripts/download/genception.sh first."
+        )
     result = pipe(prompt_embeds=str(prompt_path), input_video=_pad_to_81(video))
     # All 81 output frames are decoded (the clip-wide K fit and the smoothing window see the padding, as upstream);
     # only the real frames are exported.
-    decoded = decode_poses_from_raymap(_float_output(pipe, result), solver=args.pose_solver)
+    decoded = decode_poses_from_raymap(_float_output(pipe, result),
+                                       solver=args.pose_solver)
     output_indices = _select_output_frame_indices(len(video))
     camera_to_world = decoded.poses(smoothed=not args.raw_poses)[output_indices]
     extrinsics_w2c = c2w_to_w2c(camera_to_world)
     if len(set(sizes)) == 1:
         height, width = sizes[0]
-        intrinsics = _intrinsics_on_originals(decoded.intrinsics, transforms[:1])
+        intrinsics = _intrinsics_on_originals(decoded.intrinsics,
+                                              transforms[:1])
         intrinsics = np.repeat(intrinsics, len(image_paths), axis=0)
     else:  # mixed sizes: one COLMAP camera size only, so keep K on the 480x832 crop
         height, width = GENCEPTION_HEIGHT, GENCEPTION_WIDTH
-        intrinsics = np.repeat(decoded.intrinsics[None], len(image_paths), axis=0)
+        intrinsics = np.repeat(decoded.intrinsics[None],
+                               len(image_paths),
+                               axis=0)
 
     if args.export_depth:
         # Second pass with the official depth prompt on the same frames (GenCeption predicts one output per prompt):
@@ -353,7 +414,8 @@ def run() -> None:
         depth_video, _ = _load_video(image_paths)
         depths = _depth_pass(pipe, depth_video, depth_prompt_path, sizes)
         for image_path, depth in zip(image_paths, depths, strict=True):
-            export_depth_predictions(args.output_path, [image_path], depth[None])
+            export_depth_predictions(args.output_path, [image_path],
+                                     depth[None])
 
     export_camera_pose_priors(
         args.output_path,
@@ -366,11 +428,16 @@ def run() -> None:
         colmap_model_subdir=args.colmap_model_subdir,
     )
     decode_info = {
-        "solver": decoded.solver,
-        "poses": "raw" if args.raw_poses else "smoothed",
-        "output": "float" if hasattr(pipe, "_last_video_float") else "uint8 / 255",
-        "preprocess": "cover resize + center crop to 832x480",
-        "intrinsics_on_crop": decoded.intrinsics.tolist(),
+        "solver":
+            decoded.solver,
+        "poses":
+            "raw" if args.raw_poses else "smoothed",
+        "output":
+            "float" if hasattr(pipe, "_last_video_float") else "uint8 / 255",
+        "preprocess":
+            "cover resize + center crop to 832x480",
+        "intrinsics_on_crop":
+            decoded.intrinsics.tolist(),
         "intrinsics_size": [width, height],
     }
     write_adapter_metrics(
@@ -381,14 +448,22 @@ def run() -> None:
         checkpoint=str(args.ckpt_dir),
         depth_only=False,
         metrics_extra={
-            "task": "pose",
-            "model_size": args.model_size,
-            "prompt": "official (Input: RGB. Output: Raymap.)",
-            "decoder": "representations4d genception/evals/eval_camera_pose.py",
-            "resolution": f"{GENCEPTION_WIDTH}x{GENCEPTION_HEIGHT}",
-            "frames_predicted": len(image_paths),
-            "depth_pass": "official depth prompt" if args.export_depth else None,
-            "pose_decode": decode_info,
+            "task":
+                "pose",
+            "model_size":
+                args.model_size,
+            "prompt":
+                "official (Input: RGB. Output: Raymap.)",
+            "decoder":
+                "representations4d genception/evals/eval_camera_pose.py",
+            "resolution":
+                f"{GENCEPTION_WIDTH}x{GENCEPTION_HEIGHT}",
+            "frames_predicted":
+                len(image_paths),
+            "depth_pass":
+                "official depth prompt" if args.export_depth else None,
+            "pose_decode":
+                decode_info,
         },
     )
     np.savez_compressed(
@@ -398,8 +473,8 @@ def run() -> None:
         intrinsics_on_crop=decoded.intrinsics,
     )
     (args.output_path / "genception_pose_decode_diagnostics.json").write_text(
-        json.dumps(decode_info, indent=2) + "\n", encoding="utf-8"
-    )
+        json.dumps(decode_info, indent=2) + "\n", encoding="utf-8")
+
 
 if __name__ == "__main__":
     run()

@@ -1,6 +1,5 @@
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-
 """Shared adapter for MapAnything-style external dense reconstruction wrappers."""
 
 from __future__ import annotations
@@ -48,16 +47,17 @@ from adapter_utils import (
 # (image, image) -- DUSt3R's own monocular mode -- and only the first view's prediction is kept.
 PAIRWISE_WRAPPERS = ("DUSt3RBAWrapper", "MASt3RSGAWrapper", "Pow3RBAWrapper")
 
-
 # Shared method checkouts (the engine's METHOD_CODE_ROOT); the engine also passes the *_CODE_PATH below.
 # see spatialarena/paths.py
-SPATIALARENA_ROOT = os.path.expanduser(os.environ.get("SPATIALARENA_ROOT", "~/spatialarena"))
+SPATIALARENA_ROOT = os.path.expanduser(
+    os.environ.get("SPATIALARENA_ROOT", "~/spatialarena"))
 METHOD_CODE_ROOT = Path(
-    os.environ.get("METHOD_CODE_ROOT", f"{SPATIALARENA_ROOT}/benchmarks/_model_codes")
-)
+    os.environ.get("METHOD_CODE_ROOT",
+                   f"{SPATIALARENA_ROOT}/benchmarks/_model_codes"))
 
 
-def add_optional_path(path: Path | None, package_names: tuple[str, ...]) -> None:
+def add_optional_path(path: Path | None, package_names: tuple[str,
+                                                              ...]) -> None:
     if path is not None:
         add_code_path(path, package_names)
 
@@ -69,9 +69,9 @@ def add_nested_method_paths(path: Path | None) -> None:
         return
     root = Path(path).expanduser().resolve()
     for nested in (
-        root / "dust3r",
-        root / "dust3r" / "croco",
-        root / "croco",
+            root / "dust3r",
+            root / "dust3r" / "croco",
+            root / "croco",
     ):
         if nested.is_dir():
             add_code_path(nested, ())
@@ -88,7 +88,8 @@ def import_symbol(module_name: str, symbol_name: str) -> Any:
     try:
         return getattr(module, symbol_name)
     except AttributeError as exc:
-        raise RuntimeError(f"{module_name!r} does not expose {symbol_name!r}") from exc
+        raise RuntimeError(
+            f"{module_name!r} does not expose {symbol_name!r}") from exc
 
 
 def describe_structure(value: Any, *, depth: int = 0) -> str:
@@ -103,7 +104,8 @@ def describe_structure(value: Any, *, depth: int = 0) -> str:
             preview += ", ..."
         return f"dict(keys=[{preview}])"
     if isinstance(value, (list, tuple)):
-        inner = describe_structure(value[0], depth=depth + 1) if value else "empty"
+        inner = describe_structure(value[0], depth=depth +
+                                   1) if value else "empty"
         return f"{type(value).__name__}(len={len(value)}, first={inner})"
     if hasattr(value, "shape"):
         return f"{type(value).__name__}(shape={getattr(value, 'shape', None)})"
@@ -142,7 +144,8 @@ def attach_aligned_confidence(outputs: list[dict[str, Any]]) -> None:
     ``get_dense_pts3d()``. Outputs that already have ``conf``, or a scene without confidence, are left alone.
     """
     scene = _ALIGNED_SCENE.pop("scene", None)
-    if scene is None or not outputs or all("conf" in output for output in outputs):
+    if scene is None or not outputs or all(
+            "conf" in output for output in outputs):
         return
     if hasattr(scene, "im_conf"):
         confs = list(scene.im_conf)
@@ -173,11 +176,9 @@ def patch_dust3r_global_aligner(wrapper_module: str) -> None:
     benchmark self-contained and avoids patching external repositories.
     """
 
-    if not (
-        wrapper_module.endswith(".dust3r")
-        or wrapper_module.endswith(".pow3r")
-        or wrapper_module.endswith(".mast3r")
-    ):
+    if not (wrapper_module.endswith(".dust3r") or
+            wrapper_module.endswith(".pow3r") or
+            wrapper_module.endswith(".mast3r")):
         return
     try:
         module = importlib.import_module(wrapper_module)
@@ -192,10 +193,12 @@ def patch_dust3r_global_aligner(wrapper_module: str) -> None:
         return
 
     def has_dust3r_keys(value: Any) -> bool:
-        return isinstance(value, dict) and {"view1", "view2", "pred1", "pred2"}.issubset(value)
+        return isinstance(value, dict) and {"view1", "view2", "pred1", "pred2"
+                                           }.issubset(value)
 
     def tuple_to_dust3r_dict(value: Any) -> dict[str, Any] | None:
-        if isinstance(value, (list, tuple)) and len(value) >= 4 and all(isinstance(item, dict) for item in value[:4]):
+        if isinstance(value, (list, tuple)) and len(value) >= 4 and all(
+                isinstance(item, dict) for item in value[:4]):
             return {
                 "view1": value[0],
                 "view2": value[1],
@@ -212,13 +215,17 @@ def patch_dust3r_global_aligner(wrapper_module: str) -> None:
                 return normalize_dust3r_output(dust3r_output[0])
             first = dust3r_output[0]
             if all(has_dust3r_keys(item) for item in dust3r_output):
-                dust3r_output = collate_with_cat(list(dust3r_output), lists=True)
+                dust3r_output = collate_with_cat(list(dust3r_output),
+                                                 lists=True)
             else:
                 tuple_dict = tuple_to_dust3r_dict(dust3r_output)
                 if tuple_dict is not None:
                     return tuple_dict
-                if all(tuple_to_dust3r_dict(item) is not None for item in dust3r_output):
-                    collated_tuple = collate_with_cat(list(dust3r_output), lists=True)
+                if all(
+                        tuple_to_dust3r_dict(item) is not None
+                        for item in dust3r_output):
+                    collated_tuple = collate_with_cat(list(dust3r_output),
+                                                      lists=True)
                     tuple_dict = tuple_to_dust3r_dict(collated_tuple)
                     if tuple_dict is not None:
                         return tuple_dict
@@ -230,7 +237,8 @@ def patch_dust3r_global_aligner(wrapper_module: str) -> None:
             )
         return dust3r_output
 
-    def patched_global_aligner(dust3r_output: Any, *args: Any, **kwargs: Any) -> Any:
+    def patched_global_aligner(dust3r_output: Any, *args: Any,
+                               **kwargs: Any) -> Any:
         normalized_output = normalize_dust3r_output(dust3r_output)
         try:
             scene = original_global_aligner(normalized_output, *args, **kwargs)
@@ -253,10 +261,9 @@ def patch_dust3r_global_aligner(wrapper_module: str) -> None:
 def candidate_checkpoint_files(root: Path) -> list[Path]:
     suffixes = (".pth", ".pt", ".bin", ".safetensors")
     return [
-        path
-        for suffix in suffixes
-        for path in sorted(root.rglob(f"*{suffix}"))
-        if "retrieval" not in path.name.lower() and "codebook" not in path.name.lower()
+        path for suffix in suffixes for path in sorted(root.rglob(f"*{suffix}"))
+        if "retrieval" not in path.name.lower() and
+        "codebook" not in path.name.lower()
     ]
 
 
@@ -269,12 +276,16 @@ def resolve_checkpoint_arg(checkpoint: str) -> str:
     if parsed.scheme in {"http", "https"}:
         import torch
 
-        cache_root = Path(os.environ.get("TORCH_HOME", Path.home() / ".cache" / "torch"))
+        cache_root = Path(
+            os.environ.get("TORCH_HOME",
+                           Path.home() / ".cache" / "torch"))
         target_dir = cache_root / "hub" / "checkpoints"
         target_dir.mkdir(parents=True, exist_ok=True)
         target_path = target_dir / Path(parsed.path).name
         if not target_path.is_file():
-            torch.hub.download_url_to_file(checkpoint, str(target_path), progress=True)
+            torch.hub.download_url_to_file(checkpoint,
+                                           str(target_path),
+                                           progress=True)
         return str(target_path)
 
     path = Path(checkpoint).expanduser()
@@ -293,30 +304,38 @@ def resolve_checkpoint_arg(checkpoint: str) -> str:
             raise RuntimeError(
                 f"Checkpoint {checkpoint!r} looks like an HF repo id, but huggingface_hub is unavailable."
             ) from exc
-        snapshot_dir = Path(snapshot_download(repo_id=checkpoint, repo_type="model"))
+        snapshot_dir = Path(
+            snapshot_download(repo_id=checkpoint, repo_type="model"))
         candidates = candidate_checkpoint_files(snapshot_dir)
         if candidates:
             return str(candidates[0])
-        raise FileNotFoundError(f"No checkpoint file found in HF snapshot for {checkpoint}")
+        raise FileNotFoundError(
+            f"No checkpoint file found in HF snapshot for {checkpoint}")
 
     return checkpoint
 
 
-def parse_common_args(method_name: str, ckpt_env: str, code_env: str) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=f"Run {method_name} and export benchmark artifacts.")
+def parse_common_args(method_name: str, ckpt_env: str,
+                      code_env: str) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=f"Run {method_name} and export benchmark artifacts.")
     parser.add_argument("--data_path", type=Path, required=True)
     parser.add_argument("--output_path", type=Path, required=True)
     parser.add_argument("--ckpt_path", default=os.environ.get(ckpt_env, ""))
-    parser.add_argument("--method_code_path", type=Path,
-                        default=Path(os.environ[code_env]) if code_env in os.environ else None)
+    parser.add_argument(
+        "--method_code_path",
+        type=Path,
+        default=Path(os.environ[code_env]) if code_env in os.environ else None)
     parser.add_argument(
         "--mapanything_code_path",
         type=Path,
         default=Path(os.environ["MAPANYTHING_CODE_PATH"])
-        if "MAPANYTHING_CODE_PATH" in os.environ
-        else METHOD_CODE_ROOT / "map-anything",
+        if "MAPANYTHING_CODE_PATH" in os.environ else METHOD_CODE_ROOT /
+        "map-anything",
     )
-    parser.add_argument("--track", choices=("rgb", "rgb_depth", "rgb_cameras"), default="rgb")
+    parser.add_argument("--track",
+                        choices=("rgb", "rgb_depth", "rgb_cameras"),
+                        default="rgb")
     parser.add_argument("--interval", type=int, default=1)
     parser.add_argument("--resolution", type=int, default=512)
     parser.add_argument("--image_load_resolution", type=int, default=512)
@@ -366,30 +385,30 @@ def preprocess_dust3r_family(
         size = 512
     # exif_transpose=True to match mapanything.utils.image.preprocess_inputs's own convention
     # (the function this bypasses still applies it).
-    images, transforms = preprocess_images(
-        image_paths, method="vggt_omega", size=size, mode="pad", exif_transpose=True
-    )
+    images, transforms = preprocess_images(image_paths,
+                                           method="vggt_omega",
+                                           size=size,
+                                           mode="pad",
+                                           exif_transpose=True)
     # The "dust3r" UniCeption normalization (used by every wrapper this shared code supports) is
     # ToTensor (-> [0,1]) + Normalize(0.5, 0.5); preprocess_images already returns [0,1], so only
     # the normalization step remains.
     images = images * 2.0 - 1.0
     views: list[dict[str, Any]] = []
     for index, image_path in enumerate(image_paths):
-        frame = images[index : index + 1]
+        frame = images[index:index + 1]
         height, width = frame.shape[-2:]
-        views.append(
-            {
-                "img": frame,
-                "data_norm_type": [norm_type],
-                "true_shape": np.int32([[height, width]]),
-                "label": [Path(args.data_path).name],
-                "instance": [Path(image_path).name],
-                "idx": index,
-                "camera_intrinsics": default_intrinsics(width, height)[None],
-                "camera_pose": torch.eye(4, dtype=torch.float32)[None],
-                "depthmap": torch.zeros((1, height, width, 1), dtype=torch.float32),
-            }
-        )
+        views.append({
+            "img": frame,
+            "data_norm_type": [norm_type],
+            "true_shape": np.int32([[height, width]]),
+            "label": [Path(args.data_path).name],
+            "instance": [Path(image_path).name],
+            "idx": index,
+            "camera_intrinsics": default_intrinsics(width, height)[None],
+            "camera_pose": torch.eye(4, dtype=torch.float32)[None],
+            "depthmap": torch.zeros((1, height, width, 1), dtype=torch.float32),
+        })
     return views, transforms
 
 
@@ -410,7 +429,8 @@ def default_intrinsics(width: int, height: int):
     return intrinsics
 
 
-def move_views_to_device(views: list[dict[str, Any]], device: str) -> list[dict[str, Any]]:
+def move_views_to_device(views: list[dict[str, Any]],
+                         device: str) -> list[dict[str, Any]]:
     ignore = {"label", "instance", "data_norm_type", "idx", "true_shape"}
     for view in views:
         for key, value in list(view.items()):
@@ -423,34 +443,42 @@ def move_views_to_device(views: list[dict[str, Any]], device: str) -> list[dict[
 
 def outputs_to_standard(
     outputs: list[dict[str, Any]], views: list[dict[str, Any]]
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
+           np.ndarray]:
     from mapanything.utils.image import rgb
 
-    points = normalize_points([as_numpy(output["pts3d"])[0] for output in outputs])
+    points = normalize_points(
+        [as_numpy(output["pts3d"])[0] for output in outputs])
     if "pts3d_cam" in outputs[0]:
-        depths = normalize_depths([as_numpy(output["pts3d_cam"])[0, ..., 2] for output in outputs])
+        depths = normalize_depths(
+            [as_numpy(output["pts3d_cam"])[0, ..., 2] for output in outputs])
     else:
-        depths = normalize_depths([as_numpy(output["depth_along_ray"])[0, ..., 0] for output in outputs])
+        depths = normalize_depths([
+            as_numpy(output["depth_along_ray"])[0, ..., 0] for output in outputs
+        ])
     confidence_maps = []
     for index, output in enumerate(outputs):
-        conf = as_numpy(output.get("conf", np.ones_like(depths[index]))).squeeze()
+        conf = as_numpy(output.get("conf",
+                                   np.ones_like(depths[index]))).squeeze()
         if conf.shape == depths[index].shape:
             confidence_maps.append(conf)
         elif conf.ndim == 1 and conf.shape[0] == depths.shape[1]:
-            confidence_maps.append(np.broadcast_to(conf[:, None], depths[index].shape))
+            confidence_maps.append(
+                np.broadcast_to(conf[:, None], depths[index].shape))
         elif conf.ndim == 1 and conf.shape[0] == depths.shape[2]:
-            confidence_maps.append(np.broadcast_to(conf[None, :], depths[index].shape))
+            confidence_maps.append(
+                np.broadcast_to(conf[None, :], depths[index].shape))
         else:
-            confidence_maps.append(np.ones_like(depths[index], dtype=np.float32))
+            confidence_maps.append(np.ones_like(depths[index],
+                                                dtype=np.float32))
     # No confidence head at all: None (point sampling treats it as all-ones, as before), so no all-ones map is
     # exported as if the model had predicted it.
     has_confidence = any("conf" in output for output in outputs)
-    confidence = normalize_confidence(confidence_maps, depths.shape) if has_confidence else None
+    confidence = normalize_confidence(confidence_maps,
+                                      depths.shape) if has_confidence else None
     colors = np.stack(
-        [
-            (rgb(view["img"][0].detach().cpu(), view["data_norm_type"][0]).clip(0.0, 1.0) * 255).astype(np.uint8)
-            for view in views
-        ],
+        [(rgb(view["img"][0].detach().cpu(), view["data_norm_type"][0]).clip(
+            0.0, 1.0) * 255).astype(np.uint8) for view in views],
         axis=0,
     )
     c2w = quats_trans_to_c2w(
@@ -462,16 +490,20 @@ def outputs_to_standard(
     return depths, points, colors, confidence, extrinsics_w2c, intrinsics
 
 
-def quats_trans_to_c2w(quats: list[np.ndarray], trans: list[np.ndarray]) -> np.ndarray:
+def quats_trans_to_c2w(quats: list[np.ndarray],
+                       trans: list[np.ndarray]) -> np.ndarray:
     quat_array = np.asarray(quats, dtype=np.float32)
     trans_array = np.asarray(trans, dtype=np.float32)
-    c2w = np.repeat(np.eye(4, dtype=np.float32)[None], quat_array.shape[0], axis=0)
+    c2w = np.repeat(np.eye(4, dtype=np.float32)[None],
+                    quat_array.shape[0],
+                    axis=0)
     c2w[:, :3, :3] = quaternion_xyzw_to_matrix(quat_array)
     c2w[:, :3, 3] = trans_array
     return c2w
 
 
-def infer_intrinsics(outputs: list[dict[str, Any]], height: int, width: int) -> np.ndarray:
+def infer_intrinsics(outputs: list[dict[str, Any]], height: int,
+                     width: int) -> np.ndarray:
     intrinsics: list[np.ndarray] = []
     for output in outputs:
         ray_dirs = output.get("ray_directions")
@@ -480,8 +512,12 @@ def infer_intrinsics(outputs: list[dict[str, Any]], height: int, width: int) -> 
             continue
         rays = as_numpy(ray_dirs)[0]
         center = rays[height // 2, width // 2]
-        fx = abs(center[2]) / max(abs(rays[height // 2, min(width - 1, width // 2 + 1), 0] - center[0]), 1e-6)
-        fy = abs(center[2]) / max(abs(rays[min(height - 1, height // 2 + 1), width // 2, 1] - center[1]), 1e-6)
+        fx = abs(center[2]) / max(
+            abs(rays[height // 2,
+                     min(width - 1, width // 2 + 1), 0] - center[0]), 1e-6)
+        fy = abs(center[2]) / max(
+            abs(rays[min(height - 1, height // 2 + 1), width // 2, 1] -
+                center[1]), 1e-6)
         K = np.eye(3, dtype=np.float32)
         K[0, 0] = fx
         K[1, 1] = fy
@@ -503,7 +539,8 @@ def run_wrapper_method(
 ) -> None:
     args = parse_common_args(method, ckpt_env, code_env)
     images_dir = canonical_image_root(args.data_path)
-    image_paths = select_interval(find_image_paths(images_dir), args.interval, args.max_images_per_run)
+    image_paths = select_interval(find_image_paths(images_dir), args.interval,
+                                  args.max_images_per_run)
     if not image_paths:
         raise ValueError(f"No images found in {images_dir}")
     if args.dry_run:
@@ -528,67 +565,85 @@ def run_wrapper_method(
     cleanup_cache_dir: Path | None = None
     if wrapper_class == "MASt3RSGAWrapper":
         default_tmp_root = (
-            Path("/tmp")
-            / (os.environ.get("USER") or getpass.getuser())
-            / "feedforward_benchmark"
-            / os.environ.get("SLURM_JOB_ID", os.environ.get("RUN_ID", "manual"))
-        )
-        cache_root = Path(os.environ.get("BENCHMARK_TMP_ROOT", str(default_tmp_root))).expanduser()
+            Path("/tmp") / (os.environ.get("USER") or getpass.getuser()) /
+            "feedforward_benchmark" /
+            os.environ.get("SLURM_JOB_ID", os.environ.get("RUN_ID", "manual")))
+        cache_root = Path(
+            os.environ.get("BENCHMARK_TMP_ROOT",
+                           str(default_tmp_root))).expanduser()
         try:
             cache_root.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
             if exc.errno != errno.ENOSPC:
                 raise
             fallback_root = (  # shared benchmark scratch, never the home folder
-                Path(os.environ.get("BENCHMARK_AUX_ROOT",
-                                    f"{SPATIALARENA_ROOT}/benchmarks"))
-                / "_scratch"
-                / (os.environ.get("USER") or getpass.getuser())
-                / os.environ.get("SLURM_JOB_ID", os.environ.get("RUN_ID", "manual"))
-            )
+                Path(
+                    os.environ.get("BENCHMARK_AUX_ROOT",
+                                   f"{SPATIALARENA_ROOT}/benchmarks")) /
+                "_scratch" / (os.environ.get("USER") or getpass.getuser()) /
+                os.environ.get("SLURM_JOB_ID", os.environ.get(
+                    "RUN_ID", "manual")))
             fallback_root.mkdir(parents=True, exist_ok=True)
             cache_root = fallback_root
-        cleanup_cache_dir = Path(tempfile.mkdtemp(prefix="mast3r_sga_", dir=cache_root))
+        cleanup_cache_dir = Path(
+            tempfile.mkdtemp(prefix="mast3r_sga_", dir=cache_root))
         kwargs.setdefault("cache_dir", str(cleanup_cache_dir))
     try:
-        model = Wrapper(name=method, ckpt_path=checkpoint_path, **kwargs).to(device).eval()
+        model = Wrapper(name=method, ckpt_path=checkpoint_path,
+                        **kwargs).to(device).eval()
         mark_model_loaded()
         if args.depth_only:
             if not args.export_depth:
                 raise ValueError("--depth_only requires --export_depth")
-            batch_size = args.max_images_per_run if args.max_images_per_run > 0 else len(image_paths)
+            batch_size = args.max_images_per_run if args.max_images_per_run > 0 else len(
+                image_paths)
             if wrapper_class == "MASt3RSGAWrapper":
-                mast3r_depth_batch_size = int(os.environ.get("MAST3R_DEPTH_BATCH_SIZE", "16"))
+                mast3r_depth_batch_size = int(
+                    os.environ.get("MAST3R_DEPTH_BATCH_SIZE", "16"))
                 if mast3r_depth_batch_size > 0:
                     batch_size = min(batch_size, mast3r_depth_batch_size)
             peak_memory = 0.0
             pose_extrinsics: list[np.ndarray] = []
             pose_intrinsics: list[np.ndarray] = []
             pose_output_size: tuple[int, int] | None = None
-            for batch_index, batch_paths in enumerate(batched_image_paths(image_paths, batch_size), start=1):
+            for batch_index, batch_paths in enumerate(batched_image_paths(
+                    image_paths, batch_size),
+                                                      start=1):
                 print(
                     f"[{method}] depth batch {batch_index}: {len(batch_paths)} images "
                     f"(batch_size={batch_size})",
                     flush=True,
                 )
-                duplicate_pair = len(batch_paths) == 1 and wrapper_class in PAIRWISE_WRAPPERS
+                duplicate_pair = len(
+                    batch_paths) == 1 and wrapper_class in PAIRWISE_WRAPPERS
                 view_paths = batch_paths * 2 if duplicate_pair else batch_paths
-                views, transforms = prepare_model_input(method, view_paths, args=args, device=device)
+                views, transforms = prepare_model_input(method,
+                                                        view_paths,
+                                                        args=args,
+                                                        device=device)
                 views = move_views_to_device(views, device)
                 with torch.no_grad():
                     outputs = model(views)
                 if duplicate_pair:
-                    outputs, views, transforms = outputs[:1], views[:1], transforms[:1]
+                    outputs, views, transforms = outputs[:
+                                                         1], views[:
+                                                                   1], transforms[:
+                                                                                  1]
                 attach_aligned_confidence(outputs)
-                depths, _points, _colors, confidence, extrinsics_w2c, intrinsics = outputs_to_standard(outputs, views)
-                export_spatial_depth_predictions(args.output_path, batch_paths, depths, confidence, transforms)
+                depths, _points, _colors, confidence, extrinsics_w2c, intrinsics = outputs_to_standard(
+                    outputs, views)
+                export_spatial_depth_predictions(args.output_path, batch_paths,
+                                                 depths, confidence, transforms)
                 if args.export_colmap and extrinsics_w2c is not None and intrinsics is not None:
                     pose_extrinsics.append(np.asarray(extrinsics_w2c))
-                    restored_intrinsics, width, height = restore_camera_export(intrinsics, transforms)
+                    restored_intrinsics, width, height = restore_camera_export(
+                        intrinsics, transforms)
                     pose_intrinsics.append(restored_intrinsics)
                     pose_output_size = (width, height)
                 if torch.cuda.is_available():
-                    peak_memory = max(peak_memory, torch.cuda.max_memory_allocated() / (1024.0**2))
+                    peak_memory = max(
+                        peak_memory,
+                        torch.cuda.max_memory_allocated() / (1024.0**2))
                     torch.cuda.empty_cache()
             if pose_extrinsics:
                 width, height = pose_output_size
@@ -620,12 +675,16 @@ def run_wrapper_method(
             )
             return
 
-        views, _transforms = prepare_model_input(method, image_paths, args=args, device=device)
+        views, _transforms = prepare_model_input(method,
+                                                 image_paths,
+                                                 args=args,
+                                                 device=device)
         views = move_views_to_device(views, device)
         with torch.no_grad():
             outputs = model(views)
         attach_aligned_confidence(outputs)
-        depths, points, colors, confidence, extrinsics_w2c, intrinsics = outputs_to_standard(outputs, views)
+        depths, points, colors, confidence, extrinsics_w2c, intrinsics = outputs_to_standard(
+            outputs, views)
         export_standard_artifacts(
             method=method,
             output_path=args.output_path,
@@ -642,10 +701,15 @@ def run_wrapper_method(
             depth_only=args.depth_only,
             colmap_model_subdir=args.colmap_model_subdir,
             max_points=args.max_points,
-            conf_thresh=args.depth_conf_thresh if args.depth_conf_thresh is not None else args.conf_thresh,
+            conf_thresh=args.depth_conf_thresh
+            if args.depth_conf_thresh is not None else args.conf_thresh,
             started_at=started_at,
             checkpoint=checkpoint_path,
-            metrics_extra={"track": args.track, "adapter": wrapper_module, "selected_images": len(image_paths)},
+            metrics_extra={
+                "track": args.track,
+                "adapter": wrapper_module,
+                "selected_images": len(image_paths)
+            },
         )
     finally:
         if cleanup_cache_dir is not None:
