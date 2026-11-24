@@ -28,7 +28,7 @@ from spatialarena import spatialarena  # noqa: E402
 
 # pylint: enable=wrong-import-position
 
-DEFAULT_REPO_ID = "Bluefish2333/SpatialArena-Dataset"
+DEFAULT_REPO_ID = "mvp-lab/SpatialArena-Dataset"
 
 
 def download_tracks(benchmark_root: Path,
