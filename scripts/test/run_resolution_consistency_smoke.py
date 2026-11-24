@@ -51,6 +51,7 @@ if str(REPO_ROOT) not in sys.path:
 
 # pylint: disable=wrong-import-position
 from spatialarena import methods  # noqa: E402
+from spatialarena import models  # noqa: E402
 
 # pylint: enable=wrong-import-position
 
@@ -91,35 +92,6 @@ EXCLUDED_METHODS.update({
            "(video_diffusion_depth.py); see check_prediction_resolution.py"
           ) for name in ("DEPTHCRAFTER", "CHRONODEPTH")
 })
-
-# Methods whose adapter exposes --spatial_policy (default "legacy", unchanged
-# behavior); pass "shared" to exercise the shared restoration path.
-SUPPORTS_SPATIAL_POLICY = {
-    "VGGT", "ROBUSTVGGT", "DA3-L", "DA3-G", "DA3-NGL", "VGGT_OMEGA", "FASTVGGT",
-    "CUT3R"
-}
-
-# Methods whose adapter exposes --colmap_path explicitly (others auto-discover
-# data_path/sparse/0 via --colmap_model_subdir, which the synthetic scene
-# already provides at that exact path).
-SUPPORTS_COLMAP_PATH_FLAG = {
-    "DA3-L", "DA3-G", "DA3-NGL", "OMNIVGGT", "PI3_X", "IGGT4D", "MAPANYTHING"
-}
-
-# Methods whose adapter exposes --track.
-SUPPORTS_TRACK = {
-    "PI3_X",
-    "OMNIVGGT",
-    "MAPANYTHING",
-    "IGGT",
-    "IGGT4D",
-    "DEJAVIEW",
-    "DEPTHVLM",
-    "VLM3",
-    "DEPTHLM",
-    "QWEN3_VL",
-    "SENSENOVA_VISION",
-}
 
 # Methods that always export poses/intrinsics on the depth_only path too
 # (export_colmap valid even on the "rgb" track, not just rgb_cameras). Harmless
@@ -216,50 +188,32 @@ def build_synthetic_scene(root: pathlib.Path) -> list[str]:
 # defaults to the one running this script.
 PYTHON_BIN = os.environ.get("SI_BENCH_PYTHON", sys.executable)
 
-# The engine (run_method_case_list.sh) passes checkpoint/code paths as explicit
-# CLI flags, not by relying on each adapter's own (sometimes differently-named,
-# legacy) os.environ.get default. --ckpt_path is universal except GenCeption's
-# --ckpt_dir/--prompt_embeddings_dir. The code-path flag name doesn't always
-# match the adapter filename (confirmed per adapter via argparse
-# introspection, not guessed): None means the adapter takes no such flag
-# (HF-only, no vendored checkout needed).
-CODE_PATH_FLAG = {
-    "vggt.py": "--vggt_code_path",
-    "da3.py": "--da3_code_path",
-    "vggt_omega.py": "--vggt_omega_code_path",
-    "fastvggt.py": "--fastvggt_code_path",
-    "omnivggt.py": "--omnivggt_code_path",
-    "amb3r.py": "--amb3r_code_path",
-    "pi3.py": "--pi3_code_path",
-    "cut3r.py": "--cut3r_code_path",
-    "fast3r.py": "--fast3r_code_path",
-    "mapanything.py": "--mapanything_code_path",
-    "mapanything_dense_wrapper.py": "--method_code_path",
-    "iggt.py": "--iggt_code_path",
-    "iggt4d.py": "--iggt4d_code_path",
-    "dejaview.py": "--dejaview_code_path",
-    "come.py": "--come_code_path",
-    "depthvlm.py": "--depthvlm_code_path",
-    "sensenova_vision_depth.py": "--sensenova_vision_code_path",
-    "robustvggt.py": "--robustvggt_code_path",
-    "genception.py": None,
-    "point_query_depth_adapter.py": None,
-}
-# These adapter files forward --data_path/.../* through to another module
-# (mapanything_dense_wrapper for dust3r/mast3r/pow3r), so their own
-# parse_args() introspection is not representative; their real adapter is one
-# of the keys above.
-ADAPTER_IS_WRAPPER_STUB = {"dust3r.py", "mast3r.py", "pow3r.py"}
-
 
 def resolve_path_template(template: str) -> str:
     """Substitutes `$METHOD_CODE_ROOT` in a registry path."""
     return template.replace("$METHOD_CODE_ROOT", str(METHOD_CODE_ROOT))
 
 
+def spatial_policy_for(spec) -> str | None:
+    """Returns the restorable --spatial_policy to exercise, or None.
+
+    "shared" when the model has it, else its first "shared*" policy; None for a
+    model without --spatial_policy.
+    """
+    choices = models.get_model(spec.name).spatial_policies
+    if "shared" in choices:
+        return "shared"
+    shared = [choice for choice in choices if choice.startswith("shared")]
+    return shared[0] if shared else None
+
+
 def build_command(spec, track: str, scene_dir: pathlib.Path,
                   out_dir: pathlib.Path) -> list[str] | None:
-    """Builds the adapter command line the engine would run.
+    """Builds the command line the engine would run.
+
+    Every method runs through scripts/inference/run_model.py with the
+    engine's option set (--engine drops the options a model does not have),
+    as in run_method_case_list.sh.
 
     Args:
         spec: The method's `MethodSpec`.
@@ -270,14 +224,18 @@ def build_command(spec, track: str, scene_dir: pathlib.Path,
     Returns:
         The command.
     """
-    adapter_path = INFERENCE_DIR / spec.adapter
     cmd = [
         PYTHON_BIN,
-        str(adapter_path),
+        str(INFERENCE_DIR / "run_model.py"),
+        "--engine",
+        "--model",
+        spec.name,
         "--data_path",
         str(scene_dir),
         "--output_path",
         str(out_dir),
+        "--track",
+        track,
         "--export_depth",
         "--depth_only",
         "--interval",
@@ -285,30 +243,17 @@ def build_command(spec, track: str, scene_dir: pathlib.Path,
         "--max_images_per_run",
         str(NUM_IMAGES),
     ]
-    if spec.name == "GENCEPTION_DEPTH" or spec.name == "GENCEPTION_POSE":
-        cmd += ["--ckpt_dir", resolve_path_template(spec.ckpt_default)]
-        prompt_dir = pathlib.Path(resolve_path_template(
-            spec.ckpt_default)) / "prompt_embeddings"
-        cmd += ["--prompt_embeddings_dir", str(prompt_dir)]
-        if spec.name == "GENCEPTION_DEPTH":
-            cmd += ["--task", "depth"]
-        else:
-            cmd += ["--task", "pose"]
-    else:
+    if spec.ckpt_default:
         cmd += ["--ckpt_path", resolve_path_template(spec.ckpt_default)]
-    code_flag = CODE_PATH_FLAG.get(spec.adapter)
-    if code_flag is not None and spec.code_default:
-        cmd += [code_flag, resolve_path_template(spec.code_default)]
-    if spec.name in SUPPORTS_TRACK:
-        cmd += ["--track", track]
-    if track == "rgb_cameras" and spec.name in SUPPORTS_COLMAP_PATH_FLAG:
+    if spec.code_default:
+        cmd += ["--code_path", resolve_path_template(spec.code_default)]
+    if "cameras" in track:
         cmd += ["--colmap_path", str(scene_dir / "sparse" / "0")]
     if ALWAYS_EXPORT_COLMAP:
         cmd += ["--export_colmap"]
-    if spec.name == "VGGT_OMEGA":
-        cmd += ["--spatial_policy", "shared-pad"]
-    elif spec.name in SUPPORTS_SPATIAL_POLICY:
-        cmd += ["--spatial_policy", "shared"]
+    spatial_policy = spatial_policy_for(spec)
+    if spatial_policy is not None:
+        cmd += ["--spatial_policy", spatial_policy]
     return cmd
 
 

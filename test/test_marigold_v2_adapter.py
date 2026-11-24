@@ -39,10 +39,21 @@ def test_version_registry_separates_v11_and_v2():
     assert old.default_depth_protocol == "depth_huber_irls_gt"
 
 
-def test_engine_runs_marigold_v2_through_the_single_image_branch():
-    script = (ROOT / "spatialarena" / "templates" / "_engine" /
-              "run_method_case_list.sh").read_text(encoding="utf-8")
-    assert "|MARIGOLD_V1_1|MARIGOLD_V2|LOTUS_D|" in script
+def test_marigold_v2_command_line_is_the_common_one():
+    """The variant is the model name; the spec gives the defaults; --seed
+    stays, the old --method selector is gone."""
+    # pylint: disable-next=import-outside-toplevel
+    from spatialarena.models import registry
+
+    model_cls = registry.get_model("MARIGOLD-V2")
+    parser = model_cls.build_parser("MARIGOLD-V2")
+    args = parser.parse_args(["--data_path", "d", "--output_path", "o"])
+    assert args.method == "MARIGOLD_V2" and args.seed == 42
+    assert args.ckpt_path == resolve_method("MARIGOLD_V2").ckpt_default
+    assert args.code_path.name == "marigold-v2"
+    for removed in ("--method", "--resolution", "--max_points",
+                    "--spatial_policy"):
+        assert removed not in parser._option_string_actions
 
 
 def test_export_keeps_raw_signed_log_codes(tmp_path, adapters):
@@ -108,8 +119,8 @@ def test_run_exports_only_selected_images(tmp_path, monkeypatch, adapters,
                      method="MARIGOLD_V2",
                      seed=42,
                      track="rgb")
-    monkeypatch.setattr(module, "parse_args", lambda *a: args)
-    monkeypatch.setattr(module, "select_images", lambda a: [selected])
+    monkeypatch.setattr(module.single_image, "select_images",
+                        lambda a: [selected])
     monkeypatch.setenv("MARIGOLD_V2_PYTHON", "/model-env/python")
     monkeypatch.setenv("MARIGOLD_V2_WIDTH", "32" if fixed_size else "0")
     monkeypatch.setenv("MARIGOLD_V2_HEIGHT", "16" if fixed_size else "0")
@@ -134,7 +145,7 @@ def test_run_exports_only_selected_images(tmp_path, monkeypatch, adapters,
                     dtype=np.float32))
 
     monkeypatch.setattr(module.subprocess, "run", official_runner)
-    module.run()
+    module.MarigoldV2(args).run()
     assert [p.name for p in (args.output_path / "raw_log_depths").iterdir()
            ] == ["chosen.npz"]
     restored = load_depth_map(args.output_path / "raw_log_depths/chosen.npz")
@@ -156,15 +167,13 @@ def test_invalid_processing_size_fails_before_inference(tmp_path, monkeypatch,
     del adapters
     module = importlib.import_module("marigold_v2")
     monkeypatch.setattr(
-        module, "parse_args",
-        lambda *a: Namespace(code_path=tmp_path, output_path=tmp_path / "out"))
-    monkeypatch.setattr(
-        module, "select_images",
+        module.single_image, "select_images",
         lambda a: pytest.fail("selected images before checking the size"))
     monkeypatch.setenv("MARIGOLD_V2_WIDTH", str(width))
     monkeypatch.setenv("MARIGOLD_V2_HEIGHT", str(height))
     with pytest.raises(ValueError, match="positive multiples of 16"):
-        module.run()
+        module.MarigoldV2(
+            Namespace(code_path=tmp_path, output_path=tmp_path / "out")).run()
 
 
 @pytest.mark.parametrize("value,expected", [

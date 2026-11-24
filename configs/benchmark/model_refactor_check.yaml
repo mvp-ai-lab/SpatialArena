@@ -1,0 +1,41 @@
+# Check of the spatialarena.models refactor (BaseModel subclasses for VGGT, RobustVGGT, FastVGGT, VGGT-Omega, Pi3X
+# and DA3-L/G/NGL): rerun a few SpatialArena scenes per task with the refactored code and compare with the release
+# predictions of the same scenes (spatialarena-20261103).
+#
+#   python -m spatialarena.run_config configs/benchmark/model_refactor_check.yaml plan
+#   python -m spatialarena.run_config configs/benchmark/model_refactor_check.yaml submit
+#   python scripts/test/compare_prediction_runs.py --reference <release artifacts/full_standard> \
+#       --candidate ${SPATIALARENA_ROOT}/benchmarks/_evaluation_model_refactor_check/artifacts/full_standard
+#
+# It writes to its own evaluation root and turns the shared prediction cache off, so every case runs inference
+# again (no reused predictions) and nothing in the canonical artifact or report folders is touched. The scenes are
+# ones every checked method has in the release; the settings are those of configs/benchmark/all_tracks.yaml, which
+# produced it. MonoDepth/VideoDepth/MVRecon exercise the depth-only path (MVRecon and the camera tracks with camera
+# export), SfM the full dense-point + COLMAP export.
+
+job_system: slurm
+benchmark_root: ${SPATIALARENA_ROOT}/benchmarks
+benchmark_eval_root: ${SPATIALARENA_ROOT}/benchmarks/_evaluation_model_refactor_check
+experiment_root: ${SPATIALARENA_ROOT}/benchmarks/_eval_job_scripts
+experiment_name: model_refactor_check
+max_in_flight: 16
+slurm_exclude: []
+slurm_resources: {infer: {time: "06:00:00"}}
+
+datasets:
+  - {task: MonoDepth, dataset: spatialarena, scenes: [CambridgeUpstair, StPancrasStatue1]}
+  - {task: VideoDepth, dataset: spatialarena, scenes: [StPancrasCorridor_full_cam1]}
+  - {task: MVRecon, dataset: spatialarena, scenes: [NationalHistoryMuseum2]}
+  - {task: SfM, dataset: spatialarena, scenes: [CambridgeUpstair]}
+
+models:
+  - {name: VGGT, track: rgb, env: {SPATIAL_POLICY: shared, INFER_CASE_PARALLELISM: 1, USE_SHARED_PREDICTION_CACHE: 0}}
+  - {name: ROBUSTVGGT, track: rgb, env: {SPATIAL_POLICY: shared, USE_SHARED_PREDICTION_CACHE: 0}}
+  - {name: FASTVGGT, track: rgb, env: {SPATIAL_POLICY: shared, USE_SHARED_PREDICTION_CACHE: 0}}
+  - {name: VGGT_OMEGA, track: rgb, env: {SPATIAL_POLICY: shared-pad, USE_SHARED_PREDICTION_CACHE: 0}}
+  - {name: PI3_X, track: rgb, env: {USE_SHARED_PREDICTION_CACHE: 0}}
+  - {name: PI3_X, track: rgb_cameras, env: {USE_SHARED_PREDICTION_CACHE: 0}}
+  - {name: DA3-L, track: rgb, env: {SPATIAL_POLICY: shared, USE_SHARED_PREDICTION_CACHE: 0}}
+  - {name: DA3-G, track: rgb, env: {SPATIAL_POLICY: shared, USE_SHARED_PREDICTION_CACHE: 0}}
+  - {name: DA3-NGL, track: rgb, env: {SPATIAL_POLICY: shared, USE_SHARED_PREDICTION_CACHE: 0}}
+  - {name: DA3-NGL, track: rgb_cameras, env: {SPATIAL_POLICY: shared, USE_SHARED_PREDICTION_CACHE: 0}}

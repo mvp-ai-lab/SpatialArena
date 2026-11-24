@@ -293,3 +293,27 @@ def test_decode_rejects_bad_input():
                                  solver="procrustes")
     with pytest.raises(ValueError, match="smaller"):
         raymap_masks(240, 416)
+
+
+@pytest.mark.parametrize("method,pose", [("GENCEPTION_DEPTH", False),
+                                         ("GENCEPTION_POSE", True)])
+def test_command_line_has_no_task_selector(method, pose, monkeypatch, tmp_path):
+    """The method picks the task; --ckpt_path and the env give the paths."""
+    from spatialarena.models import registry  # pylint: disable=import-outside-toplevel
+
+    monkeypatch.setenv("GENCEPTION_CKPT_DIR", str(tmp_path / "ckpt"))
+    monkeypatch.delenv("GENCEPTION_EMBEDDINGS_DIR", raising=False)
+    monkeypatch.setenv("GENCEPTION_MODEL_SIZE", "1.3b")
+    model_cls = registry.get_model(method)
+    parser = model_cls.build_parser(method)
+    options = parser._option_string_actions
+    for flag in ("--task", "--ckpt_dir", "--resolution", "--max_points",
+                 "--spatial_policy"):
+        assert flag not in options
+    assert ("--pose_solver" in options) == pose
+    model = model_cls.from_argv(["--data_path", "d", "--output_path", "o"],
+                                method)
+    assert model.task == ("pose" if pose else "depth")
+    assert model.args.ckpt_path == str(tmp_path / "ckpt")
+    assert model.args.model_size == "1.3b"
+    assert model.prompt_embeddings_dir == tmp_path / "ckpt" / "prompt_embeddings"

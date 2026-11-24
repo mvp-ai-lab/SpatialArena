@@ -68,7 +68,7 @@ def test_real_cli_dry_run_symlink_and_subset(tmp_path, method):
     env = dict(os.environ, BENCHMARK_MAX_INPUT_FRAMES="2")
     result = subprocess.run([
         sys.executable,
-        str(ROOT / "scripts/inference/video_diffusion_depth.py"), "--method",
+        str(ROOT / "scripts/inference/video_diffusion_depth.py"), "--model",
         method, "--data_path",
         str(scene), "--output_path",
         str(tmp_path / "out"), "--code_path",
@@ -129,6 +129,7 @@ canonical_task_name() { printf '%s' "$1"; }
 dataset_root_for_case() { printf '%s' "$TEST_ROOT"; }
 env_value() { printf '%s' "$TEST_ROOT"; }
 depth_only_exports_poses() { return 1; }
+track_uses_cameras() { return 1; }
 ''' + "run_inference_once() {" + function + '''
 run_inference_once VideoDepth bonn scene 1 '' "$TEST_ROOT/out"
 '''
@@ -143,6 +144,12 @@ run_inference_once VideoDepth bonn scene 1 '' "$TEST_ROOT/out"
                METHOD_CKPT_ENV="CKPT",
                BENCHMARK_TRACK="rgb",
                MAX_IMAGES_PER_RUN="100",
+               RESOLUTION="1024",
+               IMAGE_LOAD_RESOLUTION="1024",
+               MAX_POINTS="10000",
+               CONF_THRESH="0.0",
+               DEPTH_CONF_THRESH="0.0",
+               PIXEL_LIMIT="0",
                BENCHMARK_TMP_ROOT=str(tmp_path),
                SPATIAL_POLICY="shared")
     result = subprocess.run(["bash", "-c", script],
@@ -151,7 +158,39 @@ run_inference_once VideoDepth bonn scene 1 '' "$TEST_ROOT/out"
                             text=True,
                             check=True)
     args = json.loads(result.stdout.splitlines()[-1])
-    assert args[0] == "scripts/inference/video_diffusion_depth.py"
-    assert args[args.index("--method") + 1] == method
+    assert args[:2] == ["scripts/inference/run_model.py", "--engine"]
+    assert args[args.index("--model") + 1] == method
     assert args[args.index("--max_images_per_run") + 1] == "100"
     assert "--export_depth" in args and "--export_colmap" not in args
+
+
+@pytest.mark.parametrize("method,own,other", [
+    ("DEPTHCRAFTER", ("--window_size", "--overlap"), ("--n_tokens",)),
+    ("CHRONODEPTH", ("--n_tokens", "--chunk_size"), ("--window_size",)),
+])
+def test_command_line_is_the_methods_own(method, own, other):
+    """One command line per method: no --method/--max_res, spec defaults."""
+    from spatialarena.models import registry  # pylint: disable=import-outside-toplevel
+
+    parser = registry.get_model(method).build_parser(method)
+    options = parser._option_string_actions
+    for flag in own + ("--resolution", "--seed", "--spatial_policy"):
+        assert flag in options
+    for flag in other + ("--method", "--max_res", "--image_load_resolution",
+                         "--max_points", "--conf_thresh"):
+        assert flag not in options
+    args = parser.parse_args(["--data_path", "d", "--output_path", "o"])
+    assert args.resolution == resolve_method(method).input_resolution
+    assert args.ckpt_path == resolve_method(method).ckpt_default
+    assert args.seed == 42
+
+
+def test_invalid_window_is_a_usage_error():
+    from spatialarena.models import video_diffusion_depth  # pylint: disable=import-outside-toplevel
+
+    with pytest.raises(SystemExit):
+        video_diffusion_depth.DepthCrafter.from_argv(
+            ["--data_path", "d", "--output_path", "o", "--overlap", "200"])
+    with pytest.raises(SystemExit):
+        video_diffusion_depth.ChronoDepth.from_argv(
+            ["--data_path", "d", "--output_path", "o", "--chunk_size", "11"])

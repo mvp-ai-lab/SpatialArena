@@ -1,26 +1,26 @@
+#!/usr/bin/env python3
 # Copyright (c) 2026 Yu Chen. All rights reserved.
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-"""Run Pow3R and export benchmark prediction artifacts."""
+"""Runs spatialarena.models.mapanything_wrappers.Pow3R.
 
-from mapanything_dense_wrapper import run_wrapper_method
+The engine's adapter for it; see run_model.py.
+"""
+
+import pathlib
+import sys
+
+ROOT_DIR = str(pathlib.Path(__file__).resolve().parents[2])
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+# pylint: disable-next=wrong-import-position
+from scripts.inference import run_model  # noqa: E402
+
+
+def main(argv=None):
+    """Runs POW3R on argv (default: sys.argv); see run_model.py."""
+    run_model.main(argv, default_model="POW3R")
+
 
 if __name__ == "__main__":
-    run_wrapper_method(
-        method="POW3R",
-        wrapper_module="mapanything.models.external.pow3r",
-        wrapper_class="Pow3RBAWrapper",
-        ckpt_env="POW3R_CKPT_PATH",
-        code_env="POW3R_CODE_PATH",
-        code_package_names=("pow3r", "dust3r"),
-        wrapper_kwargs={
-            "geometric_input_config": {
-                "overall_prob": 0.0,
-                "ray_dirs_prob": 0.0,
-                "depth_prob": 0.0,
-                "cam_prob": 0.0,
-            },
-            "scene_graph": "complete",
-            "inference_batch_size": 4,
-            "global_optim_niter": 120,
-        },
-    )
+    main()

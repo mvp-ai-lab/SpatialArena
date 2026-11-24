@@ -10,6 +10,7 @@ import numpy as np
 
 from spatialarena.download import HF_LOCAL_FILE_CHECKPOINTS, METHOD_CODE_COMMITS, METHOD_CODE_REPOS, _code_leaf_dir
 from spatialarena.methods import resolve_method
+from spatialarena.models import registry
 from scripts.inference.long_sequence_slam import FIXED_INPUT_LAUNCHER, PHASE_LAUNCHER, GpuMemorySampler, phase_command
 from scripts.inference.streaming_slam import (
     CODE_DIRS,
@@ -80,8 +81,9 @@ def test_streaming_methods_are_registered_slam_only_with_downloadable_weights(
     """Registry, engine dispatch, code pins and weight paths agree for all six methods."""
     weights = weight_paths(tmp_path)
     engine = ENGINE.read_text(encoding="utf-8")
-    assert "LOGER|ZIPMAP|LINGBOT_MAP|R3|SCAL3R|ABOT_RECON)" in engine
+    assert "scripts/inference/run_model.py --engine" in engine
     for method in METHODS:
+        assert registry.get_model(method).name == method
         spec = resolve_method(method)
         assert spec.adapter == "streaming_slam.py"
         assert spec.tasks == ("SLAM",)
@@ -216,3 +218,40 @@ def test_abot_recon_runs_with_loop_closure(tmp_path, monkeypatch):
     assert sorted(poses) == [0, 1, 2]
     assert LOOP_INFO == {"num_loop_edges": 2, "num_candidates": 5}
     LOOP_INFO.clear()
+
+
+def test_slam_models_have_the_common_command_line_and_their_weights(
+        tmp_path, monkeypatch):
+    """One option set: --ckpt_path is the method's checkpoint (MethodSpec default), the other weights come from
+    $SHARED_CHECKPOINT_ROOT; no --method / --ckpt_root / --keep_work_dir, no resolution or point options."""
+    import pytest
+
+    monkeypatch.setenv("SHARED_CHECKPOINT_ROOT", str(tmp_path))
+    monkeypatch.delenv("LOGER_CKPT_PATH", raising=False)
+    for method in (*METHODS, "VGGT_LONG", "PI_LONG", "VGGT_SLAM"):
+        parser = registry.get_model(method).build_parser(method)
+        options = set(parser._option_string_actions)  # pylint: disable=protected-access
+        assert "--ckpt_path" in options and "--keep_intermediate" in options
+        assert not options & {
+            "--method", "--ckpt_root", "--keep_work_dir", "--resolution",
+            "--max_points", "--conf_thresh", "--pixel_limit"
+        }
+        assert ("--phase" in options) == (method not in METHODS)
+    scene = ["--data_path", str(tmp_path), "--output_path", str(tmp_path)]
+    loger = registry.get_model("LOGER").from_argv(scene, "LOGER")
+    assert loger.args.ckpt_path == resolve_method("LOGER").ckpt_default
+    custom = tmp_path / "mine" / "latest.pt"
+    weights = registry.get_model("LOGER").from_argv(
+        [*scene, "--ckpt_path", str(custom)], "LOGER").weights()
+    assert weights["LOGER"] == custom
+    assert weights["LOGER_CONFIG"] == custom.parent / "original_config.yaml"
+    assert weights[
+        "SALAD"] == tmp_path / "local" / "slam_long" / "dino_salad.ckpt"
+    pi_long = registry.get_model("PI3_LONG").from_argv(scene, "PI3_LONG")
+    assert pi_long.method_name == "PI_LONG"
+    assert pi_long.weights(
+    )["Pi3"] == tmp_path / "local" / "slam_long" / "pi3.safetensors"
+    vggt_slam = registry.get_model("VGGT_SLAM").from_argv(
+        [*scene, "--ckpt_path", str(custom)], "VGGT_SLAM")
+    with pytest.raises(ValueError, match="--ckpt_path is not used"):
+        vggt_slam.weights()
