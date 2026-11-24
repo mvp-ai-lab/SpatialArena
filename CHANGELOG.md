@@ -6,6 +6,9 @@ SpatialArena changes. The history before the split is in FeedForward-Benchmark's
 
 ### Changed
 
+- The Hugging Face dataset moves to `mvp-lab/SpatialArena-Dataset` (from `Bluefish2333/SpatialArena-Dataset`): the
+  dashboard links and download commands, the download and release scripts' default repository, the dataset license
+  homepage, and the benchmark docs use the new repository.
 - `scripts/slurm/pack_and_upload_benchmark_datasets.sh` is removed: `scripts/release/upload_benchmark_release.sh`
   does the same stage + upload (plus the method manifests and per-scene archives) and the quickstart now uses it.
   `aggregate_full_standard_reports.sh` and `build_come_extensions.sh` default to the `si_bench` env, not `dogs`.

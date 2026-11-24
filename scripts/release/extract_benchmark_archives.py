@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Unpacks a downloaded benchmark release into a ready-to-use `benchmark_root`.
 
-The Hugging Face release (`Bluefish2333/SpatialArena-Dataset`) stores each dataset scene
+The Hugging Face release (`mvp-lab/SpatialArena-Dataset`) stores each dataset scene
 as one uncompressed `<Task>/<dataset>/<scene>.tar` (the raw tree is ~900k
 files, beyond what the Hub handles well). Run this once after downloading; it
 extracts every archive next to itself, restoring the exact layout the
@@ -10,7 +10,7 @@ evaluator expects (relative symlinks are preserved, within a dataset and from
 `SLAM/7scenes` into `MVRecon/7scenes`), and with `--delete` removes each
 archive after it extracts.
 
-    hf download Bluefish2333/SpatialArena-Dataset --repo-type dataset \\
+    hf download mvp-lab/SpatialArena-Dataset --repo-type dataset \\
         --local-dir /path/to/benchmark_root
     python extract_benchmark_archives.py /path/to/benchmark_root --delete
 

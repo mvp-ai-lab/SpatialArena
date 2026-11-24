@@ -34,7 +34,7 @@ SfM and SLAM frames are released unmasked.
 
 ## Getting the data
 
-The Hugging Face release (`Bluefish2333/SpatialArena-Dataset`) holds each track as `<Task>/spatialarena/`, one uncompressed
+The Hugging Face release (`mvp-lab/SpatialArena-Dataset`) holds each track as `<Task>/spatialarena/`, one uncompressed
 `<scene>.tar` per scene plus its `metadata.json`:
 
 ```bash
@@ -92,7 +92,7 @@ SpatialArena follows each task's standard protocol (`docs/evaluation.md`), with 
 python scripts/release/pack_and_upload_benchmark_datasets.py --benchmark_root /path/to/benchmarks \
   --staging_root /path/to/fresh_staging --datasets MonoDepth/spatialarena VideoDepth/spatialarena \
   MVRecon/spatialarena SfM/spatialarena SLAM/spatialarena --stage --archive_scenes \
-  --repo_id Bluefish2333/SpatialArena-Dataset --upload
+  --repo_id mvp-lab/SpatialArena-Dataset --upload
 ```
 
 With `SPATIALARENA_ROOT` set, `--benchmark_root` can be any folder: the tracks are read from that root.

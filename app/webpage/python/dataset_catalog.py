@@ -211,7 +211,7 @@ DATASET_CATALOG: tuple[DatasetCard, ...] = (
                "streets) with refined metric poses, LiDAR depth and GGGS "
                "dense depth, feeding all five tasks."),
         citation="SpatialArena, 2026",
-        url="https://huggingface.co/datasets/Bluefish2333/SpatialArena-Dataset",
+        url="https://huggingface.co/datasets/mvp-lab/SpatialArena-Dataset",
         scenes=30,
         total_images=34994,
         evaluated_images=10072,

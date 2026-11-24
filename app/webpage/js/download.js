@@ -6,7 +6,7 @@
 // each code block has a copy button.
 
 (function () {
-    const REPO_ID = "Bluefish2333/SpatialArena-Dataset";
+    const REPO_ID = "mvp-lab/SpatialArena-Dataset";
     const ROOT = "/data/spatialarena";
     const TASKS = ["MonoDepth", "VideoDepth", "MVRecon", "SfM", "SLAM"];
 

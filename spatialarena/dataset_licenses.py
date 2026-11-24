@@ -399,7 +399,7 @@ SOURCE_LICENSES: dict[str, SourceLicense] = {
                 "SpatialArena (the benchmark's own handheld 3-camera LiDAR rig "
                 "captures)"),
             homepage=("https://huggingface.co/datasets/"
-                      "Bluefish2333/SpatialArena-Dataset"),
+                      "mvp-lab/SpatialArena-Dataset"),
             status="restricted_noncommercial",
             license_name="CC BY-NC 4.0",
             license_url="https://creativecommons.org/licenses/by-nc/4.0/",

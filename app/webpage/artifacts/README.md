@@ -38,7 +38,7 @@ The GT depth, RGB frames, thumbnails and GT point clouds here are derived from t
   Cite: Koch, T., Liebel, L., Fraundorfer, F., Körner, M. "Evaluation of CNN-Based Single-Image Depth Estimation Methods." ECCV Workshops 2018.
 - **Neural RGB-D Surface Reconstruction dataset** (https://github.com/dazinovic/neural-rgbd-surface-reconstruction): Per-scene CC-BY or CC-0 (9 scenes sourced from BlendSwap artists; see the repo's own per-scene license table), https://github.com/dazinovic/neural-rgbd-surface-reconstruction#dataset.
   Cite: Azinović, D., Martin-Brualla, R., Goldman, D.B., Nießner, M., Thies, J. "Neural RGB-D Surface Reconstruction." CVPR 2022.
-- **SpatialArena (the benchmark's own handheld 3-camera LiDAR rig captures)** (https://huggingface.co/datasets/Bluefish2333/SpatialArena-Dataset): CC BY-NC 4.0, https://creativecommons.org/licenses/by-nc/4.0/.
+- **SpatialArena (the benchmark's own handheld 3-camera LiDAR rig captures)** (https://huggingface.co/datasets/mvp-lab/SpatialArena-Dataset): CC BY-NC 4.0, https://creativecommons.org/licenses/by-nc/4.0/.
   Cite: SpatialArena: an arena for geometric foundation models (FeedForward-Benchmark), 2026.
 - **Tanks and Temples** (https://www.tanksandtemples.org/): CC BY 4.0 for citation, plus a non-commercial-research-only install/use restriction stated in the benchmark's own license page, https://www.tanksandtemples.org/license/.
   Cite: Knapitsch, A., Park, J., Zhou, Q.Y., Koltun, V. "Tanks and Temples: Benchmarking Large-Scale Scene Reconstruction." ACM TOG 2017.

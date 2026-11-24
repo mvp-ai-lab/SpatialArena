@@ -186,7 +186,7 @@ methods with no overall rank (`rank` is null), and keep their per-task ranks.
 ## Download view
 
 The Download view (`#download`) explains how to fetch the benchmark from its Hugging Face release
-(`Bluefish2333/SpatialArena-Dataset`): install the client, build the `hf download` command for the chosen tasks (or the
+(`mvp-lab/SpatialArena-Dataset`): install the client, build the `hf download` command for the chosen tasks (or the
 SpatialArena tracks only), unpack the per-scene archives with the bundled `extract_benchmark_archives.py`, link the
 five datasets that two tasks share (packed once; the other task's folder holds a `SEE_INSTEAD.md`), and verify the
 result. The task picker and the release-contents table read the per-dataset sizes and shared-folder pointers in

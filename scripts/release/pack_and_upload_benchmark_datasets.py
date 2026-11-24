@@ -503,7 +503,7 @@ def _write_dataset_card(staging_root: pathlib.Path,
             ("tree is ~900k files). After downloading, extract everything in "
              "place with the bundled script:\n"),
             "```bash",
-            ("hf download Bluefish2333/SpatialArena-Dataset --repo-type dataset "
+            ("hf download mvp-lab/SpatialArena-Dataset --repo-type dataset "
              "--local-dir /path/to/benchmark_root"),
             ("python /path/to/benchmark_root/extract_benchmark_archives.py "
              "/path/to/benchmark_root --delete"),

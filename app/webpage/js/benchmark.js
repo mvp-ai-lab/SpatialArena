@@ -1889,6 +1889,11 @@ function buildBenchmarkTableSection(task, tableKey, sourceTable, selectedFamily,
         .map(row => {
             if (row.missing) return { ...row, task_score: undefined, task_rank: undefined };
             if ("ranked" in row) return { ...row, task_score: row.score, task_rank: row.score_rank };
+            if (tableKey !== "all") {
+                // A dataset tab scores and ranks each method on that dataset alone.
+                const datasetScore = benchmarkDatasetScoreForMethod(row.method, task, tableKey);
+                return { ...row, task_score: datasetScore, task_rank: undefined, ranked: isFiniteNumber(datasetScore) };
+            }
             const taskScore = benchmarkTaskScoreForMethod(row.method, task);
             return {
                 ...row,
@@ -1908,11 +1913,14 @@ function buildBenchmarkTableSection(task, tableKey, sourceTable, selectedFamily,
         metricKeys,
         methodRows,
         ownScore,
-        scoreLabel: ownScore ? "Cell Score" : "Task Score",
-        note: ownScore
+        scoreLabel: task === "SLAM" ? "Cell Score" : ownScore ? "Dataset Score" : "Task Score",
+        note: task === "SLAM" && ownScore
             ? "Cell Score = mean over the sequences of the 0-100 normalized ATE RMSE and drift (the protocol's "
                 + "ranking metrics); a failed (e.g. OOM) or missing sequence scores 0."
-            : "",
+            : ownScore
+                ? "Dataset Score = the task score on this dataset alone: the mean over its cases of the 0-100 "
+                    + "normalized metrics; a failed (e.g. OOM) or missing case scores 0. Ranks are within this dataset."
+                : "",
     };
 }
 
@@ -2616,6 +2624,15 @@ function renderBenchmarkRankBadge(rank, title = undefined) {
         : integerRank === 1 ? "Gold rank" : integerRank === 2 ? "Silver rank" : integerRank === 3 ? "Bronze rank" : `Rank ${integerRank}`;
     const titleAttribute = rankTitle === null ? "" : ` title="${escapeBenchmarkAttr(rankTitle)}"`;
     return `<span class="benchmark-rank${topClass}"${titleAttribute}>${label}</span>`;
+}
+
+// A method's score on one dataset of a task (the task score computed on that dataset alone), including the datasets
+// kept out of the leaderboard (excluded_dataset_scores); null without a result there.
+function benchmarkDatasetScoreForMethod(method, task, dataset) {
+    const row = (benchmarkData?.task_ranking?.rows || benchmarkData?.ranking?.rows || [])
+        .find(item => item.method === method);
+    const entry = row?.task_dataset_scores?.[task]?.[dataset] ?? row?.excluded_dataset_scores?.[task]?.[dataset];
+    return isFiniteNumber(entry?.score) ? entry.score : null;
 }
 
 function benchmarkTaskScoreForMethod(method, task) {

@@ -731,10 +731,9 @@ METRIC_KEYS = [metric["key"] for metric in METRICS]
 # would systematically flatter those methods over ones that never saw it.
 # Spring (MonoDepth) is excluded for the same reason: its evaluation frames
 # come from the Spring train split, which DA3, MapAnything, CUT3R, OmniVGGT
-# and Deja View train on. SpatialArena is left out because its evaluation is
-# still running and the release has none of it, so only a few local runs have
-# results (every other method would score 0 on it).
-LEADERBOARD_EXCLUDED_DATASETS = {"scannetpp", "spring", "spatialarena"}
+# and Deja View train on. SpatialArena is scored and averaged like every other
+# dataset.
+LEADERBOARD_EXCLUDED_DATASETS = {"scannetpp", "spring"}
 
 # Percent forms of the depth evaluator's fractions (it writes the percent form
 # only for AbsRel, delta 1.03 and 1.25).
