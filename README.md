@@ -1,5 +1,7 @@
 # SpatialArena
 
+[Paper (tech report)](docs/spatial_arena_tech_report.pdf) | [Hugging Face dataset](https://huggingface.co/datasets/mvp-lab/SpatialArena-Dataset)
+
 SpatialArena is the benchmark for geometric foundation models: evaluation, model adapters, benchmark
 dataset preparation, reports and the results dashboard. It was split out of FeedForward-Benchmark, which keeps the
 training-data side (dataset downloads, WebDataset conversion, dataloaders, MindCloud processing).
@@ -113,7 +115,10 @@ logs, but final evaluators only require the standardized artifacts above.
 ## Running Benchmark Adapters
 
 Method scripts under `scripts/inference/` are adapters for producing test
-artifacts. They are not used by the evaluators themselves. The supported
+artifacts. They are not used by the evaluators themselves. Methods are being moved onto one base class,
+`spatialarena.models.BaseModel`, which holds the shared preprocessing, restoration to the source grid, export and
+metrics. Your own model can subclass it and register with `spatialarena.models.register_model` to be evaluated with
+this repository as a dependency (`docs/models.md`). The supported
 methods, their aliases, tracks and input-resolution profiles are listed in
 `docs/evaluation.md` ("Methods and Tracks"); print them with:
 
@@ -259,128 +264,6 @@ include ATE, relative rotation error, direct relative translation-direction
 error, standard translation-axis error, RRA@5/15/30, RTA@5/15/30, mAA@30,
 and AUC@1/3/5/10/20/30. ATE uses a pose-aware Sim(3) alignment (LMedS RANSAC over
 the GTSAM pose fit + robust refit, `spatialarena/eval/pose_alignment.py`); see `docs/evaluation.md`.
-
-## Mesh And ScanNet++ Evaluators
-
-These evaluators are separate from the adapter artifact-only depth and pose
-workflow. They evaluate mesh or ScanNet++ depth/geometry artifacts with
-dataset-specific protocols.
-
-### DTU Mesh
-
-Script:
-
-```text
-spatialarena/eval/eval_dtu_mesh.py
-```
-
-Inputs:
-
-- `--dataset_path`: parent directory containing the DTU dataset folder `dtu/`.
-  The evaluator reads DTU cameras, object masks, plane masks, and STL ground
-  truth through the DTU dataset adapter.
-- `--input_dir`: parent directory containing method reconstructions.
-- `--suffix`: experiment suffix. For each scan, the evaluator expects:
-
-```text
-INPUT_DIR/SCAN_NAME_SUFFIX/evaluation/meshes/mesh_final.ply
-```
-
-Command:
-
-```sh
-python -m spatialarena.eval.eval_dtu_mesh \
-  --dataset_path ~/datasets \
-  --input_dir ~/datasets/dtu/dtu_exp \
-  --suffix 2dgs
-```
-
-Outputs are written next to each input mesh under `evaluation/meshes/`:
-
-- `results.json` with `mean_d2s`, `mean_s2d`, and `overall`.
-- `vis_<scan>_d2s.ply` and `vis_<scan>_s2d.ply` error visualizations.
-- `recon_aligned.ply` when coordinate-frame alignment is enabled by code.
-
-### Tanks-And-Temples Mesh
-
-Script:
-
-```text
-spatialarena/eval/eval_tnt_mesh.py
-```
-
-Inputs:
-
-- `--dataset_path`: parent directory containing
-  `tanks_and_temples_gof/SCENE/` with the Tanks-and-Temples GT point cloud,
-  crop JSON, alignment transform, and COLMAP SfM trajectory log.
-- `--input_dir`: parent directory containing method reconstructions.
-- `--suffix`: experiment suffix. For each scene, the evaluator expects:
-
-```text
-INPUT_DIR/SCENE_SUFFIX/evaluation/meshes/mesh_final.ply
-```
-
-Command:
-
-```sh
-python -m spatialarena.eval.eval_tnt_mesh \
-  --dataset_path ~/datasets \
-  --input_dir ~/datasets/tanks_and_temples_exp \
-  --suffix 2dgs
-```
-
-Outputs are written under each scene's `evaluation/meshes/` folder:
-
-- `metrics.json` with distance threshold, precision, recall, and F-score.
-- Histogram and plot artifacts produced by the Tanks-and-Temples toolbox.
-
-### ScanNet++ Depth And Geometry
-
-Script:
-
-```text
-spatialarena/eval/eval_scannetpp_depth.py
-```
-
-The current main benchmark summaries exclude ScanNet/ScanNet++, but this
-evaluator is available for ScanNet++ depth and geometry experiments.
-
-Depth-sidecar mode evaluates predicted per-frame depth maps, optionally builds a
-point cloud or TSDF mesh, and can also compare metric depths against GT depth
-PNGs:
-
-```sh
-python -m spatialarena.eval.eval_scannetpp_depth \
-  --mode depth \
-  --scannetpp_root /path/to/scannetpp/raw \
-  --colmap_root /path/to/scannetpp_colmap \
-  --scene_ids SCENE_ID_0,SCENE_ID_1 \
-  --image_folder images_4 \
-  --model_folder 0 \
-  --depth_folder depths_4_3dgs \
-  --scale_json_root /path/to/scale_json_root \
-  --scale_source estimated \
-  --output_dir /path/to/scannetpp_eval
-```
-
-PLY mode evaluates an existing point cloud or mesh against ScanNet++ GT:
-
-```sh
-python -m spatialarena.eval.eval_scannetpp_depth \
-  --mode ply \
-  --scannetpp_root /path/to/scannetpp/raw \
-  --scene_ids SCENE_ID_0 \
-  --input_ply_root /path/to/predicted_ply_root \
-  --input_ply_name point_cloud.ply \
-  --output_dir /path/to/scannetpp_eval
-```
-
-Outputs:
-
-- `OUTPUT_DIR/metrics.json` with aggregate geometry and optional depth metrics.
-- `OUTPUT_DIR/scenes/SCENE_ID/metrics.json` with per-scene results.
-- Optional distance artifacts, visualizations, and TSDF meshes when requested.
 
 ## Dataset And Case Utilities
 
