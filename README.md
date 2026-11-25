@@ -1,6 +1,6 @@
 # SpatialArena
 
-[Paper (tech report)](docs/spatial_arena_tech_report.pdf) | [Hugging Face dataset](https://huggingface.co/datasets/mvp-lab/SpatialArena-Dataset)
+[arXiv](https://arxiv.org/pdf/2611.32816) | [Hugging Face dataset](https://huggingface.co/datasets/mvp-lab/SpatialArena-Dataset)
 
 SpatialArena is the benchmark for geometric foundation models: evaluation, model adapters, benchmark
 dataset preparation, reports and the results dashboard. It was split out of FeedForward-Benchmark, which keeps the
