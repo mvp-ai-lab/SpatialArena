@@ -20,6 +20,13 @@ def _bench(tmp_path, **kwargs):
     )
 
 
+def _vggt_with_checkpoint(tmp_path):
+    """VGGT with a stand-in checkpoint: validate() checks that the file exists."""
+    checkpoint = tmp_path / "vggt.pt"
+    checkpoint.touch()
+    return {"name": "VGGT", "env": {"VGGT_CKPT_PATH": str(checkpoint)}}
+
+
 def test_singleton_is_a_benchmark_evaluator():
     assert isinstance(evaluator, BenchmarkEvaluator)
 
@@ -259,10 +266,10 @@ def test_plan_respects_explicit_select_runs_over_cartesian_product(tmp_path):
     }]
 
 
-def test_validate_returns_structured_report(tmp_path):
-    bench = _bench(tmp_path)
+def test_validate_returns_structured_report(tmp_path, benchmark_root):
+    bench = _bench(tmp_path, benchmark_root=benchmark_root)
     bench.select_datasets([{"task": "MonoDepth", "dataset": "marigold"}])
-    bench.select_models([{"name": "VGGT"}])
+    bench.select_models([_vggt_with_checkpoint(tmp_path)])
     report = bench.validate()
     assert isinstance(report, ValidationReport)
     assert report.ok is True
@@ -789,10 +796,11 @@ def _fake_report(tmp_path, plan, *, report_dirs=()):
     )
 
 
-def test_export_report_writes_summary_plan_validation_json(tmp_path):
-    bench = _bench(tmp_path)
+def test_export_report_writes_summary_plan_validation_json(
+        tmp_path, benchmark_root):
+    bench = _bench(tmp_path, benchmark_root=benchmark_root)
     bench.select_datasets([{"task": "MonoDepth", "dataset": "marigold"}])
-    bench.select_models([{"name": "VGGT"}])
+    bench.select_models([_vggt_with_checkpoint(tmp_path)])
     bench.validate()
     plan = bench.plan()
     # pylint: disable-next=protected-access
@@ -1001,16 +1009,19 @@ def test_mvrecon_cases_skip_scenes_without_gt_geometry():
     assert [entry.scene for entry in sfm] == ["office", "meadow"]
 
 
-def test_model_slurm_resources_override_the_config_per_phase(tmp_path):
+def test_model_slurm_resources_override_the_config_per_phase(
+        tmp_path, benchmark_root):
     """slurm_resources stack config < dataset item < model item, option by option, in the matching runs only."""
+    checkpoint = _vggt_with_checkpoint(tmp_path)["env"]["VGGT_CKPT_PATH"]
     config = tmp_path / "cfg.yaml"
     config.write_text(
         f"experiment_root: {tmp_path}\nexperiment_name: exp\njob_system: slurm\n"
+        f"benchmark_root: {benchmark_root}\n"
         "slurm_resources: {eval: {mem: 64G, cpus-per-task: 8}}\n"
         "datasets:\n  - {task: SLAM, dataset: tum_dynamics, slam_range: short,"
         " slurm_resources: {eval: {mem: 32G}, infer: {time: '1:00:00'}}}\n"
         "  - {task: SfM, dataset: eth3d}\n"
-        "models:\n  - {name: VGGT}\n"
+        f"models:\n  - {{name: VGGT, env: {{VGGT_CKPT_PATH: {checkpoint}}}}}\n"
         "  - {name: VGGT_LONG, slurm_resources: {eval: {mem: 128G}}}\n",
         encoding="utf-8",
     )

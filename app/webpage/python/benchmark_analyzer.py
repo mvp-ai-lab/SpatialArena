@@ -1126,8 +1126,8 @@ def track_ranking_tasks(track: str, tasks: list[str],
 
     That is every task for `rgb`; for a conditioned track ([+C], [+D]) only the
     tasks the task/track matrix lets it run on a leaderboard dataset. A task it
-    cannot run (MonoDepth [+C], or VideoDepth [+C], which runs only on the
-    unscored SpatialArena) is not a missing result.
+    cannot run there (MonoDepth [+C], or one evaluated only on a
+    LEADERBOARD_EXCLUDED_DATASETS dataset) is not a missing result.
 
     Args:
         track: The track name, e.g. "rgb" or "rgb_cameras".
@@ -2222,8 +2222,8 @@ def summarize_method_scene_means(
     for method_row in method_rows:
         scenes = by_method.get(method_row["method"], [])
         if not scenes and unscored.get(method_row["method"]):
-            # E.g. VideoDepth [+C], run on SpatialArena only: say why the row
-            # is empty instead of leaving it blank.
+            # E.g. a track run only on ScanNet++: say why the row is empty
+            # instead of leaving it blank.
             names = sorted(
                 DATASET_DISPLAY_NAMES.get(name, name)
                 for name in unscored[method_row["method"]])
