@@ -17,6 +17,23 @@ SpatialArena changes. The history before the split is in FeedForward-Benchmark's
   for pull requests, and measures the coverage of the `spatialarena` package. On a push to `main` it writes the
   coverage to the `badges` branch as a shields.io endpoint file (`coverage.json`), which the README's coverage
   badge reads. It uses only the workflow's own token, with no third-party service.
+- CI: the webpage deployment runs in its own job after the build job. Deploying from the build job sometimes looked
+  up the uploaded artifact before it was registered and failed with "No artifacts named github-pages were found".
+- CI: the test workflow installs the EGL/GL and OpenMP runtimes `open3d` needs on the bare runner. Without them, test
+  collection stopped at the first module importing `open3d`, so no coverage was measured and the badge was never
+  written.
+- Tests: the suite passes without the benchmark data (782 passed), as it must on CI.
+  - The planner tests in `test_evaluator.py` and `test_run_config.py` now use a stand-in benchmark root (the new
+    `benchmark_root` fixture in `test/conftest.py`) instead of the real datasets. It holds one `metadata.json` per
+    selected dataset, listing the scenes of the canonical case lists, with an empty folder per scene. VGGT's
+    checkpoint is given as a stand-in file through `VGGT_CKPT_PATH`.
+  - Two dashboard tests still treated SpatialArena as unscored. It has been scored like every other dataset since it
+    left `LEADERBOARD_EXCLUDED_DATASETS`, so VideoDepth [+C] counts for its track's average once SpatialArena is
+    evaluated. The "not scored" label is now tested with ScanNet++, and two stale docstrings in
+    `benchmark_analyzer.py` are corrected.
+  - Two `materialize_spatialarena` tests checked the masked block of a random-noise JPEG for a maximum of 8. JPEG
+    ringing at quality 95 reaches ~70 there, so they now check the block's mean (~11 masked, ~127 unmasked). One
+    also checked the heatmap at a pixel without a LiDAR point; it now checks the first point outside the mask.
 - The Hugging Face dataset moves to `mvp-lab/SpatialArena-Dataset` (from `Bluefish2333/SpatialArena-Dataset`): the
   dashboard links and download commands, the download and release scripts' default repository, the dataset license
   homepage, and the benchmark docs use the new repository.
