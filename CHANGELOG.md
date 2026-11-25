@@ -6,6 +6,17 @@ SpatialArena changes. The history before the split is in FeedForward-Benchmark's
 
 ### Changed
 
+- README: rewritten for readability. It now has a header with the logo, authors, and badges (arXiv, Hugging Face
+  dataset, leaderboard, tests, coverage, Python, license), the benchmark at a glance, and a task/dataset table. Its
+  quick start follows the dashboard's four steps with their code and terminal output (install, describe your model
+  as one command template, plan and evaluate, compare in the dashboard). It also has a BibTeX citation. The long command references (engine submission, data and artifact formats,
+  evaluator commands, case utilities) keep their content in collapsible sections.
+- Dashboard home: the project links row adds the arXiv paper (https://arxiv.org/abs/2611.32816), before GitHub and
+  the Hugging Face dataset, with arXiv's logomark (`assets/logos/arxiv.svg`, from Simple Icons, CC0).
+- CI: `.github/workflows/tests.yml` runs `pytest test/` on CPU (Python 3.11, CPU PyTorch) for pushes to `main` and
+  for pull requests, and measures the coverage of the `spatialarena` package. On a push to `main` it writes the
+  coverage to the `badges` branch as a shields.io endpoint file (`coverage.json`), which the README's coverage
+  badge reads. It uses only the workflow's own token, with no third-party service.
 - The Hugging Face dataset moves to `mvp-lab/SpatialArena-Dataset` (from `Bluefish2333/SpatialArena-Dataset`): the
   dashboard links and download commands, the download and release scripts' default repository, the dataset license
   homepage, and the benchmark docs use the new repository.
