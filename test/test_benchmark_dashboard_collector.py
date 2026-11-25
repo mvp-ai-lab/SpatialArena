@@ -690,8 +690,9 @@ def test_slam_scene_scores_rank_every_method_and_score_failed_sequences_zero(
 
 def test_case_coverage_labels_rows_short_of_their_cases_and_keeps_them_out_of_metric_ranks(
 ):
-    """A row with fewer evaluated scenes than expected is marked incomplete with its failures named; a dataset the
-    method never took on does not make its all-datasets row incomplete."""
+    """A row with fewer evaluated scenes than expected is marked incomplete with its failures named; a leaderboard
+    dataset the method never took on counts against its all-datasets row too (the task score scores it 0), while an
+    excluded dataset (Spring) does not."""
     from app.webpage.python.benchmark_analyzer import attach_case_coverage
 
     def ds(evaluated, expected, failed=()):
@@ -730,6 +731,20 @@ def test_case_coverage_labels_rows_short_of_their_cases_and_keeps_them_out_of_me
                     }
                 }
             },
+            {
+                "method": "C",
+                "cells": {
+                    "MonoDepth|rgb": {
+                        "method_id": "C",
+                        "datasets": {
+                            "x": ds(3, 3),
+                            "y": ds(2, 2),
+                            "z": ds(4, 4),
+                            "spring": ds(0, 1)
+                        }
+                    }
+                }
+            },
         ]
     }
     tables = {
@@ -739,6 +754,9 @@ def test_case_coverage_labels_rows_short_of_their_cases_and_keeps_them_out_of_me
                 "metrics": {}
             }, {
                 "method": "B",
+                "metrics": {}
+            }, {
+                "method": "C",
                 "metrics": {}
             }],
             "dataset_tables": {
@@ -774,8 +792,11 @@ def test_case_coverage_labels_rows_short_of_their_cases_and_keeps_them_out_of_me
     attach_case_coverage(tables, coverage, failures)
     overall = {row["method"]: row for row in tables["MonoDepth"]["methods"]}
     assert overall["A"]["incomplete"] and overall["A"][
-        "coverage_label"] == "2/5 scenes · 2 GPU OOM"
-    assert "incomplete" not in overall["B"]  # z was never run: not counted
+        "coverage_label"] == "2/9 scenes · 2 GPU OOM"
+    # z was never run: it still counts, as the task score scores it 0.
+    assert overall["B"]["incomplete"] and overall["B"][
+        "coverage_label"] == "5/9 scenes"
+    assert "incomplete" not in overall["C"]  # Spring is off the leaderboard
     y = {
         row["method"]: row
         for row in tables["MonoDepth"]["dataset_tables"]["y"]["methods"]
@@ -788,6 +809,43 @@ def test_case_coverage_labels_rows_short_of_their_cases_and_keeps_them_out_of_me
     assert x["A"][
         "coverage_label"] == "2/3 scenes" and "failure_label" not in x["A"]
 
+
+def test_case_coverage_labels_unregistered_methods_from_their_track():
+    """A method outside the registry (no coverage cell, e.g. imported results) is held to its (task, track)'s
+    expected scenes, counted from the dataset tables, so a dataset it never ran makes it incomplete."""
+    from app.webpage.python.benchmark_analyzer import attach_case_coverage
+
+    def ds(evaluated, expected):
+        return {"evaluated": evaluated, "expected": expected, "failed_scenes": []}
+
+    coverage = {
+        "methods": [{
+            "method": "A",
+            "cells": {
+                "MonoDepth|rgb": {
+                    "method_id": "A",
+                    "datasets": {"x": ds(3, 3), "y": ds(2, 2)}
+                }
+            }
+        }]
+    }
+    tables = {
+        "MonoDepth": {
+            "methods": [{"method": "A", "metrics": {}}, {"method": "IMPORTED", "metrics": {}}],
+            "dataset_tables": {
+                "x": {"methods": [{"method": "A", "scenes": 3, "metrics": {}},
+                                  {"method": "IMPORTED", "scenes": 3, "metrics": {}}]},
+                "y": {"methods": [{"method": "A", "scenes": 2, "metrics": {}},
+                                  {"method": "IMPORTED", "missing": True, "metrics": {}}]},
+            },
+        }
+    }
+    attach_case_coverage(tables, coverage)
+    overall = {row["method"]: row for row in tables["MonoDepth"]["methods"]}
+    assert "incomplete" not in overall["A"]
+    assert overall["IMPORTED"]["incomplete"] and overall["IMPORTED"]["coverage_label"] == "3/5 scenes"
+    x = {row["method"]: row for row in tables["MonoDepth"]["dataset_tables"]["x"]["methods"]}
+    assert "incomplete" not in x["IMPORTED"]
 
 def test_all_datasets_table_averages_the_leaderboard_scenes():
     """With per-scene rows the all-datasets table's metrics are scene means over the leaderboard datasets: each scene
@@ -1108,6 +1166,42 @@ def _depth_scene(method, scene, absrel, **extra):
         "metrics": metrics
     }
 
+
+def test_metric_case_scores_average_every_case_with_missing_ones_zero():
+    """A metric column ranks by its normalized score over every case, a case the method skipped counting 0: BAR's
+    better AbsRel on the two scenes it ran does not beat FOO, which ran all five."""
+    from app.webpage.python.benchmark_analyzer import (attach_metric_case_scores, build_rankings)
+
+    rows = [{
+        "method": method,
+        "task": "MonoDepth",
+        "dataset": "ibims1",
+        "slam_range": "",
+        "metrics": {}
+    } for method in ("FOO", "BAR")]
+    scenes = [_depth_scene("FOO", f"s{i}", 10.0) for i in range(5)]
+    scenes += [_depth_scene("BAR", f"s{i}", 5.0) for i in range(2)]
+    ranking = build_rankings(rows, scenes)["rows"]
+    by_method = {row["method"]: row["metric_case_scores"]["MonoDepth"] for row in ranking}
+    # AbsRel: BAR best on s0, s1 (FOO 0 there); FOO alone on s2-s4 (100), BAR 0 there.
+    assert by_method["FOO"]["all"]["absrel_percent"] == 60.0
+    assert by_method["BAR"]["all"]["absrel_percent"] == 40.0
+    assert by_method["BAR"]["datasets"]["ibims1"]["absrel_percent"] == 40.0
+    assert "mae_normal_deg" not in by_method["FOO"]["all"]  # nobody reports it
+
+    tables = {
+        "MonoDepth": {
+            "methods": [{"method": "FOO", "metrics": {}}, {"method": "BAR", "metrics": {}}],
+            "dataset_tables": {
+                "ibims1": {"methods": [{"method": "FOO", "metrics": {}}, {"method": "BAR", "metrics": {}}]}
+            },
+        }
+    }
+    attach_metric_case_scores(tables, ranking)
+    overall = {row["method"]: row for row in tables["MonoDepth"]["methods"]}
+    assert overall["BAR"]["metric_case_scores"]["absrel_percent"] == 40.0
+    ibims1 = {row["method"]: row for row in tables["MonoDepth"]["dataset_tables"]["ibims1"]["methods"]}
+    assert ibims1["FOO"]["metric_case_scores"]["absrel_percent"] == 60.0
 
 def test_scene_scores_weigh_every_case_and_score_missing_ones_zero():
     """Per-scene min-max on the depth score metrics only; a case or metric a method lacks counts 0."""

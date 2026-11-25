@@ -528,6 +528,27 @@ def read_failures_by_cell(
     return cells
 
 
+def case_failure_records(
+    report_roots: Sequence[report_discovery.ReportRoot]
+) -> list[dict[str, Any]]:
+    """Returns the case failures in benchmark_analyzer.read_case_failures' form.
+
+    Only the keys attach_case_coverage reads are filled: method, task,
+    dataset, scene and the reader-facing label.
+    """
+    return [{
+        "method": failure.method,
+        "task": failure.task,
+        "dataset": failure.dataset,
+        "scene": failure.scene,
+        "status": failure.status,
+        "label": benchmark_analyzer.CASE_FAILURE_LABELS.get(
+            failure.status,
+            failure.status.replace("_", " ") or "Failed"),
+    } for failure in report_discovery.read_case_failures(
+        root.path for root in report_roots)]
+
+
 def render_scene_tsv(
         rows: Sequence[summarize_benchmark_reports.SceneMetrics]) -> str:
     """Renders one TSV line per evaluated scene with its metrics.
@@ -668,6 +689,11 @@ def collect(
     # it has no result.
     benchmark_analyzer.add_missing_method_rows(data["task_tables"],
                                                data["coverage"])
+    # Rows short of their expected cases are labelled `incomplete`, which keeps
+    # them out of the page's per-metric ranks.
+    benchmark_analyzer.attach_case_coverage(data["task_tables"],
+                                            data["coverage"],
+                                            case_failure_records(roots))
     if cases is not None:
         scene_filter = "case_list"
     else:

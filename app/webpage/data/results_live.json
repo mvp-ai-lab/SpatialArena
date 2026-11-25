@@ -2207,7 +2207,9 @@
               "display": "28.49",
               "rank": 11
             }
-          }
+          },
+          "coverage_label": "14/33 scenes",
+          "incomplete": true
         },
         {
           "method": "GPT_6_ASTRA",
@@ -2366,7 +2368,7 @@
               "rank": 12
             }
           },
-          "coverage_label": "21/33 scenes \u00b7 12 GPU OOM",
+          "coverage_label": "21/33 scenes",
           "incomplete": true
         },
         {
@@ -3592,7 +3594,7 @@
               ]
             }
           ],
-          "coverage_label": "32/33 scenes \u00b7 1 Constant prediction",
+          "coverage_label": "32/33 scenes",
           "incomplete": true
         },
         {
@@ -5462,7 +5464,7 @@
                   "rank": 16
                 }
               },
-              "coverage_label": "2/3 scenes \u00b7 1 GPU OOM",
+              "coverage_label": "2/3 scenes",
               "incomplete": true
             },
             {
@@ -6613,7 +6615,7 @@
                   ]
                 }
               ],
-              "coverage_label": "2/3 scenes \u00b7 1 Constant prediction",
+              "coverage_label": "2/3 scenes",
               "incomplete": true
             },
             {
@@ -24441,7 +24443,7 @@
               ]
             }
           ],
-          "coverage_label": "87/89 scenes \u00b7 2 Int32 index limit",
+          "coverage_label": "87/89 scenes",
           "incomplete": true
         },
         {
@@ -24743,7 +24745,7 @@
               "rank": 4
             }
           },
-          "coverage_label": "88/89 scenes \u00b7 1 GPU OOM",
+          "coverage_label": "88/89 scenes",
           "incomplete": true
         },
         {
@@ -24895,7 +24897,7 @@
               "rank": 3
             }
           },
-          "coverage_label": "88/89 scenes \u00b7 1 GPU OOM",
+          "coverage_label": "88/89 scenes",
           "incomplete": true
         },
         {
@@ -25339,7 +25341,7 @@
               "rank": 32
             }
           },
-          "coverage_label": "23/89 scenes \u00b7 50 GPU OOM, 15 RAM OOM, 1 OOM",
+          "coverage_label": "23/89 scenes",
           "incomplete": true
         },
         {
@@ -25566,7 +25568,7 @@
               "rank": 16
             }
           },
-          "coverage_label": "88/89 scenes \u00b7 1 GPU OOM",
+          "coverage_label": "88/89 scenes",
           "incomplete": true
         },
         {
@@ -25718,7 +25720,7 @@
               "rank": 11
             }
           },
-          "coverage_label": "83/89 scenes \u00b7 6 GPU OOM",
+          "coverage_label": "83/89 scenes",
           "incomplete": true
         },
         {
@@ -25795,7 +25797,7 @@
               "rank": 10
             }
           },
-          "coverage_label": "88/89 scenes \u00b7 1 GPU OOM",
+          "coverage_label": "88/89 scenes",
           "incomplete": true
         },
         {
@@ -25872,7 +25874,7 @@
               "rank": 20
             }
           },
-          "coverage_label": "88/89 scenes \u00b7 1 GPU OOM",
+          "coverage_label": "88/89 scenes",
           "incomplete": true
         },
         {
@@ -26029,7 +26031,7 @@
               ]
             }
           ],
-          "coverage_label": "88/89 scenes \u00b7 1 Runtime error",
+          "coverage_label": "88/89 scenes",
           "incomplete": true
         },
         {
@@ -26115,7 +26117,7 @@
               ]
             }
           ],
-          "coverage_label": "86/89 scenes \u00b7 2 GPU OOM, 1 CUDA illegal access",
+          "coverage_label": "86/89 scenes",
           "incomplete": true
         },
         {
@@ -26197,7 +26199,7 @@
               ]
             }
           ],
-          "coverage_label": "12/15 scenes \u00b7 2 GPU OOM, 1 CUDA illegal access",
+          "coverage_label": "12/15 scenes",
           "incomplete": true
         },
         {
@@ -26416,7 +26418,7 @@
               "rank": 31
             }
           },
-          "coverage_label": "23/89 scenes \u00b7 51 GPU OOM, 15 RAM OOM",
+          "coverage_label": "23/89 scenes",
           "incomplete": true
         },
         {
@@ -26568,7 +26570,7 @@
               "rank": 16
             }
           },
-          "coverage_label": "88/89 scenes \u00b7 1 GPU OOM",
+          "coverage_label": "88/89 scenes",
           "incomplete": true
         },
         {
@@ -26720,7 +26722,7 @@
               "rank": 16
             }
           },
-          "coverage_label": "88/89 scenes \u00b7 1 GPU OOM",
+          "coverage_label": "88/89 scenes",
           "incomplete": true
         },
         {
@@ -34601,7 +34603,7 @@
                   ]
                 }
               ],
-              "coverage_label": "13/15 scenes \u00b7 2 Int32 index limit",
+              "coverage_label": "13/15 scenes",
               "incomplete": true
             },
             {
@@ -34887,7 +34889,7 @@
                   "rank": 10
                 }
               },
-              "coverage_label": "14/15 scenes \u00b7 1 GPU OOM",
+              "coverage_label": "14/15 scenes",
               "incomplete": true
             },
             {
@@ -35031,7 +35033,7 @@
                   "rank": 12
                 }
               },
-              "coverage_label": "14/15 scenes \u00b7 1 GPU OOM",
+              "coverage_label": "14/15 scenes",
               "incomplete": true
             },
             {
@@ -35601,7 +35603,7 @@
                   "rank": 13
                 }
               },
-              "coverage_label": "14/15 scenes \u00b7 1 GPU OOM",
+              "coverage_label": "14/15 scenes",
               "incomplete": true
             },
             {
@@ -35745,7 +35747,7 @@
                   "rank": 4
                 }
               },
-              "coverage_label": "9/15 scenes \u00b7 6 GPU OOM",
+              "coverage_label": "9/15 scenes",
               "incomplete": true
             },
             {
@@ -35818,7 +35820,7 @@
                   "rank": 9
                 }
               },
-              "coverage_label": "14/15 scenes \u00b7 1 GPU OOM",
+              "coverage_label": "14/15 scenes",
               "incomplete": true
             },
             {
@@ -35891,7 +35893,7 @@
                   "rank": 21
                 }
               },
-              "coverage_label": "14/15 scenes \u00b7 1 GPU OOM",
+              "coverage_label": "14/15 scenes",
               "incomplete": true
             },
             {
@@ -36044,7 +36046,7 @@
                   ]
                 }
               ],
-              "coverage_label": "14/15 scenes \u00b7 1 Runtime error",
+              "coverage_label": "14/15 scenes",
               "incomplete": true
             },
             {
@@ -36126,7 +36128,7 @@
                   ]
                 }
               ],
-              "coverage_label": "12/15 scenes \u00b7 2 GPU OOM, 1 CUDA illegal access",
+              "coverage_label": "12/15 scenes",
               "incomplete": true
             },
             {
@@ -36208,7 +36210,7 @@
                   ]
                 }
               ],
-              "coverage_label": "12/15 scenes \u00b7 2 GPU OOM, 1 CUDA illegal access",
+              "coverage_label": "12/15 scenes",
               "incomplete": true
             },
             {
@@ -36494,7 +36496,7 @@
                   "rank": 13
                 }
               },
-              "coverage_label": "14/15 scenes \u00b7 1 GPU OOM",
+              "coverage_label": "14/15 scenes",
               "incomplete": true
             },
             {
@@ -36638,7 +36640,7 @@
                   "rank": 13
                 }
               },
-              "coverage_label": "14/15 scenes \u00b7 1 GPU OOM",
+              "coverage_label": "14/15 scenes",
               "incomplete": true
             },
             {
@@ -36832,7 +36834,7 @@
               ]
             }
           ],
-          "coverage_label": "80/84 scenes \u00b7 3 Int32 index limit, 1 RAM OOM",
+          "coverage_label": "80/84 scenes",
           "incomplete": true
         },
         {
@@ -37042,7 +37044,7 @@
               "rank": 8
             }
           },
-          "coverage_label": "82/84 scenes \u00b7 2 RAM OOM",
+          "coverage_label": "82/84 scenes",
           "incomplete": true
         },
         {
@@ -37096,7 +37098,7 @@
               "rank": 1
             }
           },
-          "coverage_label": "82/84 scenes \u00b7 2 RAM OOM",
+          "coverage_label": "82/84 scenes",
           "incomplete": true
         },
         {
@@ -37210,7 +37212,7 @@
               ]
             }
           ],
-          "coverage_label": "76/84 scenes \u00b7 6 Int32 index limit, 2 RAM OOM",
+          "coverage_label": "76/84 scenes",
           "incomplete": true
         },
         {
@@ -37260,7 +37262,7 @@
               "rank": 13
             }
           },
-          "coverage_label": "47/84 scenes \u00b7 29 RAM OOM, 8 GPU OOM",
+          "coverage_label": "47/84 scenes",
           "incomplete": true
         },
         {
@@ -37323,7 +37325,7 @@
               ]
             }
           ],
-          "coverage_label": "63/84 scenes \u00b7 11 RAM OOM, 10 Empty eval region",
+          "coverage_label": "63/84 scenes",
           "incomplete": true
         },
         {
@@ -37481,7 +37483,7 @@
               "rank": 7
             }
           },
-          "coverage_label": "82/84 scenes \u00b7 2 RAM OOM",
+          "coverage_label": "82/84 scenes",
           "incomplete": true
         },
         {
@@ -37587,7 +37589,7 @@
               "rank": 11
             }
           },
-          "coverage_label": "83/84 scenes \u00b7 1 RAM OOM",
+          "coverage_label": "83/84 scenes",
           "incomplete": true
         },
         {
@@ -37704,7 +37706,7 @@
               ]
             }
           ],
-          "coverage_label": "69/84 scenes \u00b7 8 Empty eval region, 7 Runtime error",
+          "coverage_label": "69/84 scenes",
           "incomplete": true
         },
         {
@@ -37810,7 +37812,7 @@
               "rank": 9
             }
           },
-          "coverage_label": "83/84 scenes \u00b7 1 RAM OOM",
+          "coverage_label": "83/84 scenes",
           "incomplete": true
         },
         {
@@ -37912,7 +37914,7 @@
               "rank": 5
             }
           },
-          "coverage_label": "82/84 scenes \u00b7 2 RAM OOM",
+          "coverage_label": "82/84 scenes",
           "incomplete": true
         },
         {
@@ -37966,7 +37968,7 @@
               "rank": 3
             }
           },
-          "coverage_label": "83/84 scenes \u00b7 1 RAM OOM",
+          "coverage_label": "83/84 scenes",
           "incomplete": true
         },
         {
@@ -38064,7 +38066,7 @@
               "rank": 10
             }
           },
-          "coverage_label": "47/84 scenes \u00b7 37 RAM OOM",
+          "coverage_label": "47/84 scenes",
           "incomplete": true
         },
         {
@@ -39846,7 +39848,7 @@
                   "rank": 14
                 }
               },
-              "coverage_label": "7/15 scenes \u00b7 8 GPU OOM",
+              "coverage_label": "7/15 scenes",
               "incomplete": true
             },
             {
@@ -39903,7 +39905,7 @@
                   ]
                 }
               ],
-              "coverage_label": "5/15 scenes \u00b7 10 Empty eval region",
+              "coverage_label": "5/15 scenes",
               "incomplete": true
             },
             {
@@ -40503,7 +40505,7 @@
                   "rank": 17
                 }
               },
-              "coverage_label": "7/15 scenes \u00b7 8 RAM OOM",
+              "coverage_label": "7/15 scenes",
               "incomplete": true
             },
             {
@@ -41103,7 +41105,7 @@
                   "rank": 9
                 }
               },
-              "coverage_label": "10/11 scenes \u00b7 1 RAM OOM",
+              "coverage_label": "10/11 scenes",
               "incomplete": true
             },
             {
@@ -41795,7 +41797,7 @@
                   "rank": 8
                 }
               },
-              "coverage_label": "10/11 scenes \u00b7 1 RAM OOM",
+              "coverage_label": "10/11 scenes",
               "incomplete": true
             },
             {
@@ -43479,7 +43481,7 @@
                   "rank": 21
                 }
               },
-              "coverage_label": "3/9 scenes \u00b7 6 RAM OOM",
+              "coverage_label": "3/9 scenes",
               "incomplete": true
             },
             {
@@ -44549,7 +44551,7 @@
                   ]
                 }
               ],
-              "coverage_label": "19/20 scenes \u00b7 1 Empty eval region",
+              "coverage_label": "19/20 scenes",
               "incomplete": true
             },
             {
@@ -45251,7 +45253,7 @@
                   ]
                 }
               ],
-              "coverage_label": "3/6 scenes \u00b7 3 Int32 index limit",
+              "coverage_label": "3/6 scenes",
               "incomplete": true
             },
             {
@@ -45437,7 +45439,7 @@
                   "rank": 8
                 }
               },
-              "coverage_label": "4/6 scenes \u00b7 2 RAM OOM",
+              "coverage_label": "4/6 scenes",
               "incomplete": true
             },
             {
@@ -45485,7 +45487,7 @@
                   "rank": 6
                 }
               },
-              "coverage_label": "4/6 scenes \u00b7 2 RAM OOM",
+              "coverage_label": "4/6 scenes",
               "incomplete": true
             },
             {
@@ -45579,7 +45581,7 @@
                   "rank": 19
                 }
               },
-              "coverage_label": "5/6 scenes \u00b7 1 RAM OOM",
+              "coverage_label": "5/6 scenes",
               "incomplete": true
             },
             {
@@ -45949,7 +45951,7 @@
                   "rank": 7
                 }
               },
-              "coverage_label": "5/6 scenes \u00b7 1 RAM OOM",
+              "coverage_label": "5/6 scenes",
               "incomplete": true
             },
             {
@@ -45997,7 +45999,7 @@
                   "rank": 4
                 }
               },
-              "coverage_label": "5/6 scenes \u00b7 1 RAM OOM",
+              "coverage_label": "5/6 scenes",
               "incomplete": true
             },
             {
@@ -46302,7 +46304,7 @@
                   "rank": 16
                 }
               },
-              "coverage_label": "5/6 scenes \u00b7 1 RAM OOM",
+              "coverage_label": "5/6 scenes",
               "incomplete": true
             },
             {
@@ -46626,7 +46628,7 @@
                   "rank": 11
                 }
               },
-              "coverage_label": "4/6 scenes \u00b7 2 RAM OOM",
+              "coverage_label": "4/6 scenes",
               "incomplete": true
             },
             {
@@ -46674,7 +46676,7 @@
                   "rank": 22
                 }
               },
-              "coverage_label": "2/6 scenes \u00b7 4 RAM OOM",
+              "coverage_label": "2/6 scenes",
               "incomplete": true
             },
             {
@@ -46814,7 +46816,7 @@
                   "rank": 13
                 }
               },
-              "coverage_label": "4/6 scenes \u00b7 2 RAM OOM",
+              "coverage_label": "4/6 scenes",
               "incomplete": true
             },
             {
@@ -46908,7 +46910,7 @@
                   "rank": 9
                 }
               },
-              "coverage_label": "5/6 scenes \u00b7 1 RAM OOM",
+              "coverage_label": "5/6 scenes",
               "incomplete": true
             },
             {
@@ -47094,7 +47096,7 @@
                   "rank": 7
                 }
               },
-              "coverage_label": "5/6 scenes \u00b7 1 RAM OOM",
+              "coverage_label": "5/6 scenes",
               "incomplete": true
             },
             {
@@ -47142,7 +47144,7 @@
                   "rank": 4
                 }
               },
-              "coverage_label": "5/6 scenes \u00b7 1 RAM OOM",
+              "coverage_label": "5/6 scenes",
               "incomplete": true
             },
             {
@@ -47511,7 +47513,7 @@
               ]
             }
           ],
-          "coverage_label": "106/109 scenes \u00b7 3 Int32 index limit",
+          "coverage_label": "106/109 scenes",
           "incomplete": true
         },
         {
@@ -48504,7 +48506,7 @@
               "rank": 19
             }
           },
-          "coverage_label": "87/109 scenes \u00b7 15 GPU OOM, 7 RAM OOM",
+          "coverage_label": "87/109 scenes",
           "incomplete": true
         },
         {
@@ -49638,7 +49640,7 @@
               "rank": 13
             }
           },
-          "coverage_label": "102/109 scenes \u00b7 7 GPU OOM",
+          "coverage_label": "102/109 scenes",
           "incomplete": true
         },
         {
@@ -50201,7 +50203,7 @@
               "rank": 5
             }
           },
-          "coverage_label": "51/58 scenes \u00b7 7 GPU OOM",
+          "coverage_label": "51/58 scenes",
           "incomplete": true
         },
         {
@@ -50342,7 +50344,7 @@
               "rank": 18
             }
           },
-          "coverage_label": "87/109 scenes \u00b7 15 GPU OOM, 7 RAM OOM",
+          "coverage_label": "87/109 scenes",
           "incomplete": true
         },
         {
@@ -54776,7 +54778,7 @@
                   "rank": 16
                 }
               },
-              "coverage_label": "12/13 scenes \u00b7 1 GPU OOM",
+              "coverage_label": "12/13 scenes",
               "incomplete": true
             },
             {
@@ -56546,7 +56548,7 @@
                   "rank": 14
                 }
               },
-              "coverage_label": "12/13 scenes \u00b7 1 GPU OOM",
+              "coverage_label": "12/13 scenes",
               "incomplete": true
             },
             {
@@ -66541,7 +66543,7 @@
                   ]
                 }
               ],
-              "coverage_label": "4/7 scenes \u00b7 3 Int32 index limit",
+              "coverage_label": "4/7 scenes",
               "incomplete": true
             },
             {

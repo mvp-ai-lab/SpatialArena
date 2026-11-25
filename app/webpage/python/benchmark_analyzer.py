@@ -2352,8 +2352,9 @@ def attach_case_coverage(
     """Labels the non-SLAM rows that fell short of their cases.
 
     The expected cases come from the coverage matrix (build_coverage). A row (a
-    dataset table's, or the all-datasets table's over the leaderboard datasets
-    it ran) whose method evaluated fewer scenes than expected gets
+    dataset table's, or the all-datasets table's over every leaderboard
+    dataset of the task, including ones the method never ran) whose method
+    evaluated fewer scenes than expected gets
     `coverage_label` ("2/14 scenes · 12 GPU OOM", failures named by
     `case_failures`) and `incomplete`: its metric means cover a subset, so the
     page does not rank them. A row with no scene at all but recorded failures
@@ -2370,11 +2371,39 @@ def attach_case_coverage(
                       failure["scene"])
         records[record_key] = failure
     cells: dict[tuple[str, str], dict[str, Any]] = {}
+    # The expected scenes depend on the task and track only, so a method
+    # outside the registry (no coverage cell, e.g. results imported from
+    # another benchmark's release) borrows them from its (task, track).
+    expected_by_track: dict[tuple[str, str], dict[str, int]] = {}
     for entry in coverage.get("methods", []):
         for key, cell in (entry.get("cells") or {}).items():
             if cell.get("method_id") and cell.get("datasets"):
-                task = key.split("|", 1)[0]
+                task, _, track = key.partition("|")
                 cells[(task, cell["method_id"])] = cell["datasets"]
+                expected_by_track.setdefault(
+                    (task, track or "rgb"), {
+                        dataset: entry_["expected"]
+                        for dataset, entry_ in cell["datasets"].items()
+                    })
+
+    def unregistered_cell(task: str, table: dict[str, Any],
+                          method: str) -> dict[str, Any]:
+        """Builds a coverage cell from the dataset tables' scene counts."""
+        expected = expected_by_track.get((task, method_track(method)), {})
+        by_dataset = {}
+        for dataset, count in expected.items():
+            rows = table.get("dataset_tables", {}).get(dataset,
+                                                       {}).get("methods", [])
+            evaluated = next(
+                (row.get("scenes") or 0
+                 for row in rows
+                 if row["method"] == method and not row.get("missing")), 0)
+            by_dataset[dataset] = {
+                "evaluated": min(int(evaluated), count),
+                "expected": count,
+                "failed_scenes": [],
+            }
+        return by_dataset
 
     def label(
         method: str, task: str,
@@ -2409,20 +2438,24 @@ def attach_case_coverage(
                 "dataset_tables", {}).items())
         for target, dataset in targets:
             for row in target.get("methods", []):
-                by_dataset = cells.get((task, row["method"]), {})
+                if (task, row["method"]) in cells:
+                    by_dataset = cells[(task, row["method"])]
+                else:
+                    by_dataset = unregistered_cell(task, table, row["method"])
                 if dataset is not None:
                     if dataset in by_dataset:
                         by_dataset = {dataset: by_dataset[dataset]}
                     else:
                         by_dataset = {}
                 else:
-                    # The task score's cases: the leaderboard datasets the
-                    # method ran (results or failures).
+                    # The task score's cases: every leaderboard dataset of
+                    # the task, run or not. The task score counts a dataset
+                    # the method never ran as 0, so its metric means (over
+                    # the datasets it did run) are not comparable either.
                     by_dataset = {
                         name: entry
                         for name, entry in by_dataset.items()
-                        if name not in LEADERBOARD_EXCLUDED_DATASETS and
-                        (entry["evaluated"] or entry.get("failed_scenes"))
+                        if name not in LEADERBOARD_EXCLUDED_DATASETS
                     }
                 coverage_label, failure_label, incomplete, limitations = label(
                     row["method"], task, by_dataset)
@@ -3028,8 +3061,10 @@ def add_scene_scores(method_stats: dict[str, Any], rows: list[dict[str, Any]],
                 continue
             stats = method_stats[method]
             metric_scores = []
+            case_scores = stats["task_dataset_metric_case_scores"][task][dataset]
             for metric_key in keys:
                 entries, ranks, scores = metric_results[metric_key]
+                case_scores[metric_key].append(scores.get(method, 0.0))
                 if method not in scores:
                     metric_scores.append(0.0)
                     continue
@@ -3126,12 +3161,81 @@ def _new_method_stats() -> dict[str, Any]:
         # tasks (DTU in MVRecon and SfM).
         "task_dataset_scores":
             collections.defaultdict(lambda: collections.defaultdict(list)),
+        # Task -> dataset -> metric -> one normalized score per case, a case
+        # the method did not evaluate counting 0 (add_scene_scores).
+        "task_dataset_metric_case_scores":
+            collections.defaultdict(lambda: collections.defaultdict(
+                lambda: collections.defaultdict(list))),
         "comparisons": [],
         "first_place_wins":
             0,
         "slam_range_scores":
             collections.defaultdict(list),
     }
+
+
+def metric_case_scores(stats: dict[str, Any]) -> dict[str, Any]:
+    """Returns a method's per-metric case scores by task.
+
+    Each is the mean of the metric's normalized 0-100 score over every case
+    of the task (or of one dataset) that some method evaluated, a case the
+    method did not evaluate counting 0: the task score's rule, per metric.
+
+    Returns:
+        {task: {"all": {metric: score}, "datasets": {dataset: {metric:
+        score}}}}.
+    """
+    result = {}
+    for task, by_dataset in stats["task_dataset_metric_case_scores"].items():
+        pooled: dict[str, list[float]] = collections.defaultdict(list)
+        per_dataset = {}
+        for dataset, by_metric in sorted(by_dataset.items()):
+            per_dataset[dataset] = {
+                metric_key: average(scores)
+                for metric_key, scores in by_metric.items()
+                if scores
+            }
+            for metric_key, scores in by_metric.items():
+                pooled[metric_key].extend(scores)
+        result[task] = {
+            "all": {
+                metric_key: average(scores)
+                for metric_key, scores in pooled.items()
+                if scores
+            },
+            "datasets": per_dataset,
+        }
+    return result
+
+
+def attach_metric_case_scores(task_tables: dict[str, Any],
+                              ranking_rows: list[dict[str, Any]]) -> None:
+    """Copies the metric case scores onto the task-table rows, in place.
+
+    A table row (all-datasets or one dataset's) gets `metric_case_scores`
+    {metric: score}; the page ranks each metric column by it, so a method
+    that skipped cases is ranked as if it scored 0 on them.
+
+    Args:
+        task_tables: The task tables, updated in place.
+        ranking_rows: Ranking rows carrying `metric_case_scores`
+            (build_rankings).
+    """
+    by_method = {
+        row["method"]: row.get("metric_case_scores") or {}
+        for row in ranking_rows
+    }
+    for task, table in task_tables.items():
+        for row in table.get("methods", []):
+            scores = by_method.get(row["method"], {}).get(task)
+            if scores and scores["all"]:
+                row["metric_case_scores"] = scores["all"]
+        for dataset, dataset_table in table.get("dataset_tables", {}).items():
+            for row in dataset_table.get("methods", []):
+                scores = by_method.get(row["method"], {}).get(task, {})
+                dataset_scores = scores.get("datasets", {}).get(dataset)
+                if dataset_scores:
+                    row["metric_case_scores"] = dataset_scores
 
 
 def build_rankings(
@@ -3345,6 +3449,8 @@ def build_rankings(
                     } for dataset, scores in sorted(by_dataset.items())
                 } for task, by_dataset in stats["task_dataset_scores"].items()
             },
+            "metric_case_scores":
+                metric_case_scores(stats),
         })
 
     _rank_overall(ranking_rows)
@@ -3607,7 +3713,9 @@ def build_benchmark_visualization(
                                    eligible_failures)
     attach_excluded_dataset_scores(rankings["rows"], task_rankings["rows"],
                                    rows, scene_rows, case_failures)
-    radar = build_radar_data(rankings["rows"])
+    # The task ranks' pool (task_rankings) is the one the metric tables show.
+    attach_metric_case_scores(task_tables, task_rankings["rows"])
+    radar =build_radar_data(rankings["rows"])
     methods = sorted({row["method"] for row in rows})
     tasks = sorted({row["task"] for row in rows}, key=task_sort_key)
     datasets = sorted({row["dataset"] for row in rows})
