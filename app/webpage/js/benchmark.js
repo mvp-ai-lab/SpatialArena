@@ -1986,22 +1986,34 @@ function benchmarkSectionRankRows(section) {
     return section.ownScore ? rows.filter(row => row.ranked) : rows;
 }
 
-// Rows whose metric means cover only some of their cases (``incomplete``) are left out of the per-metric ranks.
+// Rows whose metric means cover only some of their cases (``incomplete``) are left out of the per-metric ranks
+// that rank the raw metric means (payloads without ``metric_case_scores``).
 function benchmarkSectionMetricRankRows(section) {
     return benchmarkSectionRankRows(section).filter(row => !row.incomplete);
 }
 
+// Each metric column is ranked by the metric's case score (``metric_case_scores``: its normalized 0-100 score
+// averaged over every case of the table, a case the method did not evaluate counting 0, as in the task score), so
+// a method that skipped cases is ranked, not dropped. Payloads without case scores rank the raw means instead.
 function benchmarkSectionMetricRanks(section) {
-    const rankRows = benchmarkSectionMetricRankRows(section);
+    const allRows = benchmarkSectionRankRows(section);
+    const byCaseScore = allRows.some(row => row.metric_case_scores);
+    const rankRows = byCaseScore ? allRows : benchmarkSectionMetricRankRows(section);
     return Object.fromEntries(section.metricKeys.map(metricKey => {
         const metric = benchmarkMetricInfo(metricKey);
         return [
             metricKey,
-            rankBenchmarkVisibleRows(
-                rankRows,
-                row => row.metrics?.[metricKey]?.value,
-                metric.direction === "higher" ? "higher" : "lower",
-            ),
+            byCaseScore
+                ? rankBenchmarkVisibleRows(
+                    rankRows,
+                    row => (isFiniteNumber(row.metrics?.[metricKey]?.value) ? row.metric_case_scores?.[metricKey] : undefined),
+                    "higher",
+                )
+                : rankBenchmarkVisibleRows(
+                    rankRows,
+                    row => row.metrics?.[metricKey]?.value,
+                    metric.direction === "higher" ? "higher" : "lower",
+                ),
         ];
     }));
 }
@@ -2053,7 +2065,8 @@ function renderBenchmarkTaskSection(section) {
             const limitation = failure && benchmarkFailureIsLimitation(row, failure);
             return failure
                 ? `<td class="numeric benchmark-failed-cell${limitation ? " benchmark-limitation-cell" : ""}" title="${escapeBenchmarkAttr(limitation ? `Method limitation: ${failure}` : failure)}">${escapeBenchmarkHtml(failure)}</td>`
-                : renderBenchmarkMetricCell(row.metrics?.[metricKey], metricRanks[metricKey]?.get(row.method) ?? null, metricKey);
+                : renderBenchmarkMetricCell(row.metrics?.[metricKey], metricRanks[metricKey]?.get(row.method) ?? null, metricKey,
+                    row.metric_case_scores?.[metricKey]);
         }).join("");
         const unranked = section.ownScore && !row.ranked;
         const coverageTitle = row.unscored_only ? "Results only on datasets left out of the leaderboard score; see their dataset tables"
@@ -2552,8 +2565,12 @@ function downloadBenchmarkCsv(filename, rows) {
     URL.revokeObjectURL(url);
 }
 
-function renderBenchmarkMetricCell(cell, rankOverride = undefined, metricKey = "") {
-    const title = metricKey ? ` title="${escapeBenchmarkAttr(benchmarkMetricCellTitle(metricKey))}"` : "";
+// ``caseScore`` (the metric's case score, which ranks the column) is added to the hover text.
+function renderBenchmarkMetricCell(cell, rankOverride = undefined, metricKey = "", caseScore = undefined) {
+    const caseLine = isFiniteNumber(caseScore)
+        ? `\nCase score ${caseScore.toFixed(1)} / 100 (ranks this column): normalized over every case, a missing case counting 0`
+        : "";
+    const title = metricKey ? ` title="${escapeBenchmarkAttr(benchmarkMetricCellTitle(metricKey) + caseLine)}"` : "";
     if (!cell || cell.display === "-") {
         return `<td class="numeric benchmark-muted"${title}>-</td>`;
     }
