@@ -338,7 +338,7 @@ const benchmarkMetricDefinitions = {
     mAA_30: { group: "SfM", equation: "mean average accuracy over pose thresholds up to 30 deg" },
 };
 
-const benchmarkViewNames = ["home", "overview", "download", "leaderboard", "artifacts"];
+const benchmarkViewNames = ["home", "overview", "download", "submit", "leaderboard", "artifacts"];
 // Hashes of views that were removed or merged into another, so old links still land somewhere. Task Metrics is the
 // Leaderboard's task tabs now (#tasks opens the first task).
 const benchmarkViewAliases = { datasets: "download", coverage: "overview", tasks: "leaderboard", contributors: "home" };

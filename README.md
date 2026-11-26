@@ -182,8 +182,10 @@ bench.export_report("./report")
 ```
 
 Besides `{data_path}` and `{output_path}`, the command template can use `{images_dir}`, `{code_path}`,
-`{ckpt_path}`, `{resolution}`, `{track}` and more (see `scripts/inference/external_command_adapter.py`). To
-evaluate a **registered** model instead, select it by name:
+`{ckpt_path}`, `{resolution}`, `{track}` and more (see `scripts/inference/external_command_adapter.py`).
+[Writing a compatible inference script](docs/benchmark/submitting_a_model.md) describes what the command receives and
+must write, with a template (`scripts/inference/submission_template.py`) and a checker for its output. To evaluate a
+**registered** model instead, select it by name:
 
 ```python
 bench.select_models([{"name": "VGGT"}, {"name": "PI3_X", "track": "rgb_cameras"}])

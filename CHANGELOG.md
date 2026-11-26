@@ -4,6 +4,27 @@ SpatialArena changes. The history before the split is in FeedForward-Benchmark's
 
 ## Unreleased
 
+### Added
+
+- Webpage: a Submit tab for model submissions that we evaluate on our servers (`app/webpage/js/submit.js`). The form
+  takes the model, its code and the licenses of the code and of the weights, the tasks and tracks (checked against
+  `task_track_matrix.py`), the command template (it runs from our checkout, so repository files are
+  `{code_path}/...`; the page lists the outputs each task needs), the checkpoint, an install command or a Docker image,
+  the GPU memory (up to 32 GB on V100 or 128 GB on H200; less memory gets higher priority) and a contact. It validates
+  the fields, keeps a draft in the browser, previews the submission file and the benchmark config we would plan from
+  it, and downloads the file.
+- Submissions are sent by email while there is no backend (GitHub Pages cannot host one): for public models (code and
+  weights reachable without a login), Submit saves the submission file and opens the visitor's email app addressed to
+  the `spatialarena-submit-email` and `spatialarena-submit-cc` meta tags in `index.html`. When the whole file does not
+  fit in the email, the message lists every field needed to start the evaluation and asks for the file as an
+  attachment. Once a backend exists, the `spatialarena-submit-api` meta tag switches the form to it; the API it expects
+  is described at the top of `submit.js`.
+- Docs: `docs/benchmark/submitting_a_model.md`, how to write an inference script the pipeline can run (how the command
+  is run, its placeholders, the depth and COLMAP files each task reads, local testing), linked from the README and the
+  Submit page. `scripts/inference/submission_template.py` is a template to copy into a model's repository (NumPy and
+  Pillow only; it writes the depth maps and the COLMAP model), and `scripts/inference/check_submission_output.py`
+  checks one scene's output the way the evaluator reads it. Tested in `test/test_submission_template.py`.
+
 ### Changed
 
 - README: rewritten for readability. It now has a header with the logo, authors, and badges (arXiv, Hugging Face

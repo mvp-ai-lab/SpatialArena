@@ -6,6 +6,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- The submission backend (js/submit.js). Empty until the site runs on our own servers. -->
+    <meta name="spatialarena-submit-api" content="">
+    <!-- Where submissions of public models are emailed while there is no backend (js/submit.js): "to" and the
+         comma-separated "cc". -->
+    <meta name="spatialarena-submit-email" content="hackerdreamer34@gmail.com">
+    <meta name="spatialarena-submit-cc" content="haosen.yang.6@gmail.com,stan.suee@gmail.com,j.deng16@imperial.ac.uk">
     <title>SpatialArena</title>
     <link rel="icon" type="image/svg+xml" href="assets/logo/spatialarena.svg">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -52,6 +58,9 @@
                 </a>
                 <a href="#download" class="navbar-link" data-benchmark-view="download" role="tab" aria-selected="false" aria-controls="benchmark-view-download">
                     <i class="fas fa-download"></i> Download
+                </a>
+                <a href="#submit" class="navbar-link" data-benchmark-view="submit" role="tab" aria-selected="false" aria-controls="benchmark-view-submit">
+                    <i class="fas fa-cloud-arrow-up"></i> Submit
                 </a>
             </div>
             <div class="navbar-actions">
@@ -575,6 +584,274 @@ bench = BenchmarkEvaluator(benchmark_root="/data/spatialarena")</pre>
             </div>
             </section>
 
+            <!-- The submission form runs in the browser (js/submit.js). Sending a submission needs the evaluation
+                 backend, which GitHub Pages cannot host: set the spatialarena-submit-api meta tag once it is live. -->
+            <section id="benchmark-view-submit" class="benchmark-view-panel download submit" role="tabpanel" hidden>
+            <div class="card download-intro">
+                <div class="download-intro-text">
+                    <h2>Submit your model <span class="submit-status">Backend TBD</span></h2>
+                    <p>
+                        Submit your model with its inference code and we evaluate it on our servers, with the same
+                        protocol as the published results, and add it to the leaderboard. Describe the model, pick the
+                        tasks and tracks, and give the command that runs it on one scene.
+                    </p>
+                    <p>
+                        New to the pipeline? <a href="https://github.com/mvp-ai-lab/SpatialArena/blob/main/docs/benchmark/submitting_a_model.md" target="_blank" rel="noopener">Writing a compatible inference script</a>
+                        explains what the command receives and must write, with a template and a checker to test it
+                        locally.
+                    </p>
+                </div>
+            </div>
+
+            <div class="card submit-notice" id="submit-backend-notice" role="note">
+                <i class="fas fa-circle-info" aria-hidden="true"></i>
+                <p id="submit-plain-notice">Submissions cannot be sent yet: the evaluation backend needs our own
+                    servers, which this site (on GitHub Pages) does not have yet. You can fill in the form now and
+                    download the submission file; your draft is kept in this browser.</p>
+                <p id="submit-email-notice" hidden>Until our evaluation backend is live, we take submissions of
+                    <strong>public models</strong> by email: the code repository and the weights must be reachable
+                    without a login or an access request. Fill in the form and press <em>Submit by email</em>; it opens
+                    your email app with the submission, addressed to <a id="submit-email-address" href="#"></a> with the
+                    other organizers in copy, and we start the evaluation by hand. Status lookup is not available for email submissions; we reply by
+                    email.</p>
+            </div>
+
+            <form id="submit-form" class="submit-form" novalidate>
+                <div class="card">
+                    <div class="card-header"><h2><span class="download-step-number">1</span> Model</h2></div>
+                    <div class="submit-grid">
+                        <div class="submit-field">
+                            <label for="submit-model-name">Model ID <span class="submit-required" aria-hidden="true">*</span></label>
+                            <input id="submit-model-name" name="model_name" type="text" required maxlength="40" autocomplete="off" spellcheck="false" placeholder="MY_MODEL">
+                            <p class="submit-hint">The name in result files and configs: letters, digits, <code>_</code>, <code>.</code> or <code>-</code>.</p>
+                        </div>
+                        <div class="submit-field">
+                            <label for="submit-display-name">Display name</label>
+                            <input id="submit-display-name" name="display_name" type="text" maxlength="60" placeholder="My Model">
+                            <p class="submit-hint">As shown on the leaderboard; the model ID if empty.</p>
+                        </div>
+                        <div class="submit-field submit-wide">
+                            <label for="submit-description">Description <span class="submit-required" aria-hidden="true">*</span></label>
+                            <textarea id="submit-description" name="description" rows="3" required maxlength="1000" placeholder="What the model predicts and how, in a sentence or two."></textarea>
+                        </div>
+                        <div class="submit-field">
+                            <label for="submit-code-url">Code repository <span class="submit-required" aria-hidden="true">*</span></label>
+                            <input id="submit-code-url" name="code_url" type="url" required placeholder="https://github.com/you/model">
+                        </div>
+                        <div class="submit-field">
+                            <label for="submit-code-revision">Commit or tag</label>
+                            <input id="submit-code-revision" name="code_revision" type="text" maxlength="80" spellcheck="false" placeholder="v1.0 or a commit hash">
+                            <p class="submit-hint">The default branch if empty.</p>
+                        </div>
+                        <div class="submit-field">
+                            <label for="submit-paper-url">Paper</label>
+                            <input id="submit-paper-url" name="paper_url" type="url" placeholder="https://arxiv.org/abs/...">
+                        </div>
+                        <div class="submit-field">
+                            <label for="submit-license">Code license <span class="submit-required" aria-hidden="true">*</span></label>
+                            <select id="submit-license" name="license" required>
+                                <option value="">Choose…</option>
+                                <option>MIT</option>
+                                <option>Apache-2.0</option>
+                                <option>BSD-3-Clause</option>
+                                <option>GPL-3.0</option>
+                                <option>CC BY-NC 4.0</option>
+                                <option value="other-noncommercial">Other, non-commercial</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="submit-field">
+                            <label for="submit-weights-license">Weights license <span class="submit-required" aria-hidden="true">*</span></label>
+                            <select id="submit-weights-license" name="weights_license" required>
+                                <option value="same">Same as the code</option>
+                                <option>MIT</option>
+                                <option>Apache-2.0</option>
+                                <option>BSD-3-Clause</option>
+                                <option>GPL-3.0</option>
+                                <option>CC BY-NC 4.0</option>
+                                <option value="other-noncommercial">Other, non-commercial</option>
+                                <option value="other">Other</option>
+                            </select>
+                            <p class="submit-hint">Released weights often have their own license, e.g. a non-commercial one.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><h2><span class="download-step-number">2</span> Tasks and tracks</h2></div>
+                    <div class="submit-picker">
+                        <div>
+                            <p class="submit-label" id="submit-tasks-label">Tasks</p>
+                            <div class="download-chips" id="submit-tasks" role="group" aria-labelledby="submit-tasks-label"></div>
+                        </div>
+                        <div>
+                            <p class="submit-label" id="submit-tracks-label">Tracks: the inputs your model takes</p>
+                            <div class="download-chips" id="submit-tracks" role="group" aria-labelledby="submit-tracks-label"></div>
+                        </div>
+                    </div>
+                    <div class="submit-matrix-wrap">
+                        <table class="submit-matrix" id="submit-matrix" aria-describedby="submit-matrix-summary"></table>
+                    </div>
+                    <p class="submit-hint" id="submit-matrix-summary" aria-live="polite"></p>
+                    <fieldset class="submit-field submit-radios">
+                        <legend>Datasets</legend>
+                        <label><input type="radio" name="scope" value="all" checked> Every dataset of the chosen tasks (the leaderboard needs these)</label>
+                        <label><input type="radio" name="scope" value="spatialarena"> SpatialArena only</label>
+                    </fieldset>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><h2><span class="download-step-number">3</span> Inference</h2></div>
+                    <div class="submit-grid">
+                        <div class="submit-field submit-wide">
+                            <label for="submit-command">Command that runs your model on one scene <span class="submit-required" aria-hidden="true">*</span></label>
+                            <p class="submit-hint">The command you would type in a terminal, with the paths replaced by
+                                placeholders in braces: we fill them in for every scene and run the line. For example:</p>
+                            <div class="submit-example" aria-label="Example">
+                                <span class="submit-example-label">On your computer</span>
+                                <code>python infer.py --images ./my_scene/images --output ./results --weights ./model.pt</code>
+                                <span class="submit-example-label">In this form</span>
+                                <code>python {code_path}/infer.py --images {images_dir} --output {output_path} --weights {ckpt_path}</code>
+                            </div>
+                            <textarea id="submit-command" name="command" rows="2" required spellcheck="false" class="submit-mono" placeholder="python {code_path}/infer.py --images {images_dir} --output {output_path} --weights {ckpt_path}"></textarea>
+                            <div class="submit-command-tools">
+                                <button type="button" class="submit-button submit-small" id="submit-use-template">Use our template's command</button>
+                                <span class="submit-hint">if you copied <a href="https://github.com/mvp-ai-lab/SpatialArena/blob/main/scripts/inference/submission_template.py" target="_blank" rel="noopener"><code>submission_template.py</code></a>
+                                    into your repository as <code>spatialarena_infer.py</code>.</span>
+                            </div>
+                            <p class="submit-hint">Insert a placeholder (hover for what it stands for):</p>
+                            <div class="submit-placeholders" id="submit-placeholders"></div>
+                            <details class="submit-format">
+                                <summary>What the command must write</summary>
+                                <ul>
+                                    <li><strong>MonoDepth, VideoDepth:</strong> <code>depths/&lt;image name&gt;.npz</code>, one per
+                                        input image, holding a float32 array <code>depth</code> (height × width). Any resolution
+                                        and scale: the evaluator resizes and aligns it.</li>
+                                    <li><strong>SfM, SLAM:</strong> a COLMAP model in <code>sparse/0/</code>
+                                        (<code>cameras</code>, <code>images</code>, <code>points3D</code>, text or binary) whose
+                                        image names are the input file names.</li>
+                                    <li><strong>MVRecon:</strong> both: <code>depths/</code> and <code>sparse/0/</code>.</li>
+                                    <li>Conditioned tracks give your command the extra inputs: the ground-truth cameras in
+                                        <code>{camera_dir}</code> (COLMAP) and depth maps in <code>{depth_dir}</code>.</li>
+                                    <li>Optional: <code>confidences/&lt;image name&gt;.npz</code> (array <code>confidence</code>) and a
+                                        dense point cloud <code>points3D_dense.ply</code> for the viewer.</li>
+                                </ul>
+                                <p class="submit-hint">If your repository has no such script yet, add one (a fork or a branch
+                                    is fine) and give its commit above: start from our
+                                    <a href="https://github.com/mvp-ai-lab/SpatialArena/blob/main/scripts/inference/submission_template.py" target="_blank" rel="noopener">template</a>
+                                    and check its output with
+                                    <a href="https://github.com/mvp-ai-lab/SpatialArena/blob/main/scripts/inference/check_submission_output.py" target="_blank" rel="noopener"><code>check_submission_output.py</code></a>.</p>
+                            </details>
+                        </div>
+                        <div class="submit-field">
+                            <label for="submit-checkpoint-url">Checkpoint</label>
+                            <input id="submit-checkpoint-url" name="checkpoint_url" type="url" placeholder="https://huggingface.co/you/model">
+                            <p class="submit-hint">A download link, given to the command as <code>{ckpt_path}</code>. Empty if your code fetches the weights.</p>
+                        </div>
+                        <div class="submit-field">
+                            <label for="submit-gpu-memory">GPU memory needed</label>
+                            <select id="submit-gpu-memory" name="gpu_memory" aria-describedby="submit-gpu-memory-hint">
+                                <option value="32" selected>Up to 32 GB (V100)</option>
+                                <option value="128">Up to 128 GB (H200)</option>
+                            </select>
+                            <p class="submit-hint" id="submit-gpu-memory-hint">We run submissions on V100 (32 GB) or H200
+                                (128 GB) GPUs. Submissions that need less GPU memory get higher priority.</p>
+                        </div>
+                        <fieldset class="submit-field submit-radios submit-wide">
+                            <legend>Environment</legend>
+                            <label><input type="radio" name="env_kind" value="python" checked> Python packages</label>
+                            <label><input type="radio" name="env_kind" value="docker"> Docker image</label>
+                        </fieldset>
+                        <div class="submit-grid submit-wide" id="submit-env-python">
+                            <div class="submit-field">
+                                <label for="submit-python-version">Python</label>
+                                <select id="submit-python-version" name="python_version">
+                                    <option>3.10</option>
+                                    <option selected>3.11</option>
+                                    <option>3.12</option>
+                                </select>
+                            </div>
+                            <div class="submit-field">
+                                <label for="submit-install">Install command <span class="submit-required" aria-hidden="true">*</span></label>
+                                <input id="submit-install" name="install" type="text" spellcheck="false" value="pip install -r requirements.txt" class="submit-mono">
+                                <p class="submit-hint">Run in your repository's root, e.g. <code>pip install -e .</code></p>
+                            </div>
+                        </div>
+                        <div class="submit-field submit-wide" id="submit-env-docker" hidden>
+                            <label for="submit-docker-image">Docker image <span class="submit-required" aria-hidden="true">*</span></label>
+                            <input id="submit-docker-image" name="docker_image" type="text" spellcheck="false" class="submit-mono" placeholder="ghcr.io/you/model:1.0">
+                        </div>
+                        <div class="submit-field submit-wide">
+                            <label for="submit-notes">Notes for the evaluators</label>
+                            <textarea id="submit-notes" name="notes" rows="2" maxlength="2000" placeholder="Resolution, number of frames per window, known limits…"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><h2><span class="download-step-number">4</span> Contact and visibility</h2></div>
+                    <div class="submit-grid">
+                        <div class="submit-field">
+                            <label for="submit-contact-name">Name <span class="submit-required" aria-hidden="true">*</span></label>
+                            <input id="submit-contact-name" name="contact_name" type="text" autocomplete="name" maxlength="80">
+                        </div>
+                        <div class="submit-field">
+                            <label for="submit-contact-email">Email <span class="submit-required" aria-hidden="true">*</span></label>
+                            <input id="submit-contact-email" name="contact_email" type="email" autocomplete="email" maxlength="120">
+                            <p class="submit-hint">For the evaluation status only; never shown on the site.</p>
+                        </div>
+                        <div class="submit-field">
+                            <label for="submit-affiliation">Affiliation</label>
+                            <input id="submit-affiliation" name="affiliation" type="text" autocomplete="organization" maxlength="120">
+                        </div>
+                        <fieldset class="submit-field submit-radios">
+                            <legend>Results</legend>
+                            <label><input type="radio" name="visibility" value="public" checked> Publish on the leaderboard</label>
+                            <label><input type="radio" name="visibility" value="private"> Send them to me only</label>
+                        </fieldset>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><h2><span class="download-step-number">5</span> Review and submit</h2></div>
+                    <div class="submit-previews">
+                        <details open>
+                            <summary>Submission file</summary>
+                            <pre id="submit-preview-json" class="submit-preview"></pre>
+                        </details>
+                        <details>
+                            <summary>How we will run it (benchmark config)</summary>
+                            <pre id="submit-preview-yaml" class="submit-preview"></pre>
+                        </details>
+                    </div>
+                    <label class="submit-check" id="submit-public-check" hidden><input type="checkbox" name="agree_public">
+                        <span>The code repository and the weights are public: anyone can open them without a login or
+                        an access request.</span></label>
+                    <label class="submit-check"><input type="checkbox" name="agree_code"> <span>We may run the code and
+                        weights above on our servers, and the code and weights are mine to share.</span></label>
+                    <label class="submit-check"><input type="checkbox" name="agree_terms"> <span>I have read the datasets'
+                        licenses (<a href="#download">Download</a> page); scores and outputs on them are for research use.</span></label>
+                    <div class="submit-actions">
+                        <button type="submit" class="submit-button submit-primary" id="submit-send"><i class="fas fa-paper-plane" aria-hidden="true"></i> Submit</button>
+                        <button type="button" class="submit-button" id="submit-download"><i class="fas fa-file-arrow-down" aria-hidden="true"></i> Download submission file</button>
+                        <button type="button" class="submit-button submit-quiet" id="submit-reset">Clear form</button>
+                        <span class="submit-hint" id="submit-draft-note" aria-live="polite"></span>
+                    </div>
+                    <div id="submit-status" class="submit-result" role="status" hidden></div>
+                </div>
+            </form>
+
+            <div class="card">
+                <div class="card-header"><h2>Check a submission</h2></div>
+                <form id="submit-lookup" class="submit-lookup">
+                    <label class="sr-only" for="submit-lookup-id">Submission ID</label>
+                    <input id="submit-lookup-id" type="text" spellcheck="false" placeholder="Submission ID">
+                    <button type="submit" class="submit-button" id="submit-lookup-button">Check status</button>
+                </form>
+                <div id="submit-lookup-result" class="submit-hint" aria-live="polite" hidden></div>
+            </div>
+            </section>
+
             <section id="benchmark-view-leaderboard" class="benchmark-view-panel" role="tabpanel" hidden>
             <div class="card">
                 <div id="benchmark-task-tabs" class="benchmark-task-tabs benchmark-leaderboard-tabs" role="tablist" aria-label="Overall leaderboard or one task's metric tables"></div>
@@ -653,6 +930,7 @@ bench = BenchmarkEvaluator(benchmark_root="/data/spatialarena")</pre>
     <script src="js/benchmark.js"></script>
     <script src="js/table_drag.js"></script>
     <script src="js/download.js"></script>
+    <script src="js/submit.js"></script>
     <script src="js/home_atlas.js"></script>
     <script src="js/home_align.js"></script>
     <script src="js/home.js"></script>
