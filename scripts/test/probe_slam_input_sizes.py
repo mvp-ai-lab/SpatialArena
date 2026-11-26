@@ -128,20 +128,10 @@ def probe_pi3(paths, size):
     It uses the RGB loader at new_width = 504, and the rgb_depth multimodal
     loader at a W x H pixel budget.
     """
-    sys.path[:0] = [
-        str(CODE_ROOT / "Pi3"),
-        str(REPO_ROOT / "scripts" / "inference")
-    ]
+    sys.path[:0] = [str(CODE_ROOT / "Pi3"), str(REPO_ROOT)]
     from pi3.utils.basic import load_multimodal_data  # pylint: disable=import-outside-toplevel
 
-    import importlib.util  # pylint: disable=import-outside-toplevel
-
-    # The adapter (scripts/inference/pi3.py) shares its name with the upstream
-    # pi3 package: load it by path.
-    spec = importlib.util.spec_from_file_location(
-        "pi3_adapter", REPO_ROOT / "scripts" / "inference" / "pi3.py")
-    adapter = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(adapter)
+    from spatialarena.models import pi3 as adapter  # pylint: disable=import-outside-toplevel
 
     rgb = adapter.load_pi3_official_eval_rgb_tensor(paths,
                                                     new_width=504,

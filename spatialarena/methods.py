@@ -1186,10 +1186,54 @@ _METHOD_BY_KEY: dict[str, MethodSpec] = {
     for key in (spec.name, *spec.aliases)
 }
 
+# External methods added at run time by register_method(); METHOD_SPECS
+# itself stays the built-in set.
+_EXTERNAL_SPECS: list[MethodSpec] = []
+
+
+def register_method(spec: MethodSpec, override: bool = False) -> MethodSpec:
+    """Adds an external method to the registry.
+
+    `spatialarena.models.register_model(spec=...)` calls this, so the
+    evaluation engine and `BenchmarkEvaluator` resolve and schedule the
+    method like a built-in one.
+
+    Args:
+        spec: The method.
+        override: Replace a method registered under the same name or alias.
+
+    Returns:
+        `spec`.
+
+    Raises:
+        ValueError: The name or an alias belongs to another method.
+    """
+    keys = [normalize_key(key) for key in (spec.name, *spec.aliases)]
+    clashes = [
+        key for key in keys
+        if key in _METHOD_BY_KEY and _METHOD_BY_KEY[key] != spec
+    ]
+    if clashes and not override:
+        raise ValueError(
+            f"Method name(s) {', '.join(clashes)} already registered")
+    _EXTERNAL_SPECS[:] = [
+        existing for existing in _EXTERNAL_SPECS if existing.name != spec.name
+    ]
+    _EXTERNAL_SPECS.append(spec)
+    for key in keys:
+        _METHOD_BY_KEY[key] = spec
+    return spec
+
+
+def all_method_specs() -> tuple[MethodSpec, ...]:
+    """Returns the built-in methods, then the registered external ones."""
+    external = [spec for spec in _EXTERNAL_SPECS if spec not in METHOD_SPECS]
+    return METHOD_SPECS + tuple(external)
+
 
 def method_names() -> list[str]:
     """Returns the canonical names of all registered methods."""
-    return [spec.name for spec in METHOD_SPECS]
+    return [spec.name for spec in all_method_specs()]
 
 
 def resolve_method(value: str) -> MethodSpec:
@@ -1238,16 +1282,18 @@ def validate_track(method: str, track: str) -> MethodSpec:
     return spec
 
 
-def specs_as_dicts(specs: Iterable[MethodSpec] = METHOD_SPECS) -> list[dict]:
+def specs_as_dicts(specs: Iterable[MethodSpec] | None = None) -> list[dict]:
     """Returns the methods as dicts, with their derived properties added.
 
     Args:
-        specs: Methods to convert; all methods by default.
+        specs: Methods to convert; all registered methods by default.
 
     Returns:
         One dict per method: its fields, then `external_command_env` and
         `default_depth_protocol`.
     """
+    if specs is None:
+        specs = all_method_specs()
     rows = []
     for spec in specs:
         row = dataclasses.asdict(spec)

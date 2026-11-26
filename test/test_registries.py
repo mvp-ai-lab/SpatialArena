@@ -193,14 +193,17 @@ def test_pi3_alias_uses_pi3_evaluation_profile():
 
 
 def test_pi3_adapter_direct_defaults_match_registry_profile():
-    adapter_path = (Path(__file__).resolve().parents[1] / "scripts" /
-                    "inference" / "pi3.py")
-    source = adapter_path.read_text(encoding="utf-8")
+    import inspect  # pylint: disable=import-outside-toplevel
 
-    assert 'parser.add_argument("--resolution", type=int, default=512)' in source
-    assert 'parser.add_argument("--image_load_resolution", type=int, default=512)' in source
-    assert 'parser.add_argument("--pixel_limit", type=int, default=262144)' in source
-    assert 'parser.add_argument("--conf_thresh", type=float, default=0.0)' in source
+    from spatialarena.models import pi3  # pylint: disable=import-outside-toplevel
+
+    args = pi3.Pi3.build_parser().parse_args(
+        ["--data_path", "scene", "--output_path", "out"])
+    assert not hasattr(args, "resolution")  # Pi3 sizes by the next two only.
+    assert args.image_load_resolution == 512
+    assert args.pixel_limit == 262144
+    assert args.conf_thresh == 0.0
+    source = inspect.getsource(pi3)
     assert "load_pi3_official_eval_rgb_tensor" in source
     assert "official_width_resize14" in source
 

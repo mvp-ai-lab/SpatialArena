@@ -178,7 +178,7 @@ def test_vggt_and_da3_dry_runs_report_standard_artifact_layout(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     for script_name, method in (
         ("vggt.py", "VGGT"),
-        ("da3.py", "DA3"),
+        ("da3.py", "DA3-L"),  # da3.py defaults to DA3-L (--model).
         ("pi3.py", "PI3"),
         ("fastvggt.py", "FASTVGGT"),
         ("come.py", "COME"),

@@ -22,7 +22,7 @@ has two matching halves for every method below:
 
 1. **Before inference**: record exactly what happened to each image on its way into the model --
    how much it was scaled, and how many pixels (if any) of padding or cropping were added on each
-   side. This record is a `SpatialTransform` (defined in `scripts/inference/adapter_utils.py`).
+   side. This record is a `SpatialTransform` (defined in `spatialarena/models/utils.py`).
 2. **After inference**: use that same record to undo it -- scale the predicted depth map back
    down, strip off any padding, and mark any border pixel the model never actually saw as invalid
    (not a guess). Camera intrinsics get the matching inverse transform, so a COLMAP export's focal
@@ -42,7 +42,11 @@ logic another adapter already had. There is now exactly one name to look for:
 model_input, transforms = prepare_model_input(METHOD, image_paths, args=args, device=device)
 ```
 
-`prepare_model_input` (in `adapter_utils.py`) looks up `METHOD`'s own implementation -- a function
+Methods already on `spatialarena.models.BaseModel` (VGGT, RobustVGGT, FastVGGT, VGGT-Omega, Pi3X, DA3; see
+`docs/models.md`) implement this as their `preprocess()` method instead: it returns a `ModelInput` carrying the
+same `transforms`, and the base class does the restoration below. The rest still use:
+
+`prepare_model_input` (in `spatialarena/models/utils.py`) looks up `METHOD`'s own implementation -- a function
 named `preprocess_<method>` that every adapter module registers once, near its definition, via
 `register_preprocessor(METHOD, preprocess_<method>)` -- and calls it. The implementation still
 varies by method (a tensor, a list of per-view dictionaries, a batch dict, or a list of file paths

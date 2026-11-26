@@ -34,7 +34,7 @@ if str(ROOT_DIR) not in sys.path:
 
 # pylint: disable=wrong-import-position
 from scripts.inference import adapter_utils  # noqa: E402
-from scripts.inference import openrouter_vlm_depth as adapter  # noqa: E402
+from spatialarena.models import openrouter_vlm as adapter  # noqa: E402
 from spatialarena import methods  # noqa: E402
 
 # pylint: enable=wrong-import-position

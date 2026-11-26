@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-import scripts.inference.openrouter_vlm_depth as adapter
+from spatialarena.models import openrouter_vlm as adapter
 from spatialarena.methods import resolve_method
 from spatialarena.eval.depth_prediction_evaluator import load_depth_map
 
@@ -58,6 +58,22 @@ def test_registry_entries_match_adapter_defaults(name, slug):
     assert spec.tasks == ("MonoDepth",)
 
 
+def test_command_line_defaults_come_from_the_method_spec(monkeypatch):
+    """--model picks the method; the slug and image size are the spec's."""
+    monkeypatch.delenv("GPT_6_ASTRA_CKPT_PATH", raising=False)
+    monkeypatch.delenv("OPENROUTER_DEPTH_GRID_SIZE", raising=False)
+    args = adapter.parse_args(
+        ["--model", "GPT-6-ASTRA", "--data_path", "d", "--output_path", "o"])
+    assert args.method == "GPT_6_ASTRA"
+    assert args.ckpt_path == "openai/gpt-6-astra"
+    assert args.image_load_resolution == 1024
+    assert args.point_grid_size == 16
+    for removed in ("method_name", "resolution", "max_points", "conf_thresh"):
+        assert not hasattr(args, removed)
+    with pytest.raises(SystemExit):
+        adapter.parse_args(["--model", "VLM3", "--data_path", "d"])
+
+
 def _scene(tmp_path: Path, count: int = 3) -> Path:
     images = tmp_path / "scene" / "images"
     images.mkdir(parents=True)
@@ -70,6 +86,7 @@ def _scene(tmp_path: Path, count: int = 3) -> Path:
 
 def _run(monkeypatch, tmp_path, scene, out_name, extra=()):
     calls = []
+    monkeypatch.delenv("GEMINI_4_ARGON_CKPT_PATH", raising=False)
 
     def fake_post(payload, api_key, timeout):  # pylint: disable=unused-argument
         calls.append(payload)
@@ -98,7 +115,7 @@ def _run(monkeypatch, tmp_path, scene, out_name, extra=()):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.setattr(sys, "argv", [
         "openrouter_vlm_depth.py",
-        "--method_name",
+        "--model",
         "GEMINI_4_ARGON",
         "--data_path",
         str(scene),
@@ -272,7 +289,7 @@ def test_two_pass_refinement_run(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.setattr(sys, "argv", [
         "openrouter_vlm_depth.py",
-        "--method_name",
+        "--model",
         "GEMINI_4_ARGON",
         "--data_path",
         str(tmp_path / "scene"),
@@ -433,7 +450,7 @@ def test_incomplete_answer_gets_a_completion_followup(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.setattr(sys, "argv", [
         "openrouter_vlm_depth.py",
-        "--method_name",
+        "--model",
         "CLAUDE_OPUS_5_5",
         "--data_path",
         str(scene),
@@ -496,7 +513,7 @@ def test_followups_stop_when_the_model_adds_nothing(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.setattr(sys, "argv", [
         "openrouter_vlm_depth.py",
-        "--method_name",
+        "--model",
         "CLAUDE_OPUS_5_5",
         "--data_path",
         str(scene),

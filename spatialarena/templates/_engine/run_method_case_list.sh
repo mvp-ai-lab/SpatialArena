@@ -325,6 +325,14 @@ else
     IGGT_CKPT_PATH=${IGGT_CKPT_PATH:-lifuguan/IGGT_official}
 fi
 IGGT4D_CKPT_PATH=${IGGT4D_CKPT_PATH:-$SHARED_CHECKPOINT_ROOT/local/iggt4d/model.safetensors}
+# Streaming SLAM systems (spatialarena/models/streaming_slam.py); their shared weights (SALAD, DINOv2) are read
+# from SHARED_CHECKPOINT_ROOT directly.
+LOGER_CKPT_PATH=${LOGER_CKPT_PATH:-$SHARED_CHECKPOINT_ROOT/local/loger/LoGeR/latest.pt}
+ZIPMAP_CKPT_PATH=${ZIPMAP_CKPT_PATH:-$SHARED_CHECKPOINT_ROOT/local/zipmap/checkpoint_aff_inv.pt}
+LINGBOT_MAP_CKPT_PATH=${LINGBOT_MAP_CKPT_PATH:-$SHARED_CHECKPOINT_ROOT/local/lingbot_map/lingbot-map.pt}
+R3_CKPT_PATH=${R3_CKPT_PATH:-$SHARED_CHECKPOINT_ROOT/local/r3/r3.safetensors}
+SCAL3R_CKPT_PATH=${SCAL3R_CKPT_PATH:-$SHARED_CHECKPOINT_ROOT/local/scal3r/scal3r.pt}
+ABOT_RECON_CKPT_PATH=${ABOT_RECON_CKPT_PATH:-$SHARED_CHECKPOINT_ROOT/local/abot_recon/abot_recon.safetensors}
 POW3R_CKPT_PATH=${POW3R_CKPT_PATH:-https://download.europe.naverlabs.com/ComputerVision/Pow3R/Pow3R_ViTLarge_BaseDecoder_512_linear.pth}
 DUST3R_CKPT_PATH=${DUST3R_CKPT_PATH:-https://download.europe.naverlabs.com/ComputerVision/DUSt3R/DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth}
 MAST3R_CKPT_PATH=${MAST3R_CKPT_PATH:-https://download.europe.naverlabs.com/ComputerVision/MASt3R/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth}
@@ -359,11 +367,28 @@ SENSENOVA_VISION_CODE_PATH=${SENSENOVA_VISION_CODE_PATH:-$METHOD_CODE_ROOT/Sense
 QWEN3_VL_CODE_PATH=${QWEN3_VL_CODE_PATH:-$METHOD_CODE_ROOT/qwen3-vl}
 GENCEPTION_CODE_PATH=${GENCEPTION_CODE_PATH:-$METHOD_CODE_ROOT/representations4d}
 COME_MODEL=${COME_MODEL:-co_me_fused_vggt_3x3}
+# The models read their model-specific settings (GENCEPTION_*, COME_MODEL, VGGT_OMEGA_TEXT_CKPT_PATH,
+# MAPANYTHING_CODE_PATH for the DUSt3R family, ...) and these defaults from the environment.
+export IGGT_CKPT_PATH
+export SHARED_CHECKPOINT_ROOT DA3_CKPT_PATH DA3_L_CKPT_PATH DA3_G_CKPT_PATH DA3_NGL_CKPT_PATH VGGT_CKPT_PATH
+export AMB3R_CKPT_PATH METHOD_CODE_ROOT DA3_CODE_PATH VGGT_CODE_PATH AMB3R_CODE_PATH PI3_CKPT_PATH
+export FASTVGGT_CKPT_PATH COME_CKPT_PATH CUT3R_CKPT_PATH FAST3R_CKPT_PATH VGGT_OMEGA_CKPT_PATH
+export VGGT_OMEGA_TEXT_CKPT_PATH MAPANYTHING_CKPT_PATH OMNIVGGT_CKPT_PATH DEJAVIEW_CKPT_PATH IGGT4D_CKPT_PATH
+export POW3R_CKPT_PATH DUST3R_CKPT_PATH MAST3R_CKPT_PATH ROBUSTVGGT_CKPT_PATH DEPTHVLM_CKPT_PATH VLM3_CKPT_PATH
+export DEPTHLM_CKPT_PATH SENSENOVA_VISION_CKPT_PATH QWEN3_VL_CKPT_PATH GENCEPTION_CKPT_DIR GENCEPTION_EMBEDDINGS_DIR
+export GENCEPTION_MODEL_SIZE PI3_CODE_PATH FASTVGGT_CODE_PATH COME_CODE_PATH CUT3R_CODE_PATH FAST3R_CODE_PATH
+export VGGT_OMEGA_CODE_PATH MAPANYTHING_CODE_PATH OMNIVGGT_CODE_PATH DEJAVIEW_CODE_PATH IGGT_CODE_PATH
+export IGGT4D_CODE_PATH POW3R_CODE_PATH DUST3R_CODE_PATH MAST3R_CODE_PATH ROBUSTVGGT_CODE_PATH DEPTHVLM_CODE_PATH
+export VLM3_CODE_PATH DEPTHLM_CODE_PATH SENSENOVA_VISION_CODE_PATH QWEN3_VL_CODE_PATH GENCEPTION_CODE_PATH
+export COME_MODEL LOGER_CKPT_PATH ZIPMAP_CKPT_PATH LINGBOT_MAP_CKPT_PATH R3_CKPT_PATH SCAL3R_CKPT_PATH
+export ABOT_RECON_CKPT_PATH
 if [ -n "$METHOD_CODE_ENV" ]; then
     eval "$METHOD_CODE_ENV=\${$METHOD_CODE_ENV:-$METHOD_CODE_DEFAULT}"
+    export "${METHOD_CODE_ENV?}"
 fi
 if [ -n "$METHOD_CKPT_ENV" ]; then
     eval "$METHOD_CKPT_ENV=\${$METHOD_CKPT_ENV:-$METHOD_CKPT_DEFAULT}"
+    export "${METHOD_CKPT_ENV?}"
 fi
 RESOLUTION=${RESOLUTION:-$METHOD_RESOLUTION_DEFAULT}
 IMAGE_LOAD_RESOLUTION=${IMAGE_LOAD_RESOLUTION:-$METHOD_IMAGE_LOAD_RESOLUTION_DEFAULT}
@@ -1200,501 +1225,49 @@ run_inference_once() {
     local method_ckpt_path
     method_code_path=$(env_value "$METHOD_CODE_ENV")
     method_ckpt_path=$(env_value "$METHOD_CKPT_ENV")
+    # Every registered method runs through one entry point with one option set (spatialarena.models.BaseModel;
+    # docs/models.md): the method name selects the model and its variant, its MethodSpec gives the defaults, and
+    # --engine drops the options below that a model does not have (e.g. --resolution for a method that resizes
+    # on its own). Model-specific settings come from the environment (GENCEPTION_*, COME_MODEL, ...; exported
+    # above).
+    cmd=(
+        "$PYTHON" scripts/inference/run_model.py --engine
+        --model "$METHOD"
+        --data_path "$data_path"
+        --output_path "$output_path"
+        --track "$BENCHMARK_TRACK"
+        --interval "$interval"
+        --resolution "$RESOLUTION"
+        --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
+        --max_points "$MAX_POINTS"
+        --max_images_per_run "$MAX_IMAGES_PER_RUN"
+        --conf_thresh "$CONF_THRESH"
+        --depth_conf_thresh "$DEPTH_CONF_THRESH"
+        --pixel_limit "$PIXEL_LIMIT"
+    )
+    # Unset paths keep the model's own defaults.
+    if [ -n "$method_code_path" ]; then
+        cmd+=(--code_path "$method_code_path")
+    fi
+    if [ -n "$method_ckpt_path" ]; then
+        cmd+=(--ckpt_path "$method_ckpt_path")
+    fi
+    if track_uses_cameras; then
+        local camera_prior_path
+        if ! camera_prior_path=$(materialized_camera_prior_path "$data_path"); then
+            echo "No camera priors found for $METHOD $BENCHMARK_TRACK case: $data_path" >&2
+            exit 3
+        fi
+        cmd+=(--colmap_path "$camera_prior_path")
+    fi
     case "$METHOD" in
-        DEPTHCRAFTER|CHRONODEPTH)
-            cmd=(
-                "$PYTHON" "scripts/inference/$METHOD_ADAPTER"
-                --method "$METHOD"
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$method_ckpt_path"
-                --code_path "$method_code_path"
-                --track "$BENCHMARK_TRACK"
-                --interval "$interval"
-            )
-            ;;
-        DA3-L|DA3-G|DA3-NGL)
-            local da3_ckpt
-            if [ "$METHOD" = "DA3-L" ]; then
-                da3_ckpt=$DA3_L_CKPT_PATH
-            elif [ "$METHOD" = "DA3-G" ]; then
-                da3_ckpt=$DA3_G_CKPT_PATH
-            else
-                da3_ckpt=$DA3_NGL_CKPT_PATH
-            fi
-            cmd=(
-                "$PYTHON" scripts/inference/da3.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$da3_ckpt"
-                --method_name "$METHOD"
-                --da3_code_path "$DA3_CODE_PATH"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-                --max_points "$MAX_POINTS"
-            )
-            if [ "$BENCHMARK_TRACK" = "rgb_cameras" ]; then
-                local da3_colmap_path
-                if ! da3_colmap_path=$(materialized_camera_prior_path "$data_path"); then
-                    echo "No camera priors found for DA3 rgb_cameras case: $data_path" >&2
-                    exit 3
-                fi
-                cmd+=(--load_from_colmap --colmap_path "$da3_colmap_path" --max_num_image_per_batch "$MAX_IMAGES_PER_RUN")
-            fi
-            ;;
-        VGGT)
-            cmd=(
-                "$PYTHON" scripts/inference/vggt.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$VGGT_CKPT_PATH"
-                --vggt_code_path "$VGGT_CODE_PATH"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-                --max_points "$MAX_POINTS"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
-            ;;
-        AMB3R)
-            cmd=(
-                "$PYTHON" scripts/inference/amb3r.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$AMB3R_CKPT_PATH"
-                --amb3r_code_path "$AMB3R_CODE_PATH"
-                --interval "$interval"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-                --max_points "$MAX_POINTS"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
-            ;;
         VGGT_LONG|PI_LONG|VGGT_SLAM)
-            cmd=(
-                "$PYTHON" scripts/inference/long_sequence_slam.py
-                --method "$METHOD"
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --code_path "$(env_value "$METHOD_CODE_ENV")"
-                --ckpt_root "$SHARED_CHECKPOINT_ROOT"
-                --interval "$interval"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-                --track "$BENCHMARK_TRACK"
-            )
+            # Long-sequence SLAM: GPU phase and CPU alignment as separate jobs (docs/benchmark/slam_protocol.md).
             if [ "${SLAM_ALIGN_ONLY:-0}" = 1 ]; then
                 cmd+=(--phase align)
             elif [ "$CASE_PHASE" = "inference" ] && [ "$SLAM_DEFER_ALIGN" = 1 ]; then
                 cmd+=(--phase gpu)
             fi
-            ;;
-        LOGER|ZIPMAP|LINGBOT_MAP|R3|SCAL3R|ABOT_RECON)
-            cmd=(
-                "$PYTHON" scripts/inference/streaming_slam.py
-                --method "$METHOD"
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --code_path "$(env_value "$METHOD_CODE_ENV")"
-                --ckpt_root "$SHARED_CHECKPOINT_ROOT"
-                --interval "$interval"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-                --track "$BENCHMARK_TRACK"
-            )
-            ;;
-        GENCEPTION_DEPTH)
-            cmd=(
-                "$PYTHON" scripts/inference/genception.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --task depth
-                --ckpt_dir "$GENCEPTION_CKPT_DIR"
-                --prompt_embeddings_dir "$GENCEPTION_EMBEDDINGS_DIR"
-                --model_size "$GENCEPTION_MODEL_SIZE"
-                --interval "$interval"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-            )
-            ;;
-        GENCEPTION_POSE)
-            cmd=(
-                "$PYTHON" scripts/inference/genception.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --task pose
-                --ckpt_dir "$GENCEPTION_CKPT_DIR"
-                --prompt_embeddings_dir "$GENCEPTION_EMBEDDINGS_DIR"
-                --model_size "$GENCEPTION_MODEL_SIZE"
-                --interval "$interval"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-            )
-            ;;
-        PI3_X)
-            cmd=(
-                "$PYTHON" scripts/inference/pi3.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$PI3_CKPT_PATH"
-                --pi3_code_path "$PI3_CODE_PATH"
-                --track "$BENCHMARK_TRACK"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-                --pixel_limit "$PIXEL_LIMIT"
-                --max_points "$MAX_POINTS"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
-            if track_uses_cameras; then
-                local pi3_colmap_path
-                if ! pi3_colmap_path=$(materialized_camera_prior_path "$data_path"); then
-                    echo "No camera priors found for PI3_X $BENCHMARK_TRACK case: $data_path" >&2
-                    exit 3
-                fi
-                cmd+=(--colmap_path "$pi3_colmap_path")
-            fi
-            ;;
-        FASTVGGT)
-            cmd=(
-                "$PYTHON" scripts/inference/fastvggt.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$FASTVGGT_CKPT_PATH"
-                --fastvggt_code_path "$FASTVGGT_CODE_PATH"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-                --max_points "$MAX_POINTS"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
-            ;;
-        COME)
-            cmd=(
-                "$PYTHON" scripts/inference/come.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$COME_CKPT_PATH"
-                --come_code_path "$COME_CODE_PATH"
-                --come_model "$COME_MODEL"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_points "$MAX_POINTS"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
-            ;;
-        CUT3R)
-            cmd=(
-                "$PYTHON" scripts/inference/cut3r.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$CUT3R_CKPT_PATH"
-                --cut3r_code_path "$CUT3R_CODE_PATH"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_points "$MAX_POINTS"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
-            ;;
-        FAST3R)
-            cmd=(
-                "$PYTHON" scripts/inference/fast3r.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$FAST3R_CKPT_PATH"
-                --fast3r_code_path "$FAST3R_CODE_PATH"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_points "$MAX_POINTS"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
-            ;;
-        VGGT_OMEGA)
-            cmd=(
-                "$PYTHON" scripts/inference/vggt_omega.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$VGGT_OMEGA_CKPT_PATH"
-                --text_ckpt_path "$VGGT_OMEGA_TEXT_CKPT_PATH"
-                --vggt_omega_code_path "$VGGT_OMEGA_CODE_PATH"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_points "$MAX_POINTS"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
-            ;;
-        MAPANYTHING)
-            cmd=(
-                "$PYTHON" scripts/inference/mapanything.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$MAPANYTHING_CKPT_PATH"
-                --mapanything_code_path "$MAPANYTHING_CODE_PATH"
-                --track "$BENCHMARK_TRACK"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_points "$MAX_POINTS"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
-            if track_uses_cameras; then
-                local mapanything_colmap_path
-                if ! mapanything_colmap_path=$(materialized_camera_prior_path "$data_path"); then
-                    echo "No camera priors found for MAPANYTHING $BENCHMARK_TRACK case: $data_path" >&2
-                    exit 3
-                fi
-                cmd+=(--colmap_path "$mapanything_colmap_path")
-            fi
-            ;;
-        OMNIVGGT)
-            cmd=(
-                "$PYTHON" scripts/inference/omnivggt.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$OMNIVGGT_CKPT_PATH"
-                --omnivggt_code_path "$OMNIVGGT_CODE_PATH"
-                --track "$BENCHMARK_TRACK"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_points "$MAX_POINTS"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
-            if track_uses_cameras; then
-                local omnivggt_colmap_path
-                if ! omnivggt_colmap_path=$(materialized_camera_prior_path "$data_path"); then
-                    echo "No camera priors found for OMNIVGGT $BENCHMARK_TRACK case: $data_path" >&2
-                    exit 3
-                fi
-                cmd+=(--colmap_path "$omnivggt_colmap_path")
-            fi
-            ;;
-        DEJAVIEW)
-            cmd=(
-                "$PYTHON" scripts/inference/dejaview.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$DEJAVIEW_CKPT_PATH"
-                --dejaview_code_path "$DEJAVIEW_CODE_PATH"
-                --track "$BENCHMARK_TRACK"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_points "$MAX_POINTS"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
-            ;;
-        IGGT)
-            cmd=(
-                "$PYTHON" scripts/inference/iggt.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$IGGT_CKPT_PATH"
-                --iggt_code_path "$IGGT_CODE_PATH"
-                --track "$BENCHMARK_TRACK"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_points "$MAX_POINTS"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
-            ;;
-        IGGT4D)
-            cmd=(
-                "$PYTHON" scripts/inference/iggt4d.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$IGGT4D_CKPT_PATH"
-                --iggt4d_code_path "$IGGT4D_CODE_PATH"
-                --track "$BENCHMARK_TRACK"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_points "$MAX_POINTS"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
-            ;;
-        POW3R|DUST3R|MAST3R)
-            local wrapper_adapter
-            local wrapper_code_env
-            local wrapper_ckpt
-            case "$METHOD" in
-                POW3R)
-                    wrapper_adapter=pow3r.py
-                    wrapper_code_env=POW3R_CODE_PATH
-                    wrapper_ckpt=$POW3R_CKPT_PATH
-                    ;;
-                DUST3R)
-                    wrapper_adapter=dust3r.py
-                    wrapper_code_env=DUST3R_CODE_PATH
-                    wrapper_ckpt=$DUST3R_CKPT_PATH
-                    ;;
-                MAST3R)
-                    wrapper_adapter=mast3r.py
-                    wrapper_code_env=MAST3R_CODE_PATH
-                    wrapper_ckpt=$MAST3R_CKPT_PATH
-                    ;;
-            esac
-            cmd=(
-                "$PYTHON" "scripts/inference/$wrapper_adapter"
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$wrapper_ckpt"
-                --method_code_path "$(env_value "$wrapper_code_env")"
-                --mapanything_code_path "$MAPANYTHING_CODE_PATH"
-                --track "$BENCHMARK_TRACK"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_points "$MAX_POINTS"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
-            ;;
-        ROBUSTVGGT)
-            cmd=(
-                "$PYTHON" scripts/inference/robustvggt.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$ROBUSTVGGT_CKPT_PATH"
-                --robustvggt_code_path "$ROBUSTVGGT_CODE_PATH"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-                --max_points "$MAX_POINTS"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
-            ;;
-        DEPTHVLM)
-            cmd=(
-                "$PYTHON" scripts/inference/depthvlm.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$DEPTHVLM_CKPT_PATH"
-                --depthvlm_code_path "$DEPTHVLM_CODE_PATH"
-                --track "$BENCHMARK_TRACK"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-            )
-            ;;
-        SENSENOVA_VISION)
-            cmd=(
-                "$PYTHON" scripts/inference/sensenova_vision_depth.py
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$SENSENOVA_VISION_CKPT_PATH"
-                --sensenova_vision_code_path "$SENSENOVA_VISION_CODE_PATH"
-                --track "$BENCHMARK_TRACK"
-                --interval "$interval"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-            )
-            ;;
-        VLM3|DEPTHLM|QWEN3_VL)
-            local point_query_adapter
-            local point_query_ckpt
-            case "$METHOD" in
-                VLM3)
-                    point_query_adapter=vlm3.py
-                    point_query_ckpt=$VLM3_CKPT_PATH
-                    ;;
-                DEPTHLM)
-                    point_query_adapter=depthlm.py
-                    point_query_ckpt=$DEPTHLM_CKPT_PATH
-                    ;;
-                QWEN3_VL)
-                    point_query_adapter=qwen3_vl.py
-                    point_query_ckpt=$QWEN3_VL_CKPT_PATH
-                    ;;
-            esac
-            cmd=(
-                "$PYTHON" "scripts/inference/$point_query_adapter"
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$point_query_ckpt"
-                --track "$BENCHMARK_TRACK"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_points "$MAX_POINTS"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
-            ;;
-        CLAUDE_OPUS_5_5|GPT_6_ASTRA|GEMINI_4_ARGON)
-            # Commercial VLMs via OpenRouter (no GPU); the checkpoint is the OpenRouter model slug. Grid size,
-            # concurrency, reasoning effort, budget and cache come from OPENROUTER_* variables.
-            cmd=(
-                "$PYTHON" "scripts/inference/$METHOD_ADAPTER"
-                --method_name "$METHOD"
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$method_ckpt_path"
-                --track "$BENCHMARK_TRACK"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-            )
-            ;;
-        MOGE|MOGE2|MOGE3|MARIGOLD|MARIGOLD_V1_1|MARIGOLD_V2|LOTUS_D|DEPTH_PRO|UNIDEPTH_V2|INFINIDEPTH|DVD)
-            # Official single-image MonoDepth baselines (single_image_depth.py) and DVD (VideoDepth): each adapter
-            # resizes as its method officially does and exports depth on the source grid, so RESOLUTION is not used.
-            cmd=(
-                "$PYTHON" "scripts/inference/$METHOD_ADAPTER"
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --ckpt_path "$method_ckpt_path"
-                --code_path "$method_code_path"
-                --track "$BENCHMARK_TRACK"
-                --interval "$interval"
-            )
-            if [ "$METHOD" != "DVD" ]; then
-                cmd+=(--method "$METHOD")
-            fi
-            ;;
-        *)
-            cmd=(
-                "$PYTHON" "scripts/inference/external_command_adapter.py"
-                --data_path "$data_path"
-                --output_path "$output_path"
-                --method_name "$METHOD"
-                --track "$BENCHMARK_TRACK"
-                --code_path "$method_code_path"
-                --ckpt_path "$method_ckpt_path"
-                --interval "$interval"
-                --resolution "$RESOLUTION"
-                --image_load_resolution "$IMAGE_LOAD_RESOLUTION"
-                --max_points "$MAX_POINTS"
-                --max_images_per_run "$MAX_IMAGES_PER_RUN"
-                --conf_thresh "$CONF_THRESH"
-                --depth_conf_thresh "$DEPTH_CONF_THRESH"
-            )
             ;;
     esac
 

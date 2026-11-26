@@ -15,7 +15,12 @@ This file applies to the full repository unless a more specific `AGENTS.md` is a
   (`download.py`), and the Slurm engine templates (`templates/_engine/`).
 - `spatialarena/eval/`: benchmark dataset adapters, result layouts, metrics, alignment and evaluation entry points.
 - `spatialarena/geometry/`, `spatialarena/utils/`: geometry and point/depth helpers used by evaluators and adapters.
-- `scripts/inference/`: model adapters that write prediction artifacts.
+- `spatialarena/models/`: inference models on one base class (`BaseModel`: shared preprocessing, restoration,
+  export and metrics), their registry for built-in and external models, and the shared helpers (`utils.py`).
+  See `docs/models.md`.
+- `scripts/inference/`: the engine's command-line entry points of `spatialarena.models` (one per adapter), aliases
+  kept for importers (`adapter_utils` is `spatialarena.models.utils`), and the launchers that run inside a method's
+  own interpreter (`fixed_input_launcher.py`, `long_sequence_phase_launcher.py`).
 - `scripts/preprocess/`: benchmark dataset materializers, layout normalizers and verifiers.
 - `scripts/download/`: benchmark dataset download scripts (wrapped by `spatialarena/download.py`).
 - `scripts/test/`: case lists, Slurm submission helpers, report summaries and smoke tests.
@@ -31,14 +36,14 @@ This file applies to the full repository unless a more specific `AGENTS.md` is a
 ## Coding style
 
 Python code follows the [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html).
-`spatialarena/geometry/utils.py` is a good example. In particular:
+`spatialarena/models/` is written this way. In particular:
 
 - Formatting: run `python -m yapf -i <files>` (the repo's `.style.yapf`: Google style, 80 columns). It only changes
   whitespace and line breaks; long strings and comments still need wrapping by hand.
 - Line length: at most 80 characters in new or rewritten code (URLs and pylint directives may be longer). The
   pre-commit hook enforces a hard limit of 120 characters, so code not yet rewritten keeps passing.
-- Imports: import packages and modules, not functions or classes (`from spatialarena.geometry import utils`, then
-  `utils.write_colmap_formats(...)`); `typing` names are the exception. Use full package paths, no relative imports,
+- Imports: import packages and modules, not functions or classes (`from spatialarena.models import utils`, then
+  `utils.find_image_paths(...)`); `typing` names are the exception. Use full package paths, no relative imports,
   one import per line, grouped as `__future__`, standard library, third party, then this repository, each group
   sorted. Use `from x import y as z` only to resolve a name clash or shorten a long name.
 - Docstrings: a one-line summary ending in a period, a blank line, then the details. Functions use `Args:`,
@@ -120,7 +125,7 @@ When editing evaluation logic:
 
 - keep input and output layouts compatible with `result_layout.py` and `prediction_artifacts.py`;
 - write per-frame prediction maps (depths/, confidences/, raw_disparities/, raw_log_depths/) only through
-  `adapter_utils.save_prediction_map` / `export_depth_predictions`: compressed `<stem>.npz` (depth float32, confidence
+  `spatialarena.models.utils.save_prediction_map` / `export_depth_predictions`: compressed `<stem>.npz` (depth float32, confidence
   float16), never a raw `.npy`;
 - record metrics in machine-readable JSON when possible;
 - include enough metadata to reproduce dataset split, scene list, alignment mode, and prediction source;

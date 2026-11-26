@@ -12,11 +12,8 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from scripts.inference import point_query_depth_adapter as adapter
-from scripts.inference.point_query_depth_adapter import (
-    build_message,
-    parse_depth,
-)
+from spatialarena.models import point_query as adapter
+from spatialarena.models.point_query import build_message, parse_depth
 from spatialarena.eval.depth_prediction_evaluator import load_depth_map
 
 # see spatialarena/paths.py
@@ -113,7 +110,7 @@ def fixture_point_query_run(tmp_path, monkeypatch):
             _blank_image((32, 32)).save(images / f"{index:03d}.png")
         argv = [
             "point_query_depth_adapter",
-            "--method_name",
+            "--model",
             method,
             "--data_path",
             str(tmp_path),
@@ -254,21 +251,45 @@ def test_strict_valid_constant_answers_are_not_reclassified(point_query_run):
                                   100)
 
 
+@pytest.mark.parametrize("method,spec_grid", [("VLM3", 1), ("QWEN3_VL", 16),
+                                              ("DEPTHLM", 16)])
 def test_strict_grid_environment_configuration_is_opt_in(
-        point_query_run, monkeypatch):
-    point_query_run([], strict=False)
+        point_query_run, monkeypatch, method, spec_grid):
+    """The grid defaults to the MethodSpec (VLM3 has none: the centre only)."""
+    point_query_run([], strict=False, method=method)
     argv = list(sys.argv)
     index = argv.index("--point_grid_size")
     del argv[index:index + 2]
     monkeypatch.setattr(sys, "argv", argv)
     args = adapter.parse_args()
-    assert args.point_grid_size == 1
+    assert args.point_grid_size == spec_grid
     assert args.require_spatial_queries is False
-    monkeypatch.setenv("POINT_QUERY_DEPTH_GRID_SIZE", "16")
+    monkeypatch.setenv("POINT_QUERY_DEPTH_GRID_SIZE", "5")
     monkeypatch.setenv("POINT_QUERY_REQUIRE_SPATIAL", "1")
     args = adapter.parse_args()
-    assert args.point_grid_size == 16
+    assert args.point_grid_size == 5
     assert args.require_spatial_queries is True
+
+
+def test_point_query_command_line_has_no_point_or_resize_options():
+    """Only --image_load_resolution resizes; no --method_name, no points."""
+    parser = adapter.DepthLM.build_parser("DEPTH_LM")
+    options = set(parser._option_string_actions)  # pylint: disable=protected-access
+    assert "--image_load_resolution" in options
+    for removed in ("--method_name", "--resolution", "--max_points",
+                    "--conf_thresh", "--depth_conf_thresh"):
+        assert removed not in options
+    args = parser.parse_args(["--data_path", "d", "--output_path", "o"])
+    assert args.method == "DEPTHLM"
+    assert args.image_load_resolution == 750  # The MethodSpec's.
+    assert args.ckpt_path == os.environ.get("DEPTHLM_CKPT_PATH",
+                                            "facebook/DepthLM")
+
+
+def test_script_rejects_a_model_of_another_family(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["x", "--model", "DA3-L"])
+    with pytest.raises(SystemExit):
+        adapter.run()
 
 
 def test_parse_depth_returns_none_for_unparseable_text():
@@ -303,7 +324,7 @@ def test_run_exports_depth_at_true_source_resolution_not_the_contained_size(
         "argv",
         [
             "point_query_depth_adapter.py",
-            "--method_name",
+            "--model",
             "VLM3",
             "--data_path",
             str(tmp_path),

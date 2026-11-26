@@ -12,10 +12,9 @@ run_come/load_come_archive to isolate and verify just the restoration math: that
 produced on Co-Me's internal padded-square canvas gets mapped back to each image's true, non-square source
 resolution.
 
-vggt_omega_preprocess: Mocked unit test for vggt_omega.py's preprocess_vggt_omega(): VGGT-Omega's real model forward
-pass requires CUDA (the upstream implementation itself raises on CPU), so this isolates just the three-branch
-preprocessing dispatch extracted from the former inline run_vggt_omega_model, and checks each branch picks the same
-path (and files) the pre-refactor code did.
+vggt_omega_preprocess: Mocked unit test of preprocess_vggt_omega() (spatialarena/models/vggt_omega.py).
+VGGT-Omega's real forward pass requires CUDA (the upstream code raises on CPU), so this isolates the three-branch
+preprocessing dispatch and checks each branch picks the same path (and files) as the pre-refactor code.
 
 single_image_depth: The shared single-image MonoDepth loop: source-grid export, raw disparities, and the shape guard.
 """
@@ -28,7 +27,7 @@ import numpy as np
 import pytest
 import torch
 from PIL import Image
-from scripts.inference.vggt import crop_to_original_image_region
+from spatialarena.models import vggt as vggt_model
 from spatialarena.eval.depth_prediction_evaluator import load_depth_map
 from pathlib import Path
 from scripts.inference.amb3r import materialize_symlinked_images
@@ -47,7 +46,7 @@ def test_crop_to_original_image_region_removes_square_padding():
     original_coord = np.array([3.0, 0.0, 7.0, 10.0, 4.0, 10.0],
                               dtype=np.float32)
 
-    cropped = crop_to_original_image_region(
+    cropped = vggt_model.crop_to_original_image_region(
         depth,
         original_coord=original_coord,
         padded_size=10,
@@ -96,8 +95,6 @@ def test_run_restores_intrinsics_to_source_resolution_under_shared_policy_with_c
     """End-to-end: --spatial_policy shared + --export_colmap (previously forbidden; now supported
     since intrinsics are restored) must write COLMAP camera width/height/intrinsics for the image's
     true 300x200 source resolution, not the model's padded 56x56 canvas."""
-    import scripts.inference.vggt as vggt_module
-
     fake_vggt = types.ModuleType("vggt")
     fake_vggt.__path__ = [
     ]  # looks like a package, so add_vggt_code_path won't evict it
@@ -108,8 +105,8 @@ def test_run_restores_intrinsics_to_source_resolution_under_shared_policy_with_c
     monkeypatch.setitem(sys.modules, "vggt.utils", fake_vggt_utils)
     monkeypatch.setitem(sys.modules, "vggt.utils.pose_enc",
                         fake_vggt_utils_pose_enc)
-    monkeypatch.setattr(vggt_module, "load_model",
-                        lambda args, device: _FakeVggtModel())
+    monkeypatch.setattr(vggt_model.VGGT, "load",
+                        lambda self, device: _FakeVggtModel())
 
     recorded_colmap_calls = []
 
@@ -129,7 +126,6 @@ def test_run_restores_intrinsics_to_source_resolution_under_shared_policy_with_c
 
     output_path = tmp_path / "out"
     argv = [
-        "vggt.py",
         "--data_path",
         str(tmp_path),
         "--output_path",
@@ -142,9 +138,7 @@ def test_run_restores_intrinsics_to_source_resolution_under_shared_policy_with_c
         "--spatial_policy",
         "shared",
     ]
-    monkeypatch.setattr(sys, "argv", argv)
-
-    vggt_module.run()
+    vggt_model.VGGT.main(argv)
 
     assert len(recorded_colmap_calls) == 1
     call = recorded_colmap_calls[0]
@@ -466,7 +460,7 @@ def test_depth_only_shared_policy_restores_depth_confidence_and_intrinsics(
 
 sys.path.insert(0, "scripts/inference")
 
-from scripts.inference.vggt_omega import preprocess_vggt_omega  # noqa: E402
+from spatialarena.models import vggt_omega as vggt_omega_model  # noqa: E402
 
 
 def _make_images(tmp_path: Path, n: int, size=(300, 200)) -> list[str]:
@@ -493,9 +487,8 @@ def _args(**overrides) -> argparse.Namespace:
 def test_shared_pad_builds_tensor_directly_no_disk_write(tmp_path):
     paths = _make_images(tmp_path, 2)
     args = _args(spatial_policy="shared-pad", output_path=tmp_path / "out")
-    model_input, transforms = preprocess_vggt_omega(paths,
-                                                    args=args,
-                                                    device="cpu")
+    model_input, transforms = vggt_omega_model.preprocess_vggt_omega(
+        paths, args=args, device="cpu")
     assert model_input["resized_dir"] is None
     assert transforms is not None and len(transforms) == 2
     assert model_input["images"].shape[0] == 2
@@ -512,7 +505,7 @@ def test_legacy_non_fixed_prewrites_resized_files_then_calls_vendored_loader(
         captured["image_resolution"] = image_resolution
         return torch.zeros(len(paths_), 3, image_resolution, image_resolution)
 
-    model_input, transforms = preprocess_vggt_omega(
+    model_input, transforms = vggt_omega_model.preprocess_vggt_omega(
         paths,
         args=args,
         device="cpu",
@@ -531,7 +524,7 @@ def test_legacy_fixed_input_size_skips_resize_uses_patch_grid_tensor(
         tmp_path, monkeypatch):
     """SLAM protocol pre-sized frames (FIXED_INPUT_RESOLUTION=1): no disk pre-resize, no
     load_and_preprocess_images call -- only load_patch_grid_tensor's 16px-grid crop."""
-    import scripts.inference.vggt_omega as vggt_omega_module
+    from spatialarena.models import utils as model_utils
 
     monkeypatch.setenv("FIXED_INPUT_RESOLUTION", "1")
     paths = _make_images(tmp_path, 2, size=(512, 512))
@@ -547,9 +540,9 @@ def test_legacy_fixed_input_size_skips_resize_uses_patch_grid_tensor(
         raise AssertionError(
             "the vendored loader must not be called for fixed-resolution input")
 
-    monkeypatch.setattr(vggt_omega_module, "load_patch_grid_tensor",
+    monkeypatch.setattr(model_utils, "load_patch_grid_tensor",
                         fake_patch_grid_tensor)
-    model_input, transforms = preprocess_vggt_omega(
+    model_input, transforms = vggt_omega_model.preprocess_vggt_omega(
         paths,
         args=args,
         device="cpu",
@@ -572,7 +565,7 @@ def test_legacy_pad_skips_prewrite_disabled_by_run_but_dispatch_still_prewrites(
         captured["paths"] = paths_
         return torch.zeros(len(paths_), 3, image_resolution, image_resolution)
 
-    model_input, transforms = preprocess_vggt_omega(
+    model_input, transforms = vggt_omega_model.preprocess_vggt_omega(
         paths,
         args=args,
         device="cpu",
@@ -633,9 +626,8 @@ def test_external_command_sees_only_the_engines_image_subset(
 
 # ---- single_image_depth ------------------------------------------------------------------------------------
 
-sys.path.insert(
-    0, str(Path(__file__).resolve().parents[1] / "scripts" / "inference"))
-import single_image_depth  # noqa: E402  # pylint: disable=wrong-import-position
+# pylint: disable-next=wrong-import-position
+from spatialarena.models import single_image as single_image_depth  # noqa: E402
 
 
 def _single_image_scene(tmp_path: Path) -> Path:
@@ -693,13 +685,53 @@ def test_dense_depth_only(tmp_path):
             _single_image_args(tmp_path, export_colmap=True))
 
 
+@pytest.mark.parametrize("name,method",
+                         [("MOGE", "MOGE"), ("MOGE-2", "MOGE2"),
+                          ("MOGE3", "MOGE3"), ("MARIGOLD", "MARIGOLD"),
+                          ("MARIGOLD-V1-1", "MARIGOLD_V1_1"),
+                          ("LOTUS", "LOTUS_D"), ("DEPTH_PRO", "DEPTH_PRO"),
+                          ("UNIDEPTH_V2", "UNIDEPTH_V2"),
+                          ("INFINIDEPTH", "INFINIDEPTH"),
+                          ("SENSENOVA_VISION", "SENSENOVA_VISION")])
+def test_single_image_models_take_the_variant_from_the_model_name(
+        tmp_path, monkeypatch, name, method):
+    """The model name (or alias) is the variant: its MethodSpec gives the
+    checkpoint and code defaults; the single-image models resize on their
+    own, so they have no resolution, dense-point or variant options."""
+    # pylint: disable=import-outside-toplevel
+    from spatialarena import methods
+    from spatialarena.models import registry
+
+    spec = methods.resolve_method(method)
+    monkeypatch.delenv(spec.ckpt_env, raising=False)
+    monkeypatch.delenv(spec.code_env, raising=False)
+    monkeypatch.setenv("METHOD_CODE_ROOT", str(tmp_path))
+    model_cls = registry.get_model(name)
+    parser = model_cls.build_parser(name)
+    model = model_cls(
+        parser.parse_args(["--data_path", "d", "--output_path", "o"]))
+    assert model.method_name == method == model.method_label
+    assert model.args.ckpt_path == spec.ckpt_default
+    if model_cls.uses_code_path:
+        assert model.args.code_path == Path(
+            spec.code_default.replace("$METHOD_CODE_ROOT", str(tmp_path)))
+    else:  # Marigold v1: the installed diffusers, no checkout.
+        assert not hasattr(model.args, "code_path")
+    options = parser._option_string_actions  # pylint: disable=protected-access
+    for removed in ("--method", "--resolution", "--image_load_resolution",
+                    "--max_points", "--conf_thresh", "--spatial_policy",
+                    "--sensenova_vision_code_path"):
+        assert removed not in options
+    assert ("--seed" in options) == (method != "SENSENOVA_VISION")
+
+
 def test_da3_load_prior_model_reads_the_camera_prior_model(tmp_path):
     """--load_from_colmap's dense-points branch reads the cameras, images and points of the same COLMAP prior model
     the camera priors come from (it used an undefined ``manager`` before)."""
     # pylint: disable=import-outside-toplevel
     from types import SimpleNamespace as Namespace
 
-    from scripts.inference.da3 import load_prior_model
+    from spatialarena.models import da3 as da3_model
     from spatialarena.geometry.read_write_model import BaseImage, Camera, Point3D, write_model
 
     sparse = tmp_path / "sparse" / "0"
@@ -732,7 +764,7 @@ def test_da3_load_prior_model_reads_the_camera_prior_model(tmp_path):
                     point2D_idxs=np.zeros(0, dtype=int))
     }
     write_model(cameras, images, points, str(sparse), ext=".txt")
-    model = load_prior_model(
+    model = da3_model.load_prior_model(
         Namespace(colmap_path=str(sparse),
                   data_path=tmp_path,
                   colmap_model_subdir="0"))

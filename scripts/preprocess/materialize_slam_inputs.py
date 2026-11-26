@@ -19,7 +19,7 @@ into `<benchmark_root>/SLAM/<dataset>/<scene>` (`slam_protocol.input_root`):
 - `depths/` (rgb_depth track priors, where the dataset has them): the same
   resize-within and pad, nearest-neighbor, dtype and units unchanged; the
   padded border reads as 0, this codebase's established "no depth prior here"
-  convention (e.g. scripts/inference/pi3.py's _zero_depth_like_image) -- not
+  convention (e.g. spatialarena/models/pi3.py's _zero_depth_like_image) -- not
   a real (and definitely not a zero) depth measurement;
 - `sparse/0`: the ground-truth model with the camera intrinsics mapped through
   the same resize-within and pad (poses unchanged).

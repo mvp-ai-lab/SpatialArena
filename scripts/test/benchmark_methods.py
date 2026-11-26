@@ -78,6 +78,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     """Prints the requested registry view to stdout."""
     args = parse_args()
+    # External models add their methods when their module is imported.
+    # pylint: disable-next=import-outside-toplevel
+    from spatialarena.models import registry
+
+    registry.load_plugins()
     if args.json:
         print(json.dumps(specs_as_dicts(), indent=2))
         return
