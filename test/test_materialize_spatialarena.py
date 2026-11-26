@@ -652,6 +652,16 @@ def test_frames_the_review_left_out_can_be_put_back_for_another_review(
         ).read_text())["manual_review"]["excluded_frames"] == keys[:1]
 
 
+def masked_to_black(image: np.ndarray) -> bool:
+    """Whether the fixture's masked top-left block of a JPEG photo is black.
+
+    The fixture photos are random noise, on which JPEG (quality 95) rings into
+    a black block by up to ~70 levels at single pixels, so the block's mean is
+    checked: at most ~11 when masked, ~127 when not.
+    """
+    return image[:3, :3].astype(float).mean() <= 32
+
+
 def test_depth_tracks_mask_people_and_vehicles_out_of_every_input(
         tmp_path: Path):
     make_release(tmp_path / "released", "Video", list(range(8)))
@@ -677,12 +687,11 @@ def test_depth_tracks_mask_people_and_vehicles_out_of_every_input(
         lidar = np.asarray(Image.open(next((scene / "lidar_depths").iterdir())))
         heatmap = np.asarray(
             Image.open(next((scene / mm.HEATMAP_DIRNAME).iterdir())))
-        assert np.abs(
-            image[:3, :3].astype(int)).max() <= 8  # black up to JPEG ringing
+        assert masked_to_black(image)
         assert (lidar[:4, :4]
                 == 0).all() and lidar[4, 4] == 500 and (heatmap[:4, :4]
                                                         == 0).all()
-        assert heatmap[5, 5].any()
+        assert heatmap[4, 4].any()  # the first LiDAR point outside the mask
     sfm_image = np.asarray(
         Image.open(benchmark / "SfM" / "Sfm" / "images" / "img0_000000.jpg"))
     assert sfm_image[:4, :4].any()  # SfM keeps the photos whole
@@ -709,7 +718,7 @@ def test_depth_scenes_written_before_masking_are_masked_in_place(
     run(tmp_path, ["mvrecon"])
     assert json.loads(
         (scene / "scene.json").read_text())["dynamic_objects_masked"]
-    assert np.asarray(Image.open(image))[:3, :3].max() <= 8 and (np.asarray(
+    assert masked_to_black(np.asarray(Image.open(image))) and (np.asarray(
         Image.open(lidar))[:4, :4] == 0).all()
     assert sorted(
         path.stat().st_mtime_ns

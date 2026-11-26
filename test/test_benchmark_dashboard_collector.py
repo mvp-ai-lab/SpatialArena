@@ -1240,8 +1240,11 @@ def test_scene_scores_weigh_every_case_and_score_missing_ones_zero():
 
 
 def test_conditioned_tracks_are_averaged_over_the_tasks_they_can_run():
-    """rgb averages over every task; [+C]/[+D] only over the tasks the matrix lets them run on a leaderboard dataset
-    (VideoDepth [+C] runs only on the unscored SpatialArena, so it is not one of them)."""
+    """rgb averages over every task; [+C]/[+D] only over the tasks the matrix lets them run on a leaderboard dataset.
+
+    VideoDepth [+C] runs only on SpatialArena, which is scored, so it counts once SpatialArena is evaluated; a task
+    evaluated only on a leaderboard-excluded dataset (ScanNet++) does not.
+    """
     from app.webpage.python.benchmark_analyzer import track_ranking_tasks
 
     tasks = ["MonoDepth", "VideoDepth", "MVRecon", "SfM", "SLAM"]
@@ -1256,7 +1259,10 @@ def test_conditioned_tracks_are_averaged_over_the_tasks_they_can_run():
     assert track_ranking_tasks("rgb_cameras", tasks, datasets) == ["MVRecon"]
     assert track_ranking_tasks("rgb_cameras", tasks, {
         **datasets, "VideoDepth": {"spatialarena"}
-    }) == ["MVRecon"]
+    }) == ["VideoDepth", "MVRecon"]
+    assert track_ranking_tasks("rgb_cameras", tasks, {
+        **datasets, "MVRecon": {"scannetpp"}
+    }) == []
     assert track_ranking_tasks("rgb_depth", tasks,
                                datasets) == ["MVRecon", "SfM", "SLAM"]
     assert track_ranking_tasks("rgb_depth", tasks, {
@@ -1298,13 +1304,13 @@ def test_conditioned_tracks_stay_out_of_the_overall_ranking():
 
 
 def test_all_datasets_row_says_when_results_are_only_on_unscored_datasets():
-    """A track with results only on a leaderboard-excluded dataset (VideoDepth [+C] on SpatialArena) gets a label
+    """A track with results only on a leaderboard-excluded dataset (here MVRecon [+C] on ScanNet++) gets a label
     in the all-datasets table instead of an empty row; a scored row gets none."""
     from app.webpage.python.benchmark_analyzer import summarize_method_scene_means
 
     rows = [{
         "method": method,
-        "task": "VideoDepth",
+        "task": "MVRecon",
         "dataset": dataset,
         "dataset_base": dataset,
         "slam_range": "",
@@ -1313,12 +1319,11 @@ def test_all_datasets_row_says_when_results_are_only_on_unscored_datasets():
         "matched_images": 0,
         "pairs": 0,
         "metrics": {}
-    } for method, dataset in (("FOO", "bonn"), ("FOO_rgb_cameras",
-                                                "spatialarena"))]
+    } for method, dataset in (("FOO", "dtu"), ("FOO_rgb_cameras", "scannetpp"))]
     scenes = [{
         "method": "FOO",
-        "task": "VideoDepth",
-        "dataset": "bonn",
+        "task": "MVRecon",
+        "dataset": "dtu",
         "scene": "s0",
         "metrics": {
             "absrel_percent": 5.0
@@ -1329,7 +1334,7 @@ def test_all_datasets_row_says_when_results_are_only_on_unscored_datasets():
             rows, scenes, ["absrel_percent"])
     }
     assert by_method["FOO_rgb_cameras"][
-        "coverage_label"] == "SpatialArena only · not scored"
+        "coverage_label"] == "ScanNet++ only · not scored"
     assert by_method["FOO_rgb_cameras"][
         "unscored_only"] and not by_method["FOO_rgb_cameras"]["metrics"]
     assert "coverage_label" not in by_method["FOO"] and by_method["FOO"][

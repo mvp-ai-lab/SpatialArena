@@ -1126,8 +1126,8 @@ def track_ranking_tasks(track: str, tasks: list[str],
 
     That is every task for `rgb`; for a conditioned track ([+C], [+D]) only the
     tasks the task/track matrix lets it run on a leaderboard dataset. A task it
-    cannot run (MonoDepth [+C], or VideoDepth [+C], which runs only on the
-    unscored SpatialArena) is not a missing result.
+    cannot run there (MonoDepth [+C], or one evaluated only on a
+    LEADERBOARD_EXCLUDED_DATASETS dataset) is not a missing result.
 
     Args:
         track: The track name, e.g. "rgb" or "rgb_cameras".
@@ -2222,8 +2222,8 @@ def summarize_method_scene_means(
     for method_row in method_rows:
         scenes = by_method.get(method_row["method"], [])
         if not scenes and unscored.get(method_row["method"]):
-            # E.g. VideoDepth [+C], run on SpatialArena only: say why the row
-            # is empty instead of leaving it blank.
+            # E.g. a track run only on ScanNet++: say why the row is empty
+            # instead of leaving it blank.
             names = sorted(
                 DATASET_DISPLAY_NAMES.get(name, name)
                 for name in unscored[method_row["method"]])
@@ -3061,7 +3061,8 @@ def add_scene_scores(method_stats: dict[str, Any], rows: list[dict[str, Any]],
                 continue
             stats = method_stats[method]
             metric_scores = []
-            case_scores = stats["task_dataset_metric_case_scores"][task][dataset]
+            case_scores = stats["task_dataset_metric_case_scores"][task][
+                dataset]
             for metric_key in keys:
                 entries, ranks, scores = metric_results[metric_key]
                 case_scores[metric_key].append(scores.get(method, 0.0))
@@ -3715,7 +3716,7 @@ def build_benchmark_visualization(
                                    rows, scene_rows, case_failures)
     # The task ranks' pool (task_rankings) is the one the metric tables show.
     attach_metric_case_scores(task_tables, task_rankings["rows"])
-    radar =build_radar_data(rankings["rows"])
+    radar = build_radar_data(rankings["rows"])
     methods = sorted({row["method"] for row in rows})
     tasks = sorted({row["task"] for row in rows}, key=task_sort_key)
     datasets = sorted({row["dataset"] for row in rows})
