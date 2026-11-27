@@ -66,7 +66,7 @@
         models: ['DUST3R', 'MAST3R', 'POW3R', 'CUT3R', 'FAST3R', 'VGGT', 'FASTVGGT', 'VGGT_OMEGA', 'ROBUSTVGGT', 'OMNIVGGT', 'PI3_X', 'DA3-L', 'DA3-G', 'DA3-NGL', 'AMB3R', 'MAPANYTHING', 'DEJAVIEW', 'COME', 'IGGT', 'IGGT4D'],
         prior: ['DA3-NGL', 'PI3_X', 'MAPANYTHING', 'OMNIVGGT'] },
       { name: 'Monocular depth', color: '--sky', desc: 'Affine-invariant and metric depth specialists.',
-        models: ['MARIGOLD', 'MARIGOLD_V1_1', 'MARIGOLD_V2', 'LOTUS_D', 'MOGE', 'MOGE2', 'MOGE3', 'DEPTH_PRO', 'UNIDEPTH_V2', 'INFINIDEPTH'], prior: [] },
+        models: ['MARIGOLD', 'MARIGOLD_V1_1', 'MARIGOLD_V2', 'LOTUS_D', 'MOGE', 'MOGE2', 'MOGE3', 'DEPTH_PRO', 'DEPTH_PRO_2_H', 'UNIDEPTH_V2', 'INFINIDEPTH'], prior: [] },
       { name: 'Video generative', color: '--green', desc: 'Depth and camera models built on video diffusion or generation backbones: DVD, DepthCrafter and ChronoDepth for video depth; GenCeption for depth and pose; GeoNeXt for monocular depth.',
         models: ['DVD', 'DEPTHCRAFTER', 'CHRONODEPTH', 'GENCEPTION_DEPTH', 'GENCEPTION_POSE', 'GEONEXT_OFFICIAL_SVD'], prior: [] },
       { name: 'Long-sequence & SLAM', color: '--accent', desc: 'Chunked, streaming, and memory-based systems for thousands of frames.',

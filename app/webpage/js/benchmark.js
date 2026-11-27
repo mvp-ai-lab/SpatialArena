@@ -192,6 +192,10 @@ const benchmarkMethodInfo = {
         venue: "ICLR 2025",
         links: [["Code", "https://github.com/apple/ml-depth-pro"], ["Model", "https://huggingface.co/apple/DepthPro"]],
     },
+    DEPTH_PRO_2_H: {
+        released: "2026-11",
+        links: [["Code", "https://github.com/apple-aiml-research/ml-depth-pro-2"], ["Paper", "https://arxiv.org/abs/2611.26603"], ["Model", "https://huggingface.co/apple/DepthPro2"]],
+    },
     UNIDEPTH_V2: {
         released: "2025-02",
         links: [["Code", "https://github.com/lpiccinelli-eth/UniDepth"], ["Model", "https://huggingface.co/lpiccinelli/unidepth-v2-vitl14"]],
@@ -2717,6 +2721,7 @@ function fallbackBenchmarkMethodLabel(method) {
         MARIGOLD_V1_1: "Marigold v1.1",
         LOTUS_D: "Lotus-D",
         DEPTH_PRO: "Depth Pro",
+        DEPTH_PRO_2_H: "Depth Pro 2 H+",
         UNIDEPTH_V2: "UniDepthV2",
         INFINIDEPTH: "InfiniDepth",
         DVD: "DVD",

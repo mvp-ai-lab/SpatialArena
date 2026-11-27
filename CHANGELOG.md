@@ -27,6 +27,11 @@ SpatialArena changes. The history before the split is in FeedForward-Benchmark's
 
 ### Changed
 
+- Webpage navbar: GitHub and Hugging Face dataset links at the top right. The dark-mode switch is hidden for now; the
+  page still follows a saved choice or the system setting.
+- README: the logo sits on the title line at a smaller size, and a News section starts with the release.
+- Webpage: Depth Pro 2 H+ (`DEPTH_PRO_2_H`) results on MonoDepth and VideoDepth, with its display name, links and
+  model type.
 - README: rewritten for readability. It now has a header with the logo, authors, and badges (arXiv, Hugging Face
   dataset, leaderboard, tests, coverage, Python, license), the benchmark at a glance, and a task/dataset table. Its
   quick start follows the dashboard's four steps with their code and terminal output (install, describe your model

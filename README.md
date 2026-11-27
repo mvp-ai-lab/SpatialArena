@@ -1,8 +1,7 @@
-<p align="center">
-  <img src="app/webpage/assets/logo/spatialarena.svg" alt="SpatialArena logo" width="96">
-</p>
-
-<h1 align="center">SpatialArena</h1>
+<h1 align="center">
+  <img src="app/webpage/assets/logo/spatialarena.svg" alt="SpatialArena logo" height="40" align="top">
+  SpatialArena
+</h1>
 
 <p align="center">
   <b>Where Do Geometric Foundation Models Stand?</b>
@@ -23,7 +22,7 @@
 
 <p align="center">
   <a href="https://arxiv.org/abs/2611.32816"><img alt="arXiv" src="https://img.shields.io/badge/arXiv-2611.32816-b31b1b?logo=arxiv&logoColor=white"></a>
-  <a href="https://huggingface.co/datasets/mvp-lab/SpatialArena-Dataset"><img alt="Hugging Face dataset" src="https://img.shields.io/badge/Hugging%20Face-Dataset-ffd21e?logo=huggingface&logoColor=black"></a>
+  <a href="https://huggingface.co/datasets/mvp-lab/SpatialArena-Dataset"><img alt="Hugging Face dataset" src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Dataset-ffd21e"></a>
   <a href="https://mvp-ai-lab.github.io/SpatialArena/"><img alt="Leaderboard" src="https://img.shields.io/badge/Leaderboard-online-4361ee"></a>
   <br>
   <a href="https://github.com/mvp-ai-lab/SpatialArena/actions/workflows/tests.yml"><img alt="Tests" src="https://github.com/mvp-ai-lab/SpatialArena/actions/workflows/tests.yml/badge.svg?branch=main"></a>
@@ -54,8 +53,13 @@ SpatialArena is **artifact-only**: a method reads the canonical benchmark images
 artifacts (depth maps, COLMAP cameras, point clouds). The evaluators read only those artifacts plus the canonical
 ground truth; they never import or instantiate DA3, VGGT, AMB3R or any other external model.
 
+## News
+
+- **24 Nov 2026:** We released SpatialArena!
+
 ## Contents
 
+- [News](#news)
 - [Tasks and datasets](#tasks-and-datasets)
 - [Installation](#installation)
 - [Quick start: evaluate your model](#quick-start-evaluate-your-model)

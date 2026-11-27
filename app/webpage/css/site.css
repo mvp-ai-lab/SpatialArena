@@ -114,6 +114,32 @@
     flex-shrink: 0;
 }
 
+.navbar-actions [hidden] {
+    display: none !important;
+}
+
+.navbar-icon-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    color: var(--text-primary);
+    transition: background 0.2s ease;
+}
+
+.navbar-icon-link:hover,
+.navbar-icon-link:focus-visible {
+    background: rgba(67, 97, 238, 0.12);
+}
+
+.navbar-icon-link img,
+.navbar-icon-link svg {
+    width: auto;
+    height: 22px;
+}
+
 @media screen and (max-width: 900px) {
     .navbar-container {
         flex-wrap: wrap;
